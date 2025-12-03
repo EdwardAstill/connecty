@@ -1,10 +1,10 @@
 """
-Weldy - Weld Stress Analysis Package
+Weldy - Weld and Bolt Connection Analysis Package
 
-Calculate and visualize stress distribution along welded connections
-per AISC 360 using Elastic and ICR methods.
+Calculate and visualize stress/force distribution along welded and bolted
+connections per AISC 360 using Elastic and ICR methods.
 
-Example usage:
+Example usage (Welds):
     from sectiony.library import rhs
     from weldy import Weld, WeldParameters, Force
     
@@ -25,6 +25,28 @@ Example usage:
     
     # Plot
     result.plot(section=True, force=True)
+
+Example usage (Bolts):
+    from weldy import BoltGroup, BoltParameters, Force
+    
+    # Create bolt group from pattern
+    params = BoltParameters(diameter=20, grade="A325")
+    bolts = BoltGroup.from_pattern(
+        rows=3, cols=2, spacing_y=75, spacing_z=60, parameters=params
+    )
+    
+    # Define force
+    force = Force(Fy=-100e3, location=(150, 0))
+    
+    # Analyze (elastic or icr method)
+    result = bolts.analyze(force, method="elastic")
+    
+    # Access results
+    print(f"Max force: {result.max_force:.1f} kN")
+    print(f"Utilization: {result.utilization():.1%}")
+    
+    # Plot
+    result.plot(force=True, bolt_forces=True)
 """
 
 from .weld import (
@@ -55,8 +77,29 @@ from .plotter import (
     plot_stress_components,
 )
 
+from .bolt import (
+    BoltGroup,
+    BoltParameters,
+    BoltProperties,
+    BoltForce,
+    BoltResult,
+    BOLT_SHEAR_STRENGTH,
+    SLIP_CLASS_FACTORS,
+    BOLT_PRETENSION,
+)
+
+from .bolt_stress import (
+    calculate_elastic_bolt_force,
+    calculate_icr_bolt_force,
+)
+
+from .bolt_plotter import (
+    plot_bolt_result,
+    plot_bolt_pattern,
+)
+
 __all__ = [
-    # Main classes
+    # Main weld classes
     "Weld",
     "WeldParameters",
     "WeldProperties",
@@ -64,17 +107,32 @@ __all__ = [
     "WeldGroup",
     "WeldSegment",
     "Force",
-    # Stress results
+    # Weld stress results
     "StressComponents",
     "PointStress",
     "StressResult",
-    # Functions
+    # Weld functions
     "calculate_elastic_stress",
     "calculate_icr_stress",
     "plot_stress_result",
     "plot_stress_components",
-    # Data
+    # Weld data
     "ELECTRODE_STRENGTH",
+    # Bolt classes
+    "BoltGroup",
+    "BoltParameters",
+    "BoltProperties",
+    "BoltForce",
+    "BoltResult",
+    # Bolt functions
+    "calculate_elastic_bolt_force",
+    "calculate_icr_bolt_force",
+    "plot_bolt_result",
+    "plot_bolt_pattern",
+    # Bolt data
+    "BOLT_SHEAR_STRENGTH",
+    "SLIP_CLASS_FACTORS",
+    "BOLT_PRETENSION",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

@@ -198,62 +198,45 @@ def _plot_weld_stress(
 
 
 def _plot_force_arrow(ax: plt.Axes, force, weld) -> None:
-    """Plot force arrow at application point."""
+    """Plot force application point and add legend."""
     y_loc, z_loc = force.location
     
-    # Scale arrow based on plot size
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    scale = max(xlim[1] - xlim[0], ylim[1] - ylim[0]) * 0.15
+    # Plot application point (red 'x')
+    ax.plot(z_loc, y_loc, 'rx', markersize=10, markeredgewidth=2, 
+            label='Force Location')
+            
+    # Build legend text
+    labels = []
     
-    # In-plane forces (Fy, Fz)
-    F_mag = math.hypot(force.Fy, force.Fz)
-    if F_mag > 1e-12:
-        # Normalize and scale
-        dy = force.Fy / F_mag * scale
-        dz = force.Fz / F_mag * scale
+    # Forces
+    if abs(force.Fx) > 1e-3:
+        labels.append(f"Fx = {force.Fx/1000:.1f} kN")
+    if abs(force.Fy) > 1e-3:
+        labels.append(f"Fy = {force.Fy/1000:.1f} kN")
+    if abs(force.Fz) > 1e-3:
+        labels.append(f"Fz = {force.Fz/1000:.1f} kN")
         
-        # Arrow points TO the application point
-        ax.annotate(
-            '', xy=(z_loc, y_loc),
-            xytext=(z_loc - dz, y_loc - dy),
-            arrowprops=dict(
-                arrowstyle='->', color='red', lw=2,
-                mutation_scale=15
-            )
-        )
-        
-        # Label
-        ax.text(
-            z_loc - dz * 0.5, y_loc - dy * 0.5,
-            f'F={F_mag/1000:.1f}kN',
-            color='red', fontsize=9,
-            ha='center', va='bottom'
-        )
+    # Moments (Mx is torsion, My/Mz are bending)
+    # If applied at origin (0,0), force eccentricity is zero so only applied moment matters.
+    # If not at origin, forces create moment too, but legend just shows APPLIED loads.
+    is_at_origin = abs(y_loc) < 1e-6 and abs(z_loc) < 1e-6
     
-    # Axial force (Fx) - show as circle with dot/cross
-    if abs(force.Fx) > 1e-12:
-        marker = 'o' if force.Fx > 0 else 'x'
-        ax.plot(z_loc, y_loc, marker, color='blue', markersize=12, 
-                markeredgewidth=2, label=f'Fx={force.Fx/1000:.1f}kN')
-    
-    # Moment (Mx) - show as curved arrow
-    if abs(force.Mx) > 1e-12:
-        # Draw moment arc
-        arc_radius = scale * 0.5
-        direction = 1 if force.Mx > 0 else -1
+    # Include moments if they exist OR if we're at the origin (as requested)
+    if abs(force.Mx) > 1e-3 or (is_at_origin and (abs(force.Fy) > 1e-3 or abs(force.Fz) > 1e-3)):
+        labels.append(f"Mx = {force.Mx/1e6:.1f} kNm")
+    if abs(force.My) > 1e-3:
+        labels.append(f"My = {force.My/1e6:.1f} kNm")
+    if abs(force.Mz) > 1e-3:
+        labels.append(f"Mz = {force.Mz/1e6:.1f} kNm")
         
-        theta = np.linspace(0, direction * np.pi * 1.5, 30)
-        arc_z = z_loc + arc_radius * np.cos(theta)
-        arc_y = y_loc + arc_radius * np.sin(theta)
-        ax.plot(arc_z, arc_y, 'g-', linewidth=2)
-        
-        # Arrowhead at end
-        ax.annotate(
-            '', xy=(arc_z[-1], arc_y[-1]),
-            xytext=(arc_z[-2], arc_y[-2]),
-            arrowprops=dict(arrowstyle='->', color='green', lw=2)
-        )
+    # Add a custom legend entry for the loads
+    if labels:
+        text = "\n".join(labels)
+        # Create a dummy handle for the legend text
+        from matplotlib.lines import Line2D
+        dummy_lines = [Line2D([0], [0], color='red', linestyle='None', marker='x')]
+        ax.legend(dummy_lines, [text], loc='upper left', 
+                 title="Applied Loads", framealpha=0.9)
 
 
 def plot_stress_components(

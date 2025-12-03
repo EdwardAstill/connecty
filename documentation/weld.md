@@ -19,15 +19,17 @@ Weldy calculates stress distribution along welded connections per AISC 360. It i
 
 **Elastic Method** (all weld types)
 - Conservative, closed-form solution
+- Full **3D analysis** (handles $F_x, F_y, F_z, M_x, M_y, M_z$)
 - Stress = vector sum of components (direct + moment)
 - $f_{resultant} = \sqrt{f_{axial}^2 + f_{shear,y}^2 + f_{shear,z}^2}$
 - Check: $f_{resultant} \leq \phi(0.60 F_{EXX})$
 
 **ICR Method** (fillet welds only)
 - Iterative, accounts for load angle benefit
+- **2D analysis only** (in-plane loads $F_y, F_z, M_x$)
+- Assumes instantaneous center of rotation lies in the plane of the connection
 - Strength increase factor: $(1.0 + 0.50 \sin^{1.5}\theta)$
-- Where $\theta$ = angle between force and weld axis
-- More economical than elastic method
+- More economical than elastic method for in-plane eccentricity
 
 **Base Metal Analysis** (CJP welds)
 - CJP weld strength exceeds base metal
@@ -245,6 +247,11 @@ The Instantaneous Center of Rotation method:
 2. Applies directional strength increase: $(1.0 + 0.50 \sin^{1.5}\theta)$
 3. Where $\theta$ = angle between resultant force and weld longitudinal axis
 4. More economical for eccentrically loaded connections
+
+**Note on 2D vs 3D Analysis:**
+The ICR implementation in this package is a **2D analysis**. It considers only in-plane loads ($F_y, F_z$) and torsion ($M_x$). Out-of-plane loads ($F_x, M_y, M_z$) are **ignored** by the ICR solver.
+
+*Justification:* The primary benefit of the ICR method comes from the non-linear redistribution of shear forces in eccentrically loaded groups (e.g., lap joints, bracket plates). Extending the non-linear instantaneous axis of rotation to 3D (6 degrees of freedom) significantly increases computational complexity and stability risks. For combined 3D loading, use the **Elastic Method**, which conservatively superimposes all 6 load components.
 
 ```python
 # ICR method for fillet welds

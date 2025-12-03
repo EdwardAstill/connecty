@@ -17,6 +17,18 @@ from typing import List, Tuple, TYPE_CHECKING
 import math
 import numpy as np
 
+from .icr_solver import (
+    ZERO_TOLERANCE,
+    POSITION_TOLERANCE,
+    ICRSearchConfig,
+    calculate_perpendicular_direction,
+    calculate_search_bounds,
+    find_icr_distance,
+    aisc_weld_deformation_limits,
+    aisc_weld_stress,
+    aisc_weld_strength_factor,
+)
+
 if TYPE_CHECKING:
     from .weld import Weld
     from .force import Force
@@ -331,7 +343,7 @@ def calculate_elastic_stress(
         f_moment_y = 0.0
         f_moment_z = 0.0
         
-        if Ip > 1e-12:
+        if Ip > ZERO_TOLERANCE:
             # r_mx = -M × dz / I_p (y-component, perpendicular)
             # r_mz = M × dy / I_p (z-component, perpendicular)
             f_moment_y = -Mx_total * dz / Ip
@@ -345,9 +357,9 @@ def calculate_elastic_stress(
         # Bending stress (linear with distance)
         # σ = My × z / Iy + Mz × y / Iz
         f_bending = 0.0
-        if Iy > 1e-12:
+        if Iy > ZERO_TOLERANCE:
             f_bending += My_total * dz / Iy
-        if Iz > 1e-12:
+        if Iz > ZERO_TOLERANCE:
             f_bending += Mz_total * dy / Iz
         
         components = StressComponents(
@@ -427,11 +439,11 @@ def calculate_icr_stress(
     # Total in-plane shear
     P_total = math.hypot(Fy_app, Fz_app)
     
-    if P_total < 1e-12 and abs(Mx_total) < 1e-12:
+    if P_total < ZERO_TOLERANCE and abs(Mx_total) < ZERO_TOLERANCE:
         # No in-plane loading, return elastic result
         return calculate_elastic_stress(weld, force, discretization)
     
-    if abs(Mx_total) < 1e-12:
+    if abs(Mx_total) < ZERO_TOLERANCE:
         # Pure shear (no eccentricity) behaves like elastic solution
         return calculate_elastic_stress(weld, force, discretization)
     
@@ -448,38 +460,19 @@ def calculate_icr_stress(
     dy_cent = y_arr - Cy
     dz_cent = z_arr - Cz
     
-    # Direction perpendicular to load
-    if P_total > 1e-12:
-        load_dir_y = Fy_app / P_total
-        load_dir_z = Fz_app / P_total
-        perp_y = -load_dir_z
-        perp_z = load_dir_y
-    else:
-        perp_y, perp_z = 1.0, 0.0
+    # Use shared perpendicular direction calculation
+    perp_y, perp_z = calculate_perpendicular_direction(Fy_app, Fz_app)
     
     # Target ratio between torsion and shear (eccentricity)
     target_ratio = -Mx_total / P_total
-    
-    # Determine search distances along the perpendicular line
-    char_length = max(
-        float(np.ptp(y_arr)),
-        float(np.ptp(z_arr)),
-        leg * 2.0,
-        1.0
-    )
-    
-    e_approx = abs(Mx_total) / P_total
-    dist_min = max(1e-4, 0.02 * char_length, 0.1 * leg)
-    dist_max = max(dist_min * 50.0, 10.0 * char_length, 5.0 * e_approx)
-    if dist_max <= dist_min:
-        dist_max = dist_min * 10.0
-    
-    candidate_distances = np.geomspace(dist_min, dist_max, num=min(60, max_iterations * 2))
-    if e_approx > dist_min:
-        candidate_distances = np.unique(np.append(candidate_distances, e_approx))
-    
+    eccentricity = abs(Mx_total) / P_total
     moment_sign = -1.0 if Mx_total > 0 else 1.0
-    ratio_tolerance = tolerance * max(1.0, abs(target_ratio))
+    
+    # Use shared search bounds calculation
+    dist_min, dist_max = calculate_search_bounds(
+        y_arr, z_arr, eccentricity,
+        characteristic_size=leg
+    )
     
     def evaluate_distance(distance: float) -> Tuple[float, dict[str, np.ndarray]] | None:
         """Evaluate ICR response for a distance from centroid."""
@@ -490,33 +483,26 @@ def calculate_icr_stress(
         dy_icr = y_arr - icr_y
         dz_icr = z_arr - icr_z
         c_arr = np.hypot(dy_icr, dz_icr)
-        c_arr = np.where(c_arr < 1e-9, 1e-9, c_arr)
+        c_arr = np.where(c_arr < POSITION_TOLERANCE, POSITION_TOLERANCE, c_arr)
         
         dir_y = -dz_icr / c_arr
         dir_z = dy_icr / c_arr
         
+        # Calculate angle between force direction and weld tangent
         cos_theta = np.clip(np.abs(dir_y * tan_y_arr + dir_z * tan_z_arr), 0.0, 1.0)
         theta = np.degrees(np.arccos(cos_theta))
         
-        delta_u = np.minimum(
-            0.17 * leg,
-            1.087 * np.power(theta + 6.0, -0.65) * leg
-        )
-        delta_m = 0.209 * np.power(theta + 2.0, -0.32) * leg
+        # Use shared deformation limit functions
+        delta_u, delta_m = aisc_weld_deformation_limits(theta, leg)
         
         lambda_limit = float(np.min(delta_u / c_arr))
-        if not math.isfinite(lambda_limit) or lambda_limit <= 1e-9:
+        if not math.isfinite(lambda_limit) or lambda_limit <= POSITION_TOLERANCE:
             return None
         
         delta = np.minimum(lambda_limit * c_arr, delta_u)
-        p_arr = np.clip(delta / delta_m, 1e-6, 2.1)
         
-        sin_term = np.power(np.sin(np.radians(theta)), 1.5)
-        strength_factor = 0.60 * F_EXX * (1.0 + 0.5 * sin_term)
-        deform_term = np.clip(p_arr * (1.9 - 0.9 * p_arr), 1e-6, None)
-        deform_factor = np.power(deform_term, 0.3)
-        
-        F_w = strength_factor * deform_factor
+        # Use shared stress calculation
+        F_w = aisc_weld_stress(delta, delta_m, delta_u, theta, F_EXX)
         R_mag = F_w * throat * ds_arr
         
         R_y = R_mag * dir_y
@@ -535,7 +521,7 @@ def calculate_icr_stress(
             sum_Fz = -sum_Fz
         
         P_base = math.hypot(sum_Fy, sum_Fz)
-        if P_base < 1e-9 or not math.isfinite(P_base):
+        if P_base < POSITION_TOLERANCE or not math.isfinite(P_base):
             return None
         
         sum_M = float(np.sum(dy_cent * R_z - dz_cent * R_y))
@@ -554,31 +540,30 @@ def calculate_icr_stress(
             "P_base": P_base
         }
     
-    best_result: dict[str, float | np.ndarray] | None = None
-    best_error = float("inf")
+    # Use shared ICR search
+    config = ICRSearchConfig(
+        max_iterations=max_iterations,
+        tolerance=tolerance,
+        refine_bisection=True
+    )
     
-    for distance in candidate_distances:
-        eval_result = evaluate_distance(float(distance))
-        if eval_result is None:
-            continue
-        
-        ratio, data = eval_result
-        error = ratio - target_ratio
-        
-        if abs(error) < best_error:
-            best_error = abs(error)
-            best_result = data
-        
-        if abs(error) <= ratio_tolerance:
-            best_result = data
-            break
+    result = find_icr_distance(
+        evaluate_distance,
+        target_ratio,
+        dist_min,
+        dist_max,
+        eccentricity,
+        config
+    )
     
-    if best_result is None:
+    if result is None:
         # Fallback to elastic method if ICR solver cannot converge
         return calculate_elastic_stress(weld, force, discretization)
     
+    _, best_result, _ = result
+    
     P_base = float(best_result["P_base"])
-    if P_base < 1e-9:
+    if P_base < POSITION_TOLERANCE:
         return calculate_elastic_stress(weld, force, discretization)
     
     scale = P_total / P_base
@@ -601,8 +586,9 @@ def calculate_icr_stress(
         
         cos_theta = abs(dir_y * float(tan_y_arr[idx]) + dir_z * float(tan_z_arr[idx]))
         theta = math.degrees(math.acos(min(cos_theta, 1.0)))
-        sin_term = math.sin(math.radians(theta))**1.5
-        strength_factor = 1.0 + 0.5 * sin_term
+        
+        # Use shared strength factor
+        strength_factor = float(aisc_weld_strength_factor(np.array([theta]))[0])
         
         equiv_stress = stress_value / strength_factor
         
