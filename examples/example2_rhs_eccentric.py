@@ -1,46 +1,79 @@
 """
-Example 2: RHS with eccentric load and torsion
+Example 2: RHS with eccentric load (Elastic vs ICR)
 
-Shows how eccentric loading creates torsional and bending stresses.
+Demonstrates comparison between Elastic and ICR methods for an
+eccentrically loaded weld group on an RHS section.
 """
 from sectiony.library import rhs
-from weldy import WeldedSection, WeldParameters, Force
-
-section = rhs(b=150, h=300, t=12, r=20)
-welded = WeldedSection(section=section)
-
-weld_params = WeldParameters(
-    weld_type="fillet",
-    throat_thickness=5.0,
-    leg_size=7.0
-)
-
-welded.weld_all_segments(weld_params)
-
-# Eccentric load with torsion
-force = Force(
-    Fy=-80000,   # 80kN downward
-    Fz=20000,    # 20kN horizontal
-    Mx=2e6,      # 2kNm torsion
-    location=(120, 50)  # Eccentric location
-)
-
+from weldy import Weld, WeldParameters, Force
 from pathlib import Path
 
-# ... (imports)
+# Create RHS section
+section = rhs(b=100, h=200, t=10, r=15)
 
-# ... (code)
+# Create weld with 6mm fillet
+params = WeldParameters(
+    weld_type="fillet",
+    leg=6.0,
+    electrode="E70"
+)
 
+weld = Weld.from_section(section=section, parameters=params)
+
+# Eccentric load - applied 50mm to the right of centroid
+# This creates torsion in addition to direct shear
+force = Force(
+    Fy=-100000,        # 100kN downward
+    location=(0, 50)   # 50mm right of centroid (z-direction) → creates Mx
+)
+
+# Calculate stress - Elastic method
+result_elastic = weld.stress(force, method="elastic")
+
+# Calculate stress - ICR method
+result_icr = weld.stress(force, method="icr")
+
+# Print comparison
+print("=" * 60)
+print("ELASTIC VS ICR METHOD COMPARISON")
+print("=" * 60)
+print(f"\nLoad: 100 kN vertical, 50mm horizontal eccentricity")
+print(f"Weld: 6mm fillet around RHS 100×200×10")
+print()
+
+print("ELASTIC METHOD:")
+print(f"  Max stress: {result_elastic.max:.1f} MPa")
+print(f"  Utilization: {result_elastic.utilization():.1%}")
+print(f"  Adequate: {'✓' if result_elastic.is_adequate() else '✗'}")
+
+pt = result_elastic.max_point
+if pt:
+    print(f"  Max location: ({pt.y:.1f}, {pt.z:.1f})")
+
+print()
+print("ICR METHOD:")
+print(f"  Max stress: {result_icr.max:.1f} MPa")
+print(f"  Utilization: {result_icr.utilization():.1%}")
+print(f"  Adequate: {'✓' if result_icr.is_adequate() else '✗'}")
+
+if result_icr.icr_point:
+    print(f"  ICR location: ({result_icr.icr_point[0]:.1f}, {result_icr.icr_point[1]:.1f})")
+
+print()
+print(f"ICR gives {(1 - result_icr.utilization()/result_elastic.utilization())*100:.0f}% "
+      f"more capacity than Elastic method")
+
+# Plot elastic result
 gallery_dir = Path(__file__).parent.parent / "gallery"
 gallery_dir.mkdir(exist_ok=True)
 save_path = gallery_dir / "example2_rhs_eccentric.svg"
 
-welded.plot_weld_stress(
-    force,
-    cmap="plasma",
-    weld_linewidth=6.0,
+result_elastic.plot(
+    section=True,
+    force=True,
+    cmap="coolwarm",
+    weld_linewidth=5.0,
     show=False,
     save_path=str(save_path)
 )
-print(f"Saved: {save_path}")
-
+print(f"\nSaved: {save_path}")

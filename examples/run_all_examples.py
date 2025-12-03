@@ -1,50 +1,40 @@
 """
-Run all examples and generate gallery images.
+Run all weldy examples.
 """
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
-# Get project root (parent of examples directory)
 examples_dir = Path(__file__).parent
-project_root = examples_dir.parent
 
 examples = [
-    "example1_rhs_simple",
-    "example2_rhs_eccentric",
-    "example3_i_beam",
-    "example4_u_channel",
-    "example5_stress_components",
-    "example6_chs",
+    "example1_rhs_simple.py",
+    "example2_rhs_eccentric.py",
+    "example3_i_beam.py",
+    "example4_u_channel.py",
+    "example5_stress_components.py",
+    "example6_chs.py",
 ]
 
-print("Running all examples...\n")
+print("=" * 60)
+print("RUNNING ALL WELDY EXAMPLES")
+print("=" * 60)
 
-# Use uv run to ensure package is available
-for example_name in examples:
-    print(f"Running {example_name}...")
-    try:
-        # Run each example using uv run from project root
-        example_path = examples_dir / f"{example_name}.py"
-        result = subprocess.run(
-            ["uv", "run", "python", str(example_path)],
-            cwd=str(project_root),
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            print(f"✓ {example_name} completed")
-            if result.stdout:
-                print(result.stdout)
-        else:
-            print(f"✗ {example_name} failed:")
-            if result.stderr:
-                print(result.stderr)
-            if result.stdout:
-                print(result.stdout)
-        print()
-    except Exception as e:
-        print(f"✗ {example_name} failed: {e}\n")
+for example in examples:
+    print(f"\n{'─' * 60}")
+    print(f"Running: {example}")
+    print("─" * 60)
+    
+    result = subprocess.run(
+        [sys.executable, str(examples_dir / example)],
+        capture_output=False
+    )
+    
+    if result.returncode != 0:
+        print(f"❌ {example} failed!")
+    else:
+        print(f"✓ {example} completed")
 
-print("All examples completed!")
-
+print("\n" + "=" * 60)
+print("ALL EXAMPLES COMPLETE")
+print("=" * 60)

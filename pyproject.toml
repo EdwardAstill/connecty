@@ -8,14 +8,21 @@ dependencies = [
     "sectiony",
     "matplotlib",
     "numpy",
+    "pytest>=9.0.1",
 ]
 
 [tool.uv.sources]
+weldy = { workspace = true }
 sectiony = { path = "../sectiony", editable = true }
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "weldy",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/weldy"]

@@ -1,33 +1,43 @@
 """
 Weldy - Weld Stress Analysis Package
 
-A package for calculating and visualizing stress distribution along welded
-connections in structural engineering applications.
+Calculate and visualize stress distribution along welded connections
+per AISC 360 using Elastic and ICR methods.
 
 Example usage:
     from sectiony.library import rhs
-    from weldy import WeldedSection, WeldParameters, Force
+    from weldy import Weld, WeldParameters, Force
     
-    # Create a section
+    # Create weld from section
     section = rhs(b=100, h=200, t=10, r=15)
-    
-    # Create welded section and add welds
-    welded = WeldedSection(section=section)
-    params = WeldParameters(weld_type="fillet", throat_thickness=5.0)
-    welded.weld_all_segments(params)
+    params = WeldParameters(weld_type="fillet", leg=6.0, electrode="E70")
+    weld = Weld.from_section(section=section, parameters=params)
     
     # Define force
-    force = Force(Fy=-50000, location=(100, 50))
+    force = Force(Fy=-100e3, location=(100, 0))
     
-    # Plot stress distribution
-    welded.plot_weld_stress(force)
+    # Calculate stress (elastic or icr method)
+    result = weld.stress(force, method="elastic")
+    
+    # Access results (beamy-style)
+    print(f"Max stress: {result.max:.1f} MPa")
+    print(f"Utilization: {result.utilization():.1%}")
+    
+    # Plot
+    result.plot(section=True, force=True)
 """
 
 from .weld import (
+    Weld,
     WeldParameters,
-    WeldSegment,
+    WeldProperties,
+    ELECTRODE_STRENGTH,
+)
+
+from .welded_section import (
+    WeldedSection,
     WeldGroup,
-    WeldGroupProperties,
+    WeldSegment,
 )
 
 from .force import Force
@@ -35,41 +45,36 @@ from .force import Force
 from .stress import (
     StressComponents,
     PointStress,
-    WeldStressResult,
-    WeldStressCalculator,
-    calculate_weld_stress,
-)
-
-from .section import (
-    WeldedSection,
-    create_welded_section,
+    StressResult,
+    calculate_elastic_stress,
+    calculate_icr_stress,
 )
 
 from .plotter import (
-    plot_weld_stress,
-    plot_weld_stress_components,
+    plot_stress_result,
+    plot_stress_components,
 )
 
 __all__ = [
-    # Weld definitions
+    # Main classes
+    "Weld",
     "WeldParameters",
-    "WeldSegment", 
+    "WeldProperties",
+    "WeldedSection",
     "WeldGroup",
-    "WeldGroupProperties",
-    # Force
+    "WeldSegment",
     "Force",
-    # Stress calculation
+    # Stress results
     "StressComponents",
     "PointStress",
-    "WeldStressResult",
-    "WeldStressCalculator",
-    "calculate_weld_stress",
-    # Section
-    "WeldedSection",
-    "create_welded_section",
-    # Plotting
-    "plot_weld_stress",
-    "plot_weld_stress_components",
+    "StressResult",
+    # Functions
+    "calculate_elastic_stress",
+    "calculate_icr_stress",
+    "plot_stress_result",
+    "plot_stress_components",
+    # Data
+    "ELECTRODE_STRENGTH",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

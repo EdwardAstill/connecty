@@ -1,53 +1,69 @@
 """
-Example 6: Circular hollow section
+Example 6: Circular Hollow Section (CHS)
 
-Demonstrates weld stress on a circular section with torsional loading.
+Demonstrates weld stress analysis on a circular hollow section.
 """
 from sectiony.library import chs
-from weldy import WeldedSection, WeldParameters, Force
+from weldy import Weld, WeldParameters, Force
+from pathlib import Path
 
-# Create CHS: 200mm diameter, 10mm wall thickness
-section = chs(d=200, t=10)
+# Create CHS: 150mm diameter, 6mm wall
+section = chs(d=150, t=6)
 
-welded = WeldedSection(section=section)
-
-weld_params = WeldParameters(
-    weld_type="butt",
-    throat_thickness=10.0,  # Full penetration butt weld
-    strength=250.0
+# 5mm fillet weld
+params = WeldParameters(
+    weld_type="fillet",
+    leg=5.0,
+    electrode="E70"
 )
 
-welded.weld_all_segments(weld_params)
+weld = Weld.from_section(section=section, parameters=params)
 
-# Primarily torsional loading
+# Combined loading
 force = Force(
-    Fy=-50000,   # 50kN vertical
-    Mx=3e6,      # 3kNm torsion
+    Fy=-50000,    # 50kN shear
+    Mx=2e6,       # 2kNm torsion
     location=(0, 0)
 )
 
-result = welded.calculate_weld_stress(force)
-print(f"Max stress: {result.max_stress:.2f} MPa")
-if weld_params.strength:
-    util = result.utilization(weld_params.strength)
-    print(f"Utilization: {util*100:.1f}%")
+# Calculate stress
+result = weld.stress(force, method="elastic")
 
-from pathlib import Path
+# Print results
+print("CHS WELD ANALYSIS")
+print("=" * 50)
+print(f"\nSection: CHS 150×6")
+print(f"Weld: 5mm fillet")
+print(f"\nLoading:")
+print(f"  Fy = -50 kN (shear)")
+print(f"  Mx = 2 kNm (torsion)")
+print()
 
-# ... (imports)
+print(f"Weld Properties:")
+print(f"  Length: {weld.L:.1f} mm")
+print(f"  Area: {weld.A:.1f} mm²")
+print(f"  Centroid: ({weld.Cy:.1f}, {weld.Cz:.1f})")
+print(f"  Ip: {weld.Ip:.0f} mm⁴")
+print()
 
-# ... (code)
+print(f"Results:")
+print(f"  Max stress: {result.max:.1f} MPa")
+print(f"  Min stress: {result.min:.1f} MPa")
+print(f"  Capacity: {result.capacity:.1f} MPa")
+print(f"  Utilization: {result.utilization():.1%}")
+print(f"  Adequate: {'✓' if result.is_adequate() else '✗'}")
 
+# Plot
 gallery_dir = Path(__file__).parent.parent / "gallery"
 gallery_dir.mkdir(exist_ok=True)
 save_path = gallery_dir / "example6_chs.svg"
 
-welded.plot_weld_stress(
-    force,
+result.plot(
+    section=True,
+    force=True,
     cmap="coolwarm",
     weld_linewidth=5.0,
     show=False,
     save_path=str(save_path)
 )
-print(f"Saved: {save_path}")
-
+print(f"\nSaved: {save_path}")

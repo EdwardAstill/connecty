@@ -1,57 +1,68 @@
 """
-Example 4: U-channel with combined loading
+Example 4: U-Channel with torsional loading
 
-Shows stress distribution on a U-channel section with multiple load components.
+Demonstrates weld stress analysis on a U-channel section
+with torsional moment (Mx).
 """
 from sectiony.library import u
-from weldy import WeldedSection, WeldParameters, Force
-
-# Create U-channel: 200mm deep (height), 100mm wide, 10mm thick, 10mm root radius
-section = u(h=200, b=100, t=10, r=10)
-
-welded = WeldedSection(section=section)
-
-weld_params = WeldParameters(
-    weld_type="fillet",
-    throat_thickness=4.2,
-    leg_size=6.0,
-    strength=220.0  # Allowable stress
-)
-
-welded.weld_all_segments(weld_params)
-
-# Combined loading: shear + bending + torsion
-force = Force(
-    Fy=-60000,   # 60kN vertical shear
-    Fz=-15000,   # 15kN horizontal shear
-    Mx=1.5e6,    # 1.5kNm torsion
-    My=3e6,      # 3kNm bending
-    location=(80, 20)
-)
-
-result = welded.calculate_weld_stress(force)
-print(f"Max stress: {result.max_stress:.2f} MPa")
-print(f"Min stress: {result.min_stress:.2f} MPa")
-if weld_params.strength:
-    util = result.utilization(weld_params.strength)
-    print(f"Utilization: {util*100:.1f}%")
-
+from weldy import Weld, WeldParameters, Force
 from pathlib import Path
 
-# ... (imports)
+# Create U-channel: 150mm high, 75mm wide, 8mm thickness
+section = u(b=75, h=150, t=8, r=8)
 
-# ... (code)
+# 5mm fillet weld
+params = WeldParameters(
+    weld_type="fillet",
+    leg=5.0,
+    electrode="E70"
+)
 
+weld = Weld.from_section(section=section, parameters=params)
+
+# Torsional loading
+force = Force(
+    Fy=-30000,    # 30kN shear
+    Mx=5e6,       # 5kNm torsion
+    location=(0, 0)
+)
+
+# Calculate stress
+result = weld.stress(force, method="elastic")
+
+# Print results
+print("U-CHANNEL WELD ANALYSIS (TORSION)")
+print("=" * 50)
+print(f"\nSection: U 150×75×8")
+print(f"Weld: 5mm fillet")
+print(f"\nLoading:")
+print(f"  Fy = -30 kN (shear)")
+print(f"  Mx = 5 kNm (torsion)")
+print()
+
+print(f"Weld Properties:")
+print(f"  Length: {weld.L:.1f} mm")
+print(f"  Centroid: ({weld.Cy:.1f}, {weld.Cz:.1f})")
+print(f"  Ip: {weld.Ip:.0f} mm⁴")
+print()
+
+print(f"Results:")
+print(f"  Max stress: {result.max:.1f} MPa")
+print(f"  Capacity: {result.capacity:.1f} MPa")
+print(f"  Utilization: {result.utilization():.1%}")
+print(f"  Adequate: {'✓' if result.is_adequate() else '✗'}")
+
+# Plot
 gallery_dir = Path(__file__).parent.parent / "gallery"
 gallery_dir.mkdir(exist_ok=True)
 save_path = gallery_dir / "example4_u_channel.svg"
 
-welded.plot_weld_stress(
-    force,
-    cmap="viridis",
+result.plot(
+    section=True,
+    force=True,
+    cmap="coolwarm",
     weld_linewidth=5.0,
     show=False,
     save_path=str(save_path)
 )
-print(f"Saved: {save_path}")
-
+print(f"\nSaved: {save_path}")

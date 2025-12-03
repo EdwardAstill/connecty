@@ -1,8 +1,7 @@
 """
-Weld dataclasses: WeldParameters, WeldSegment, WeldGroup
+Weld class and WeldParameters for weld stress analysis.
 
-These classes define the weld configuration and calculate weld group properties
-for elastic stress analysis.
+Supports fillet, PJP, CJP, and plug/slot welds per AISC 360.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -11,312 +10,372 @@ import math
 import numpy as np
 
 if TYPE_CHECKING:
-    from sectiony import Section
-    from sectiony.geometry import Segment
+    from sectiony import Section, Geometry
 
 # Type aliases
 Point = Tuple[float, float]
-WeldType = Literal["fillet", "butt"]
+WeldType = Literal["fillet", "pjp", "cjp", "plug", "slot", "butt"]
+
+# Electrode strength lookup (MPa)
+ELECTRODE_STRENGTH: dict[str, float] = {
+    "E60": 414.0,
+    "E70": 483.0,
+    "E80": 552.0,
+    "E90": 621.0,
+    "E100": 690.0,
+    "E110": 759.0,
+}
 
 
 @dataclass
 class WeldParameters:
     """
-    Parameters defining weld configuration.
+    Parameters defining weld configuration per AISC 360.
     
     Attributes:
-        weld_type: Type of weld - "fillet" or "butt"
-        throat_thickness: Effective throat thickness (a) in mm
-        leg_size: Leg size for fillet welds (z) in mm. If not provided,
-                  calculated as throat_thickness / 0.707 for 45° fillet
-        strength: Allowable or yield stress in MPa (optional, for utilization calc)
+        weld_type: Type of weld - "fillet", "pjp", "cjp", "plug", or "slot"
+        leg: Fillet weld leg size (w) in length units
+        throat: Effective throat thickness (a or E) in length units
+        area: Plug/slot weld area in length² units
+        electrode: Electrode classification (E60, E70, etc.)
+        F_EXX: Override electrode tensile strength (stress units)
+        F_y: Base metal yield strength (for CJP checks)
+        F_u: Base metal ultimate strength (for CJP checks)
+        t_base: Base metal thickness (for CJP checks)
+        phi: Resistance factor (AISC default 0.75)
     """
     weld_type: WeldType
-    throat_thickness: float
+    
+    # Geometry
+    leg: float | None = None
+    throat: float | None = None
+    area: float | None = None
+    
+    # Legacy aliases for compatibility
     leg_size: float | None = None
-    strength: float | None = None
+    throat_thickness: float | None = None
+    
+    # Material
+    electrode: str = "E70"
+    F_EXX: float | None = None
+    strength: float | None = None  # Allowable stress override (MPa)
+    
+    # Base metal (for CJP)
+    F_y: float | None = None
+    F_u: float | None = None
+    t_base: float | None = None
+    
+    # Resistance factor
+    phi: float = 0.75
+    
+    _capacity_override: float | None = field(default=None, init=False, repr=False)
     
     def __post_init__(self) -> None:
-        if self.leg_size is None and self.weld_type == "fillet":
-            # For 45° fillet weld: a = z * cos(45°) = z * 0.707
-            self.leg_size = self.throat_thickness / 0.707
+        # Map legacy weld type name
+        if self.weld_type == "butt":
+            # Treat butt welds as partial-joint-penetration welds by default
+            self.weld_type = "pjp"
+        
+        # Apply alias fields if provided
+        if self.leg is None and self.leg_size is not None:
+            self.leg = self.leg_size
+        if self.throat is None and self.throat_thickness is not None:
+            self.throat = self.throat_thickness
+        
+        # Auto-calculate throat from leg for fillet welds
+        if self.weld_type == "fillet":
+            if self.throat is None and self.leg is not None:
+                # Equal leg 45° fillet: a = w × 0.707
+                self.throat = self.leg * 0.707
+            elif self.throat is not None and self.leg is None:
+                # Back-calculate leg from throat
+                self.leg = self.throat / 0.707
+        
+        # Lookup electrode strength if not provided
+        if self.F_EXX is None:
+            if self.electrode in ELECTRODE_STRENGTH:
+                self.F_EXX = ELECTRODE_STRENGTH[self.electrode]
+            else:
+                raise ValueError(f"Unknown electrode '{self.electrode}'. "
+                               f"Valid: {list(ELECTRODE_STRENGTH.keys())} or provide F_EXX directly.")
+        
+        if self.strength is not None:
+            self._capacity_override = self.strength
+    
+    @property
+    def capacity(self) -> float:
+        """
+        Design capacity: φ(0.60 × F_EXX) in stress units.
+        
+        Per AISC 360 Table J2.5.
+        """
+        if self._capacity_override is not None:
+            return self._capacity_override
+        if self.F_EXX is None:
+            raise ValueError("F_EXX not set")
+        return self.phi * 0.60 * self.F_EXX
 
 
 @dataclass
-class WeldSegment:
+class WeldProperties:
     """
-    A single welded edge segment.
-    
-    Attributes:
-        segment_index: Index of the segment in the section's contour
-        parameters: WeldParameters for this segment
-        contour_index: Index of the contour (default 0 for outer contour)
-    """
-    segment_index: int
-    parameters: WeldParameters
-    contour_index: int = 0
-    
-    # These are populated when attached to a section
-    _start: Point | None = field(default=None, repr=False)
-    _end: Point | None = field(default=None, repr=False)
-    _length: float | None = field(default=None, repr=False)
-    _segment_ref: Segment | None = field(default=None, repr=False)
-    
-    @property
-    def start(self) -> Point:
-        if self._start is None:
-            raise ValueError("WeldSegment not initialized - call bind_to_section first")
-        return self._start
-    
-    @property
-    def end(self) -> Point:
-        if self._end is None:
-            raise ValueError("WeldSegment not initialized - call bind_to_section first")
-        return self._end
-    
-    @property
-    def length(self) -> float:
-        if self._length is None:
-            raise ValueError("WeldSegment not initialized - call bind_to_section first")
-        return self._length
-    
-    @property
-    def throat(self) -> float:
-        """Effective throat thickness."""
-        return self.parameters.throat_thickness
-    
-    @property
-    def area(self) -> float:
-        """Weld area = throat * length."""
-        return self.throat * self.length
-    
-    def bind_to_section(self, section: Section) -> None:
-        """
-        Bind this weld segment to a section's geometry.
-        Extracts start/end points and calculates length.
-        """
-        if section.geometry is None:
-            raise ValueError("Section has no geometry")
-        
-        if not section.geometry.contours:
-            raise ValueError("Section geometry has no contours")
-        
-        if self.contour_index >= len(section.geometry.contours):
-            raise ValueError(f"Contour index {self.contour_index} out of range")
-        
-        contour = section.geometry.contours[self.contour_index]
-        
-        if self.segment_index >= len(contour.segments):
-            raise ValueError(f"Segment index {self.segment_index} out of range")
-        
-        segment = contour.segments[self.segment_index]
-        self._segment_ref = segment
-        
-        # Get start point from segment
-        from sectiony.geometry import Line, Arc, CubicBezier
-        
-        if isinstance(segment, Line):
-            self._start = segment.start
-            self._end = segment.end
-            self._length = math.sqrt(
-                (self._end[0] - self._start[0])**2 + 
-                (self._end[1] - self._start[1])**2
-            )
-        elif isinstance(segment, Arc):
-            # Arc start point
-            cy, cz = segment.center
-            self._start = (
-                cy + segment.radius * math.sin(segment.start_angle),
-                cz + segment.radius * math.cos(segment.start_angle)
-            )
-            self._end = segment.end_point()
-            # Arc length = r * theta
-            angle_span = abs(segment.end_angle - segment.start_angle)
-            self._length = segment.radius * angle_span
-        elif isinstance(segment, CubicBezier):
-            self._start = segment.p0
-            self._end = segment.p3
-            # Approximate bezier length by discretization
-            points = segment.discretize(resolution=100)
-            self._length = 0.0
-            for i in range(len(points) - 1):
-                dy = points[i+1][0] - points[i][0]
-                dz = points[i+1][1] - points[i][1]
-                self._length += math.sqrt(dy**2 + dz**2)
-    
-    def discretize(self, num_points: int = 50) -> List[Point]:
-        """
-        Discretize the weld segment into points for stress calculation.
-        
-        Args:
-            num_points: Number of points to generate along the weld
-            
-        Returns:
-            List of (y, z) points along the weld
-        """
-        if self._segment_ref is None:
-            raise ValueError("WeldSegment not initialized - call bind_to_section first")
-        
-        return self._segment_ref.discretize(resolution=num_points)
-
-
-@dataclass
-class WeldGroupProperties:
-    """
-    Calculated properties of a weld group.
+    Calculated geometric properties of a weld group.
     
     All properties are calculated about the weld group centroid.
     """
-    # Centroid location
-    Cy: float  # y-coordinate of centroid
-    Cz: float  # z-coordinate of centroid
-    
-    # Total weld area (throat * length summed)
-    A: float
-    
-    # Total weld length
-    L: float
-    
-    # Second moments of area about centroid
-    Iz: float  # About horizontal axis (z) - sum(y^2 * dA)
-    Iy: float  # About vertical axis (y) - sum(z^2 * dA)
-    
-    # Polar moment of area about centroid
-    Ip: float  # Iz + Iy
+    Cy: float  # Centroid y-coordinate
+    Cz: float  # Centroid z-coordinate
+    A: float   # Total weld area (throat × length)
+    L: float   # Total weld length
+    Iy: float  # Second moment about y-axis (Σz²·dA)
+    Iz: float  # Second moment about z-axis (Σy²·dA)
+    Ip: float  # Polar moment (Iy + Iz)
 
 
 @dataclass
-class WeldGroup:
+class Weld:
     """
-    A group of weld segments for combined analysis.
+    A weld group defined by geometry and weld parameters.
     
-    Calculates weld group properties (centroid, moments of inertia)
-    for elastic stress analysis.
+    Can be created directly from geometry or from a section's contour.
+    
+    Attributes:
+        geometry: Weld path as sectiony Geometry
+        parameters: WeldParameters configuration
+        section: Optional Section reference for plotting
     """
-    weld_segments: List[WeldSegment] = field(default_factory=list)
-    _properties: WeldGroupProperties | None = field(default=None, repr=False)
-    _section: Section | None = field(default=None, repr=False)
+    geometry: Geometry
+    parameters: WeldParameters
+    section: Section | None = None
     
-    @property
-    def properties(self) -> WeldGroupProperties:
-        if self._properties is None:
-            raise ValueError("Properties not calculated - call calculate_properties first")
-        return self._properties
+    # Cached properties
+    _properties: WeldProperties | None = field(default=None, repr=False, init=False)
+    _discretized_points: List[Tuple[Point, float, Point, object]] | None = field(default=None, repr=False, init=False)
     
-    @property
-    def total_length(self) -> float:
-        """Total weld length."""
-        return sum(seg.length for seg in self.weld_segments)
+    def __post_init__(self) -> None:
+        # Validate geometry
+        if self.geometry is None:
+            raise ValueError("geometry is required")
+        if not self.geometry.contours:
+            raise ValueError("geometry must have at least one contour")
     
-    @property
-    def total_area(self) -> float:
-        """Total weld area (throat * length)."""
-        return sum(seg.area for seg in self.weld_segments)
-    
-    def add_segment(self, segment: WeldSegment) -> None:
-        """Add a weld segment to the group."""
-        self.weld_segments.append(segment)
-        self._properties = None  # Invalidate cached properties
-    
-    def bind_to_section(self, section: Section) -> None:
-        """Bind all weld segments to a section."""
-        self._section = section
-        for segment in self.weld_segments:
-            segment.bind_to_section(section)
-    
-    def calculate_properties(self, discretization: int = 100) -> WeldGroupProperties:
+    @classmethod
+    def from_section(
+        cls,
+        section: Section,
+        parameters: WeldParameters,
+        contour_index: int = 0
+    ) -> Weld:
         """
-        Calculate weld group properties using discretized points.
-        
-        The weld is treated as a line with thickness = throat.
-        Properties are calculated by discretizing each segment and
-        treating each small piece as a point mass.
+        Create a Weld from a section's contour.
         
         Args:
-            discretization: Points per segment for numerical integration
+            section: sectiony Section object
+            parameters: WeldParameters for the weld
+            contour_index: Which contour to use (0 = outer)
             
         Returns:
-            WeldGroupProperties with centroid and moments of inertia
+            Weld with geometry extracted from section
         """
-        if not self.weld_segments:
-            raise ValueError("No weld segments in group")
+        if section.geometry is None:
+            raise ValueError("Section has no geometry")
+        if not section.geometry.contours:
+            raise ValueError("Section has no contours")
+        if contour_index >= len(section.geometry.contours):
+            raise ValueError(f"Contour index {contour_index} out of range")
         
-        # Collect all discretized points with their segment lengths
-        y_list: List[float] = []
-        z_list: List[float] = []
-        ds_list: List[float] = []
-        throat_list: List[float] = []
-        total_length = 0.0
-
-        for seg in self.weld_segments:
-            points = seg.discretize(discretization)
-            throat = seg.throat
-
-            for i in range(len(points) - 1):
-                p1 = points[i]
-                p2 = points[i + 1]
-
-                mid_y = (p1[0] + p2[0]) / 2
-                mid_z = (p1[1] + p2[1]) / 2
-
-                ds = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
-
-                y_list.append(mid_y)
-                z_list.append(mid_z)
-                ds_list.append(ds)
-                throat_list.append(throat)
-
-                total_length += ds
-
-        if not y_list:
-            raise ValueError("Weld group has no discretized points")
-
-        y_arr = np.array(y_list, dtype=float)
-        z_arr = np.array(z_list, dtype=float)
-        ds_arr = np.array(ds_list, dtype=float)
-        throat_arr = np.array(throat_list, dtype=float)
-
-        dA_arr = throat_arr * ds_arr
-        total_area = float(np.sum(dA_arr))
-
+        from sectiony import Geometry
+        
+        # Extract the specified contour
+        contour = section.geometry.contours[contour_index]
+        geometry = Geometry(contours=[contour])
+        
+        return cls(
+            geometry=geometry,
+            parameters=parameters,
+            section=section
+        )
+    
+    def _discretize(self, discretization: int = 100) -> List[Tuple[Point, float, Point, object]]:
+        """
+        Discretize weld geometry into points with segment lengths.
+        
+        Returns:
+            List of ((y, z), ds, (t_y, t_z), segment) tuples containing the midpoint,
+            its arc length, the local unit tangent direction, and the source segment.
+        """
+        if self._discretized_points is not None and len(self._discretized_points) >= discretization:
+            return self._discretized_points
+        
+        points_with_ds: List[Tuple[Point, float, Point, object]] = []
+        
+        for contour in self.geometry.contours:
+            for segment in contour.segments:
+                # Get discretized points from segment
+                seg_points = segment.discretize(resolution=discretization)
+                
+                if len(seg_points) < 2:
+                    continue
+                
+                # Calculate arc length for each midpoint
+                for i in range(len(seg_points) - 1):
+                    p1 = seg_points[i]
+                    p2 = seg_points[i + 1]
+                    
+                    mid_y = (p1[0] + p2[0]) / 2
+                    mid_z = (p1[1] + p2[1]) / 2
+                    ds = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+                    
+                    if ds > 1e-12:
+                        t_y = (p2[0] - p1[0]) / ds
+                        t_z = (p2[1] - p1[1]) / ds
+                        points_with_ds.append(((mid_y, mid_z), ds, (t_y, t_z), segment))
+        
+        self._discretized_points = points_with_ds
+        return points_with_ds
+    
+    def _calculate_properties(self, discretization: int = 100) -> WeldProperties:
+        """Calculate weld group geometric properties."""
+        if self._properties is not None:
+            return self._properties
+        
+        points_ds = self._discretize(discretization)
+        
+        if not points_ds:
+            raise ValueError("Weld has no discretized points")
+        
+        # Get throat thickness
+        throat = self.parameters.throat
+        if throat is None:
+            if self.parameters.weld_type in ("plug", "slot") and self.parameters.area is not None:
+                # For plug/slot, use area directly
+                throat = 1.0  # Placeholder, area is used directly
+            else:
+                raise ValueError("Throat thickness not defined")
+        
+        # Calculate centroid
+        y_arr = np.array([p[0][0] for p in points_ds])
+        z_arr = np.array([p[0][1] for p in points_ds])
+        ds_arr = np.array([p[1] for p in points_ds])
+        
+        if self.parameters.weld_type in ("plug", "slot"):
+            # For plug/slot, use provided area
+            dA_arr = ds_arr  # Weight by length for centroid
+            total_area = self.parameters.area if self.parameters.area else 0.0
+        else:
+            dA_arr = throat * ds_arr
+            total_area = float(np.sum(dA_arr))
+        
+        total_length = float(np.sum(ds_arr))
+        
         if total_area < 1e-12:
-            raise ValueError("Weld group has zero area")
-
-        Cy = float(np.sum(y_arr * dA_arr) / total_area)
-        Cz = float(np.sum(z_arr * dA_arr) / total_area)
-
-        # Calculate moments of inertia about centroid using numpy
+            raise ValueError("Weld has zero area")
+        
+        # Centroid (weighted by dA for proper calculation)
+        Cy = float(np.sum(y_arr * dA_arr) / np.sum(dA_arr))
+        Cz = float(np.sum(z_arr * dA_arr) / np.sum(dA_arr))
+        
+        # Second moments about centroid
         dy_arr = y_arr - Cy
         dz_arr = z_arr - Cz
-
-        Iz = float(np.sum(dy_arr**2 * dA_arr))
-        Iy = float(np.sum(dz_arr**2 * dA_arr))
         
-        Ip = Iz + Iy
+        Iz = float(np.sum(dy_arr**2 * dA_arr))  # Σy²·dA
+        Iy = float(np.sum(dz_arr**2 * dA_arr))  # Σz²·dA
+        Ip = Iy + Iz
         
-        self._properties = WeldGroupProperties(
+        self._properties = WeldProperties(
             Cy=Cy,
             Cz=Cz,
             A=total_area,
             L=total_length,
-            Iz=Iz,
             Iy=Iy,
+            Iz=Iz,
             Ip=Ip
         )
         
         return self._properties
     
-    def get_all_points(self, discretization: int = 50) -> List[Tuple[Point, WeldSegment]]:
+    # Property accessors
+    @property
+    def A(self) -> float:
+        """Total weld area (throat × length)."""
+        return self._calculate_properties().A
+    
+    @property
+    def L(self) -> float:
+        """Total weld length."""
+        return self._calculate_properties().L
+    
+    @property
+    def Cy(self) -> float:
+        """Centroid y-coordinate."""
+        return self._calculate_properties().Cy
+    
+    @property
+    def Cz(self) -> float:
+        """Centroid z-coordinate."""
+        return self._calculate_properties().Cz
+    
+    @property
+    def Iy(self) -> float:
+        """Second moment about y-axis."""
+        return self._calculate_properties().Iy
+    
+    @property
+    def Iz(self) -> float:
+        """Second moment about z-axis."""
+        return self._calculate_properties().Iz
+    
+    @property
+    def Ip(self) -> float:
+        """Polar moment of inertia."""
+        return self._calculate_properties().Ip
+    
+    def stress(
+        self,
+        force: Force,
+        method: str = "elastic",
+        discretization: int = 100
+    ) -> StressResult:
         """
-        Get all discretized points from all segments.
+        Calculate stress distribution along the weld.
         
+        Args:
+            force: Applied Force object
+            method: Analysis method - "elastic" or "icr" (fillet only)
+            discretization: Points per segment
+            
         Returns:
-            List of (point, segment) tuples
+            StressResult with stress at all points
         """
-        result: List[Tuple[Point, WeldSegment]] = []
-        for seg in self.weld_segments:
-            points = seg.discretize(discretization)
-            for pt in points:
-                result.append((pt, seg))
-        return result
+        from .stress import calculate_elastic_stress, calculate_icr_stress, StressResult
+        
+        # Validate method for weld type
+        valid_methods = {
+            "fillet": ["elastic", "icr"],
+            "pjp": ["elastic"],
+            "cjp": ["base_metal", "elastic"],
+            "plug": ["elastic"],
+            "slot": ["elastic"],
+        }
+        
+        weld_type = self.parameters.weld_type
+        if method not in valid_methods[weld_type]:
+            raise ValueError(f"Method '{method}' not valid for {weld_type} welds. "
+                           f"Use: {valid_methods[weld_type]}")
+        
+        # Calculate properties if needed
+        self._calculate_properties(discretization)
+        
+        if method == "elastic":
+            return calculate_elastic_stress(self, force, discretization)
+        elif method == "icr":
+            return calculate_icr_stress(self, force, discretization)
+        elif method == "base_metal":
+            return calculate_elastic_stress(self, force, discretization)  # TODO: proper base metal check
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
+
+# Import Force here to avoid circular import at module level
+from .force import Force
