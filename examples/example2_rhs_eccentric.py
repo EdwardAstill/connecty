@@ -5,7 +5,7 @@ Demonstrates comparison between Elastic and ICR methods for an
 eccentrically loaded weld group on an RHS section.
 """
 from sectiony.library import rhs
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from pathlib import Path
 
 # Create RHS section

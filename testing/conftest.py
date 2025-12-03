@@ -1,7 +1,7 @@
 import pytest
 
 from sectiony.library import rhs
-from weldy import WeldedSection, WeldParameters, Force
+from connecty import WeldedSection, WeldParameters, Force
 
 
 @pytest.fixture

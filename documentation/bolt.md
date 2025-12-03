@@ -1,4 +1,4 @@
-# Weldy - Bolt Analysis
+# Connecty - Bolt Analysis
 
 ## Overview
 
@@ -36,7 +36,7 @@ The bolt analysis module follows the same architectural patterns as the weld mod
 A collection of bolts defined by coordinates or a pattern.
 
 ```python
-from weldy import BoltGroup, BoltParameters
+from connecty import BoltGroup, BoltParameters
 
 # Option A: Explicit coordinates
 bolts = BoltGroup(
@@ -69,7 +69,7 @@ bolts = BoltGroup.from_circle(
 Configuration for bolt properties.
 
 ```python
-from weldy import BoltParameters
+from connecty import BoltParameters
 
 params = BoltParameters(
     diameter=20,              # Bolt diameter (mm)
@@ -88,7 +88,7 @@ params = BoltParameters(
 Uses the existing `Force` class for consistent load definition.
 
 ```python
-from weldy import Force
+from connecty import Force
 
 force = Force(
     Fy=-100000,           # 100 kN downward (N)
@@ -104,7 +104,7 @@ force = Force(
 The API mirrors the weld workflow:
 
 ```python
-from weldy import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltParameters, Force
 
 # Setup
 params = BoltParameters(diameter=20, grade="A325")
@@ -199,7 +199,7 @@ Features:
 ### Pattern Visualization
 
 ```python
-from weldy.bolt_plotter import plot_bolt_pattern
+from connecty.bolt_plotter import plot_bolt_pattern
 
 # Visualize bolt layout before analysis
 plot_bolt_pattern(bolts, save_path="pattern.svg")

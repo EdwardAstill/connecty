@@ -5,7 +5,7 @@ Demonstrates weld stress analysis on a U-channel section
 with torsional moment (Mx).
 """
 from sectiony.library import u
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from pathlib import Path
 
 # Create U-channel: 150mm high, 75mm wide, 8mm thickness

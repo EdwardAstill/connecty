@@ -1,4 +1,4 @@
-# Weldy
+# Connecty
 
 Weld stress analysis package for structural engineering. Calculates and visualizes stress distribution along welded connections using the elastic method.
 
@@ -9,17 +9,21 @@ Weld stress analysis package for structural engineering. Calculates and visualiz
 - **Visual output** - Color-coded stress plots along weld lines
 - **Integration with sectiony** - Works with any section from the sectiony package
 
+## Documentation
+
+For comprehensive documentation, including detailed weld and bolt analysis guides, see the [User Guide](documentation/user%20guide.md).
+
 ## Installation
 
 ```bash
-uv add weldy
+uv add connecty
 ```
 
 ## Quick Start
 
 ```python
 from sectiony.library import rhs
-from weldy import WeldedSection, WeldParameters, Force
+from connecty import WeldedSection, WeldParameters, Force
 
 # Create a section
 section = rhs(b=100, h=200, t=10, r=15)

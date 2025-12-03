@@ -4,7 +4,7 @@ Generate all gallery images by running examples.
 import sys
 from pathlib import Path
 
-# Add src directory to path so weldy can be imported
+# Add src directory to path so connecty can be imported
 project_root = Path(__file__).parent.parent
 src_dir = project_root / "src"
 sys.path.insert(0, str(src_dir))

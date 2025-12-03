@@ -5,7 +5,7 @@ Demonstrates basic weld stress analysis on a rectangular hollow section
 with a simple vertical load applied at the centroid.
 """
 from sectiony.library import rhs
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from pathlib import Path
 
 # Create RHS section

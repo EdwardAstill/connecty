@@ -6,13 +6,13 @@ import math
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from weldy import WeldedSection, WeldParameters, Force, WeldGroup, WeldSegment
+from connecty import WeldedSection, WeldParameters, Force, WeldGroup, WeldSegment
 from sectiony.geometry import Line
 from sectiony import Section, Geometry, Contour
 
 def test_elastic_method_verification():
     """
-    Verify weldy calculations against manual Elastic Method calculation.
+    Verify connecty calculations against manual Elastic Method calculation.
     
     Case: Single vertical weld line under eccentric vertical load.
     

@@ -1,5 +1,5 @@
 """
-Run all weldy examples.
+Run all connecty examples.
 """
 import subprocess
 import sys
@@ -17,7 +17,7 @@ examples = [
 ]
 
 print("=" * 60)
-print("RUNNING ALL WELDY EXAMPLES")
+print("RUNNING ALL CONNECTY EXAMPLES")
 print("=" * 60)
 
 for example in examples:

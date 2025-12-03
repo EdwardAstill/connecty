@@ -1,5 +1,5 @@
 [project]
-name = "weldy"
+name = "connecty"
 version = "0.1.0"
 description = "Weld stress analysis package for structural engineering"
 readme = "README.md"
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-weldy = { workspace = true }
+connecty = { workspace = true }
 sectiony = { path = "../sectiony", editable = true }
 
 [build-system]
@@ -21,8 +21,8 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "weldy",
+    "connecty",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/weldy"]
+packages = ["src/connecty"]

@@ -1,8 +1,8 @@
-# Weldy - Weld Stress Analysis
+# Connecty - Weld Stress Analysis
 
 ## Overview
 
-Weldy calculates stress distribution along welded connections per AISC 360. It integrates with **sectiony** for section geometry and follows the **beamy** pattern for result access.
+Connecty calculates stress distribution along welded connections per AISC 360. It integrates with **sectiony** for section geometry and follows the **beamy** pattern for result access.
 
 ---
 
@@ -45,7 +45,7 @@ Weldy calculates stress distribution along welded connections per AISC 360. It i
 A weld path defined by geometry and weld parameters. The geometry can be provided directly or derived from a section's contour.
 
 ```python
-from weldy import Weld, WeldParameters
+from connecty import Weld, WeldParameters
 from sectiony import Geometry, Contour, Line, Arc
 from sectiony.library import rhs
 
@@ -162,7 +162,7 @@ For PJP welds, `throat` is the effective throat $E$ per AISC Table J2.1, which d
 Load definition with 6 components and application location.
 
 ```python
-from weldy import Force
+from connecty import Force
 
 # Option A: Direct components
 force = Force(Fx=0, Fy=-100e3, Fz=0, Mx=0, My=0, Mz=0, location=(0, 50))
@@ -423,7 +423,7 @@ result.plot_components(
 
 ```python
 from sectiony.library import rhs
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 
 # 1. Create fillet weld from RHS section
 section = rhs(b=100, h=200, t=10, r=15)
@@ -460,7 +460,7 @@ result.plot(section=True, force=True, save_path="fillet_elastic.svg")
 
 ```python
 from sectiony.library import rhs
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 
 # Same setup as Example 1
 section = rhs(b=100, h=200, t=10, r=15)
@@ -482,7 +482,7 @@ print(f"Utilization (ICR): {result.utilization():.1%}")
 ### Example 3: PJP Groove Weld
 
 ```python
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from sectiony import Geometry, Contour, Line
 
 # PJP weld at top of a beam flange connection
@@ -510,7 +510,7 @@ print(f"Utilization: {result.utilization():.1%}")
 ### Example 4: CJP Weld (Base Metal Check)
 
 ```python
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from sectiony import Geometry, Contour, Line
 
 # CJP weld - strength exceeds base metal, so check base metal
@@ -539,7 +539,7 @@ print(f"Base metal utilization: {result.utilization():.1%}")
 ### Example 5: Custom Geometry (No Section)
 
 ```python
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from sectiony import Geometry, Contour, Line
 
 # Two vertical fillet welds for a simple lap joint
@@ -563,7 +563,7 @@ result.plot(force=True)
 ### Example 6: Plug Weld
 
 ```python
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from sectiony import Geometry, Contour, Arc
 import math
 

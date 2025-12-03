@@ -1,5 +1,5 @@
 """
-Weldy Example: Weld stress analysis on an RHS section.
+Connecty Example: Weld stress analysis on an RHS section.
 
 This example demonstrates:
 1. Creating a section from sectiony
@@ -9,7 +9,7 @@ This example demonstrates:
 """
 from sectiony.library import rhs
 
-from weldy import (
+from connecty import (
     WeldedSection,
     WeldParameters,
     Force,

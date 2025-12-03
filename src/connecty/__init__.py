@@ -1,12 +1,12 @@
 """
-Weldy - Weld and Bolt Connection Analysis Package
+Connecty - Weld and Bolt Connection Analysis Package
 
 Calculate and visualize stress/force distribution along welded and bolted
 connections per AISC 360 using Elastic and ICR methods.
 
 Example usage (Welds):
     from sectiony.library import rhs
-    from weldy import Weld, WeldParameters, Force
+    from connecty import Weld, WeldParameters, Force
     
     # Create weld from section
     section = rhs(b=100, h=200, t=10, r=15)
@@ -27,7 +27,7 @@ Example usage (Welds):
     result.plot(section=True, force=True)
 
 Example usage (Bolts):
-    from weldy import BoltGroup, BoltParameters, Force
+    from connecty import BoltGroup, BoltParameters, Force
     
     # Create bolt group from pattern
     params = BoltParameters(diameter=20, grade="A325")

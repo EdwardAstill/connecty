@@ -3,7 +3,7 @@
 Verification script for Elastic vs ICR method comparison.
 """
 from sectiony.library import rhs
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 import math
 
 def run_comparison(case_name: str, weld: Weld, force: Force):

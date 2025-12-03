@@ -12,7 +12,7 @@ from typing import Tuple, Dict, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from sectiony.library import rhs, chs, i
-from weldy import WeldedSection, WeldParameters, Force
+from connecty import WeldedSection, WeldParameters, Force
 import math
 
 

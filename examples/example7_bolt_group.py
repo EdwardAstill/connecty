@@ -4,7 +4,7 @@ Example 7: Bolt Group Analysis (Elastic and ICR Methods)
 Demonstrates bolt group analysis for a rectangular pattern
 of bolts with eccentric loading.
 """
-from weldy import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltParameters, Force
 from pathlib import Path
 
 

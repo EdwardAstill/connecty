@@ -5,7 +5,7 @@ Demonstrates weld stress analysis on an I-beam section
 with axial force, shear, and bending moment.
 """
 from sectiony.library import i
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from pathlib import Path
 
 # Create I-section: 200mm deep, 100mm wide, 12mm flange, 8mm web

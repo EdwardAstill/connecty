@@ -5,7 +5,7 @@ Demonstrates accessing individual stress components and plotting
 them separately for detailed analysis.
 """
 from sectiony.library import rhs
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from pathlib import Path
 
 # Create RHS section

@@ -4,7 +4,7 @@ Example 6: Circular Hollow Section (CHS)
 Demonstrates weld stress analysis on a circular hollow section.
 """
 from sectiony.library import chs
-from weldy import Weld, WeldParameters, Force
+from connecty import Weld, WeldParameters, Force
 from pathlib import Path
 
 # Create CHS: 150mm diameter, 6mm wall
