@@ -312,9 +312,11 @@ print(f"Utilization: {result.utilization():.1%}")
 print(f"Adequate? {result.is_adequate()}")
 
 # Plot Resultant Stress
-result.plot(
+weld.plot(
+    stress=result,      # StressResult
+    info=True,          # Show stats in title
     section=True,       # Show section outline (if available)
-    force=True,         # Show applied force
+    cmap="coolwarm",    # Color map
     save_path="weld_results.svg"
 )
 
@@ -390,6 +392,13 @@ result.plot(
     ax=None,               # Matplotlib axes (creates new if None)
     show=True,             # Display plot
     save_path="weld.svg"   # Save to file (.svg recommended)
+)
+
+# Compare Elastic vs ICR (stacked plots)
+result.plot(
+    force=force,
+    method="both",
+    save_path="comparison.svg"
 )
 
 # Plot individual stress components
@@ -661,7 +670,9 @@ print(f"ICR location: {result_icr.icr_point}")
 - `parameters`: `WeldParameters` configuration
 - `section`: Optional `Section` reference for plotting
 - Properties: `A`, `L`, `Cy`, `Cz`, `Iy`, `Iz`, `Ip`
-- Methods: `stress(force, method, discretization)` → `StressResult`
+- Methods: 
+  - `stress(force, method, discretization)` → `StressResult`
+  - `plot(stress, info, ...)` → `Axes`
 - Class methods: `from_section(section, parameters, contour_index=0)` → `Weld`
 
 **`WeldedSection(section)`**

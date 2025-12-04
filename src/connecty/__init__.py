@@ -23,8 +23,11 @@ Example usage (Welds):
     print(f"Max stress: {result.max:.1f} MPa")
     print(f"Utilization: {result.utilization():.1%}")
     
-    # Plot
-    result.plot(section=True, force=True)
+    # Plot results
+    weld.plot(stress=result, section=True)
+    
+    # Or compare methods
+    weld.plot(force=force, method="both")
 
 Example usage (Bolts):
     from connecty import BoltGroup, BoltParameters, Force
@@ -74,6 +77,8 @@ from .stress import (
 
 from .plotter import (
     plot_stress_result,
+    plot_stress_comparison,
+    plot_weld_geometry,
     plot_stress_components,
 )
 
@@ -115,6 +120,8 @@ __all__ = [
     "calculate_elastic_stress",
     "calculate_icr_stress",
     "plot_stress_result",
+    "plot_stress_comparison",
+    "plot_weld_geometry",
     "plot_stress_components",
     # Weld data
     "ELECTRODE_STRENGTH",

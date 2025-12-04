@@ -386,22 +386,30 @@ print(f"f_moment_z: {components.f_moment_z}")
 
 ## Visualization
 
-### `result.plot(...)`
+### `weld.plot(...)`
 
 ```python
-result.plot(
+weld.plot(
+    stress=result,      # StressResult object (optional, plots geometry only if None)
+    info=True,          # Show stress info (max, utilization) in title
     section=True,       # Show section outline (only if weld has section reference)
-    force=True,         # Show force arrow at application point
-    colorbar=True,      # Show stress colorbar
     cmap="coolwarm",    # Matplotlib colormap
     weld_linewidth=5.0, # Weld line thickness
-    ax=None,            # Matplotlib axes (creates new if None)
     show=True,          # Display plot
-    save_path=None      # Save to file (use .svg extension)
+    save_path=None,     # Save to file (use .svg extension)
+    legend=False,       # Show legend
+    method=None         # "elastic", "icr", or "both"
 )
 ```
 
 **Note:** `section=True` only has an effect if the `Weld` was created via `Weld.from_section()`. Otherwise, only the weld path is shown.
+
+**Comparing Methods:**
+Use `method="both"` to plot Elastic and ICR results side-by-side with a shared color scale.
+
+```python
+weld.plot(force=force, method="both", save_path="comparison.svg")
+```
 
 ### `result.plot_components(...)`
 
@@ -602,6 +610,7 @@ Weld
 ├── section: Section | None         # Optional - only for plotting
 ├── A, L, Cy, Cz, Iy, Iz, Ip       (properties)
 ├── stress(force, method, discretization) → StressResult
+├── plot(stress, info, ...) → Axes
 └── from_section(section, parameters, contour_index) → Weld  (classmethod)
 
 StressResult

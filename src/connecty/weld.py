@@ -5,12 +5,13 @@ Supports fillet, PJP, CJP, and plug/slot welds per AISC 360.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Literal, List, Tuple, TYPE_CHECKING
+from typing import Literal, List, Tuple, TYPE_CHECKING, Union, Sequence
 import math
 import numpy as np
 
 if TYPE_CHECKING:
     from sectiony import Section, Geometry
+    from .stress import StressResult
 
 # Type aliases
 Point = Tuple[float, float]
@@ -196,13 +197,19 @@ class Weld:
             section=section
         )
     
-    def _discretize(self, discretization: int = 100) -> List[Tuple[Point, float, Point, object]]:
+    def _discretize(self, discretization: int = 200) -> List[Tuple[Point, float, Point, object]]:
         """
-        Discretize weld geometry into points with segment lengths.
+        Discretize weld geometry into uniformly-spaced points with segment lengths.
         
+        Uses sectiony's discretize_uniform for equal arc-length spacing across the
+        entire weld path, which ensures stress continuity at segment boundaries.
+        
+        Args:
+            discretization: Total number of points along the weld path
+            
         Returns:
-            List of ((y, z), ds, (t_y, t_z), segment) tuples containing the midpoint,
-            its arc length, the local unit tangent direction, and the source segment.
+            List of ((y, z), ds, (t_y, t_z), contour) tuples containing the midpoint,
+            its arc length, the local unit tangent direction, and the source contour.
         """
         if self._discretized_points is not None and len(self._discretized_points) >= discretization:
             return self._discretized_points
@@ -210,31 +217,44 @@ class Weld:
         points_with_ds: List[Tuple[Point, float, Point, object]] = []
         
         for contour in self.geometry.contours:
-            for segment in contour.segments:
-                # Get discretized points from segment
-                seg_points = segment.discretize(resolution=discretization)
+            # Use uniform discretization for equal arc-length spacing
+            # This ensures smooth stress distribution without jumps at segment boundaries
+            uniform_points = contour.discretize_uniform(count=discretization)
+            
+            if len(uniform_points) < 2:
+                continue
+            
+            # Calculate arc length and tangent for each midpoint
+            for i in range(len(uniform_points) - 1):
+                p1 = uniform_points[i]
+                p2 = uniform_points[i + 1]
                 
-                if len(seg_points) < 2:
-                    continue
+                mid_y = (p1[0] + p2[0]) / 2
+                mid_z = (p1[1] + p2[1]) / 2
+                ds = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
                 
-                # Calculate arc length for each midpoint
-                for i in range(len(seg_points) - 1):
-                    p1 = seg_points[i]
-                    p2 = seg_points[i + 1]
-                    
-                    mid_y = (p1[0] + p2[0]) / 2
-                    mid_z = (p1[1] + p2[1]) / 2
-                    ds = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
-                    
-                    if ds > 1e-12:
-                        t_y = (p2[0] - p1[0]) / ds
-                        t_z = (p2[1] - p1[1]) / ds
-                        points_with_ds.append(((mid_y, mid_z), ds, (t_y, t_z), segment))
+                if ds > 1e-12:
+                    t_y = (p2[0] - p1[0]) / ds
+                    t_z = (p2[1] - p1[1]) / ds
+                    points_with_ds.append(((mid_y, mid_z), ds, (t_y, t_z), contour))
+            
+            # Handle closed contour: add segment from last point back to first
+            if contour.is_closed and len(uniform_points) >= 2:
+                p1 = uniform_points[-1]
+                p2 = uniform_points[0]
+                mid_y = (p1[0] + p2[0]) / 2
+                mid_z = (p1[1] + p2[1]) / 2
+                ds = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+                
+                if ds > 1e-12:
+                    t_y = (p2[0] - p1[0]) / ds
+                    t_z = (p2[1] - p1[1]) / ds
+                    points_with_ds.append(((mid_y, mid_z), ds, (t_y, t_z), contour))
         
         self._discretized_points = points_with_ds
         return points_with_ds
     
-    def _calculate_properties(self, discretization: int = 100) -> WeldProperties:
+    def _calculate_properties(self, discretization: int = 200) -> WeldProperties:
         """Calculate weld group geometric properties."""
         if self._properties is not None:
             return self._properties
@@ -335,7 +355,7 @@ class Weld:
         self,
         force: Force,
         method: str = "elastic",
-        discretization: int = 100
+        discretization: int = 200
     ) -> StressResult:
         """
         Calculate stress distribution along the weld.
@@ -376,6 +396,127 @@ class Weld:
         else:
             raise ValueError(f"Unknown method: {method}")
 
+    def plot(
+        self,
+        stress: Union[StressResult, Sequence[StressResult], None] = None,
+        info: bool = True,
+        cmap: str = "coolwarm",
+        section: bool = True,
+        weld_linewidth: float = 5.0,
+        show: bool = True,
+        save_path: str | None = None,
+        legend: bool = False,
+        method: str | None = None,
+        force: Force | None = None
+    ):
+        """
+        Plot weld geometry or stress distribution.
+
+        Args:
+            stress: Optional StressResult (or list) to plot.
+            info: Show stress info (Max/Util) in title (if stress provided).
+            cmap: Colormap for stress.
+            section: Show section outline.
+            weld_linewidth: Width of weld lines.
+            show: Display the plot.
+            save_path: Path to save figure.
+            legend: Show legend.
+            method: Analysis method used for title or to trigger comparison.
+                   If method="both", plots comparison of Elastic and ICR.
+            force: Force object (required if stress is None and method is provided).
+        """
+        from .plotter import plot_stress_result, plot_weld_geometry, plot_stress_comparison
+
+        # Handle comparison case: method="both" OR multiple results provided
+        is_comparison = False
+        results = []
+
+        if isinstance(stress, (list, tuple)) and len(stress) > 1:
+            is_comparison = True
+            results = list(stress)
+        elif method == "both":
+            is_comparison = True
+            if stress is not None:
+                if isinstance(stress, (list, tuple)):
+                    results = list(stress)
+                else:
+                    results = [stress]
+                    # If single result provided but "both" requested, try to calculate others
+                    if force is None and hasattr(stress, 'force'):
+                         force = stress.force
+
+        if is_comparison:
+            # Calculate missing results if force available
+            if force is not None:
+                # Determine which methods we have
+                existing_methods = {r.method for r in results}
+                
+                if "elastic" not in existing_methods:
+                    results.append(self.stress(force, method="elastic"))
+                if "icr" not in existing_methods and self.parameters.weld_type == "fillet":
+                    results.append(self.stress(force, method="icr"))
+            
+            if len(results) >= 2:
+                # Ensure correct order: Elastic then ICR usually prefers
+                results.sort(key=lambda r: r.method)
+                return plot_stress_comparison(
+                    results,
+                    section=section,
+                    force=True,
+                    colorbar=True,
+                    cmap=cmap,
+                    weld_linewidth=weld_linewidth,
+                    show=show,
+                    save_path=save_path,
+                    info=info,
+                    legend=legend
+                )
+            elif len(results) == 1:
+                # Fallback if we only ended up with one result
+                stress = results[0]
+
+        # Standard single plot case
+        if stress is not None:
+            if isinstance(stress, (list, tuple)):
+                # If list passed but not method="both", just plot the first one?
+                # Or warn? Let's just plot the first one to be safe.
+                stress = stress[0]
+                
+            return plot_stress_result(
+                stress,
+                section=section,
+                force=True,
+                colorbar=True,
+                cmap=cmap,
+                weld_linewidth=weld_linewidth,
+                show=show,
+                save_path=save_path,
+                info=info,
+                legend=legend
+            )
+        elif force is not None and method is not None:
+             # Calculate and plot
+             result = self.stress(force, method=method)
+             return plot_stress_result(
+                result,
+                section=section,
+                force=True,
+                colorbar=True,
+                cmap=cmap,
+                weld_linewidth=weld_linewidth,
+                show=show,
+                save_path=save_path,
+                info=info,
+                legend=legend
+            )
+        else:
+            return plot_weld_geometry(
+                self,
+                section=section,
+                weld_linewidth=weld_linewidth,
+                show=show,
+                save_path=save_path
+            )
 
 # Import Force here to avoid circular import at module level
 from .force import Force

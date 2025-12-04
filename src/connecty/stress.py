@@ -295,7 +295,7 @@ class StressResult:
 def calculate_elastic_stress(
     weld: Weld,
     force: Force,
-    discretization: int = 100
+    discretization: int = 200
 ) -> StressResult:
     """
     Calculate weld stress using the Elastic Method.
@@ -388,7 +388,7 @@ def calculate_elastic_stress(
 def calculate_icr_stress(
     weld: Weld,
     force: Force,
-    discretization: int = 100,
+    discretization: int = 200,
     max_iterations: int = 100,
     tolerance: float = 1e-6
 ) -> StressResult:

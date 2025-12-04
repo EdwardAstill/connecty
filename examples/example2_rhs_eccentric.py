@@ -68,10 +68,11 @@ gallery_dir = Path(__file__).parent.parent / "gallery"
 gallery_dir.mkdir(exist_ok=True)
 save_path = gallery_dir / "example2_rhs_eccentric.svg"
 
-result_elastic.plot(
-    section=True,
-    force=True,
+weld.plot(
+    stress=result_elastic,
+    info=True,
     cmap="coolwarm",
+    section=True,
     weld_linewidth=5.0,
     show=False,
     save_path=str(save_path)

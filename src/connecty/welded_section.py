@@ -274,7 +274,7 @@ class WeldedSection:
         self,
         force: Force,
         method: str = "elastic",
-        discretization: int = 100
+        discretization: int = 200
     ) -> StressResult:
         """
         Run the weld stress analysis for the current assignments.
@@ -290,7 +290,7 @@ class WeldedSection:
         self,
         force: Force,
         method: str = "elastic",
-        discretization: int = 100,
+        discretization: int = 200,
         cmap: str = "coolwarm",
         weld_linewidth: float = 5.0,
         section: bool = True,
