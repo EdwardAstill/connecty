@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 # Type aliases
 Point = Tuple[float, float]
-WeldType = Literal["fillet", "pjp", "cjp", "plug", "slot", "butt"]
+WeldType = Literal["fillet", "pjp", "cjp", "plug", "slot"]
 
 # Electrode strength lookup (MPa)
 ELECTRODE_STRENGTH: dict[str, float] = {
@@ -72,11 +72,6 @@ class WeldParameters:
     _capacity_override: float | None = field(default=None, init=False, repr=False)
     
     def __post_init__(self) -> None:
-        # Map legacy weld type name
-        if self.weld_type == "butt":
-            # Treat butt welds as partial-joint-penetration welds by default
-            self.weld_type = "pjp"
-        
         # Apply alias fields if provided
         if self.leg is None and self.leg_size is not None:
             self.leg = self.leg_size
