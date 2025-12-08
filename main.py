@@ -61,7 +61,7 @@ def main() -> None:
         Fy=-50000,  # 50kN downward
         Fz=10000,   # 10kN horizontal
         Mx=1e6,     # 1kNm torsion
-        location=(100, 30)  # Applied at (y=100, z=30)
+        location=(0, 100, 30)  # Applied at (x=0, y=100, z=30)
     )
     
     print(f"\nApplied Force:")

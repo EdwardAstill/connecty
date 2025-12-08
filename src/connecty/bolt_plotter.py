@@ -170,7 +170,7 @@ def _plot_applied_force(
     extent: float
 ) -> None:
     """Plot applied force and add legend."""
-    y_loc, z_loc = force.location
+    x_loc, y_loc, z_loc = force.location
     
     # Plot application point (red 'x')
     ax.plot(z_loc, y_loc, 'rx', markersize=12, markeredgewidth=3,

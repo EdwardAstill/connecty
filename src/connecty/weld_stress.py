@@ -29,9 +29,11 @@ from .icr_solver import (
     aisc_weld_strength_factor,
 )
 
+# Avoid circular imports at module level
 if TYPE_CHECKING:
     from .weld import Weld
-    from .force import Force
+    from .load import Load
+    from .loaded_weld import LoadedWeld
 
 # Type alias
 Point = Tuple[float, float]
@@ -114,189 +116,10 @@ class PointStress:
         return self.components.resultant
 
 
-@dataclass
-class StressResult:
-    """
-    Complete stress analysis result for a weld group.
-    
-    Follows beamy's Result pattern for convenient access.
-    """
-    weld: Weld
-    force: Force
-    method: str
-    point_stresses: List[PointStress] = field(default_factory=list)
-    
-    # ICR-specific results
-    icr_point: Point | None = None
-    rotation: float | None = None
-    
-    # Cached values
-    _stresses: np.ndarray | None = field(default=None, repr=False)
-    
-    def _get_stresses(self) -> np.ndarray:
-        """Get array of resultant stresses."""
-        if self._stresses is None:
-            self._stresses = np.array([ps.stress for ps in self.point_stresses])
-        return self._stresses
-    
-    # === Beamy-style properties ===
-    
-    @property
-    def max(self) -> float:
-        """Maximum resultant stress."""
-        stresses = self._get_stresses()
-        return float(np.max(stresses)) if len(stresses) > 0 else 0.0
-    
-    @property
-    def max_stress(self) -> float:
-        """Alias for maximum resultant stress (API compatibility)."""
-        return self.max
-    
-    @property
-    def min(self) -> float:
-        """Minimum resultant stress."""
-        stresses = self._get_stresses()
-        return float(np.min(stresses)) if len(stresses) > 0 else 0.0
-    
-    @property
-    def min_stress(self) -> float:
-        """Alias for minimum resultant stress (API compatibility)."""
-        return self.min
-    
-    @property
-    def mean(self) -> float:
-        """Average stress."""
-        stresses = self._get_stresses()
-        return float(np.mean(stresses)) if len(stresses) > 0 else 0.0
-    
-    @property
-    def range(self) -> float:
-        """Stress range (max - min)."""
-        return self.max - self.min
-    
-    @property
-    def capacity(self) -> float:
-        """Design capacity φ(0.60 × F_EXX) from weld parameters."""
-        return self.weld.parameters.capacity
-    
-    @property
-    def max_point(self) -> PointStress | None:
-        """PointStress at maximum stress location."""
-        if not self.point_stresses:
-            return None
-        return max(self.point_stresses, key=lambda ps: ps.stress)
-    
-    @property
-    def all(self) -> List[PointStress]:
-        """All point stresses."""
-        return self.point_stresses
-    
-    def at(self, y: float, z: float) -> StressComponents:
-        """
-        Get stress components at or near a point.
-        
-        Returns components at the nearest discretized point.
-        """
-        if not self.point_stresses:
-            return StressComponents()
-        
-        # Find nearest point
-        min_dist = float('inf')
-        nearest = self.point_stresses[0]
-        
-        for ps in self.point_stresses:
-            dist = math.hypot(ps.y - y, ps.z - z)
-            if dist < min_dist:
-                min_dist = dist
-                nearest = ps
-        
-        return nearest.components
-    
-    def utilization(self, allowable: float | None = None) -> float:
-        """
-        Calculate utilization ratio.
-        
-        Args:
-            allowable: Allowable stress. If None, uses capacity from parameters.
-            
-        Returns:
-            max_stress / allowable (< 1.0 means acceptable)
-        """
-        if allowable is None:
-            allowable = self.capacity
-        if allowable <= 0:
-            raise ValueError("Allowable stress must be positive")
-        return self.max / allowable
-    
-    def is_adequate(self, allowable: float | None = None) -> bool:
-        """Check if weld is adequate (utilization ≤ 1.0)."""
-        return self.utilization(allowable) <= 1.0
-    
-    def plot(
-        self,
-        section: bool = True,
-        force: bool = True,
-        colorbar: bool = True,
-        cmap: str = "coolwarm",
-        weld_linewidth: float = 5.0,
-        ax=None,
-        show: bool = True,
-        save_path: str | None = None
-    ):
-        """
-        Plot stress distribution along the weld.
-        
-        Args:
-            section: Show section outline (if weld has section reference)
-            force: Show force arrow at application point
-            colorbar: Show stress colorbar
-            cmap: Matplotlib colormap name
-            weld_linewidth: Width of weld lines
-            ax: Matplotlib axes (creates new if None)
-            show: Display the plot
-            save_path: Path to save figure (.svg recommended)
-            
-        Returns:
-            Matplotlib axes
-        """
-        from .plotter import plot_stress_result
-        return plot_stress_result(
-            self,
-            section=section,
-            force=force,
-            colorbar=colorbar,
-            cmap=cmap,
-            weld_linewidth=weld_linewidth,
-            ax=ax,
-            show=show,
-            save_path=save_path
-        )
-    
-    def plot_components(
-        self,
-        components: List[str] | None = None,
-        layout: str = "grid",
-        **kwargs
-    ):
-        """
-        Plot individual stress components.
-        
-        Args:
-            components: Which to show ["direct", "moment", "axial", "bending"]
-            layout: "grid" or "row"
-            **kwargs: Passed to plot()
-        """
-        from .plotter import plot_stress_components
-        if components is None:
-            components = ["direct", "moment", "axial", "bending"]
-        return plot_stress_components(self, components, layout, **kwargs)
-
-
 def calculate_elastic_stress(
-    weld: Weld,
-    force: Force,
+    loaded_weld: "LoadedWeld",
     discretization: int = 200
-) -> StressResult:
+) -> None:
     """
     Calculate weld stress using the Elastic Method.
     
@@ -306,14 +129,15 @@ def calculate_elastic_stress(
     3. Moment: r_m = M × c / I_p (perpendicular to radius, linear)
     4. Vector sum for resultant
     
+    Modifies loaded_weld in place to set point_stresses.
+    
     Args:
-        weld: Weld object with calculated properties
-        force: Applied Force
+        loaded_weld: LoadedWeld object (modified in place)
         discretization: Points per segment
-        
-    Returns:
-        StressResult
     """
+    weld = loaded_weld.weld
+    load = loaded_weld.load
+    
     props = weld._calculate_properties(discretization)
     points_ds = weld._discretize(discretization)
     
@@ -322,7 +146,7 @@ def calculate_elastic_stress(
     Iy, Iz, Ip = props.Iy, props.Iz, props.Ip
     
     # Get total moments about weld centroid
-    Mx_total, My_total, Mz_total = force.get_moments_about(Cy, Cz)
+    Mx_total, My_total, Mz_total = load.get_moments_about(0, Cy, Cz)
     
     point_stresses: List[PointStress] = []
     
@@ -334,8 +158,8 @@ def calculate_elastic_stress(
         # === In-plane stresses ===
         
         # Direct shear (uniform): f = F / A
-        f_direct_y = force.Fy / A if A > 0 else 0.0
-        f_direct_z = force.Fz / A if A > 0 else 0.0
+        f_direct_y = load.Fy / A if A > 0 else 0.0
+        f_direct_z = load.Fz / A if A > 0 else 0.0
         
         # Moment shear (perpendicular to radius, linear with distance)
         # r_m = M × c / I_p, components perpendicular to (dy, dz)
@@ -352,7 +176,7 @@ def calculate_elastic_stress(
         # === Out-of-plane stresses ===
         
         # Direct axial (uniform)
-        f_axial = force.Fx / A if A > 0 else 0.0
+        f_axial = load.Fx / A if A > 0 else 0.0
         
         # Bending stress (linear with distance)
         # σ = My × z / Iy + Mz × y / Iz
@@ -377,21 +201,15 @@ def calculate_elastic_stress(
             segment=segment_ref
         ))
     
-    return StressResult(
-        weld=weld,
-        force=force,
-        method="elastic",
-        point_stresses=point_stresses
-    )
+    loaded_weld.point_stresses = point_stresses
 
 
 def calculate_icr_stress(
-    weld: Weld,
-    force: Force,
+    loaded_weld: "LoadedWeld",
     discretization: int = 200,
     max_iterations: int = 100,
     tolerance: float = 1e-6
-) -> StressResult:
+) -> None:
     """
     Calculate weld stress using the Instantaneous Center of Rotation (ICR) method.
     
@@ -404,17 +222,18 @@ def calculate_icr_stress(
     - Distance from ICR (deformation proportional to distance)
     - Angle between force and weld axis (strength increase)
     
+    Modifies loaded_weld in place to set point_stresses, icr_point, and rotation.
+    
     Args:
-        weld: Weld object (must be fillet type)
-        force: Applied Force
+        loaded_weld: LoadedWeld object (must be fillet type, modified in place)
         discretization: Points per segment
         max_iterations: Maximum solver iterations
         tolerance: Convergence tolerance
-        
-    Returns:
-        StressResult with ICR-specific data
     """
-    if weld.parameters.weld_type != "fillet":
+    weld = loaded_weld.weld
+    load = loaded_weld.load
+    
+    if weld.parameters.type != "fillet":
         raise ValueError("ICR method only valid for fillet welds")
     
     props = weld._calculate_properties(discretization)
@@ -432,20 +251,22 @@ def calculate_icr_stress(
     Cy, Cz = props.Cy, props.Cz
     
     # Get applied loads at centroid
-    Mx_total, _, _ = force.get_moments_about(Cy, Cz)
-    Fy_app = force.Fy
-    Fz_app = force.Fz
+    Mx_total, _, _ = load.get_moments_about(0, Cy, Cz)
+    Fy_app = load.Fy
+    Fz_app = load.Fz
     
     # Total in-plane shear
     P_total = math.hypot(Fy_app, Fz_app)
     
     if P_total < ZERO_TOLERANCE and abs(Mx_total) < ZERO_TOLERANCE:
-        # No in-plane loading, return elastic result
-        return calculate_elastic_stress(weld, force, discretization)
+        # No in-plane loading, use elastic result
+        calculate_elastic_stress(loaded_weld, discretization)
+        return
     
     if abs(Mx_total) < ZERO_TOLERANCE:
         # Pure shear (no eccentricity) behaves like elastic solution
-        return calculate_elastic_stress(weld, force, discretization)
+        calculate_elastic_stress(loaded_weld, discretization)
+        return
     
     # Prepare discretized weld data
     y_arr = np.array([p[0][0] for p in points_ds], dtype=float)
@@ -558,13 +379,15 @@ def calculate_icr_stress(
     
     if result is None:
         # Fallback to elastic method if ICR solver cannot converge
-        return calculate_elastic_stress(weld, force, discretization)
+        calculate_elastic_stress(loaded_weld, discretization)
+        return
     
     _, best_result, _ = result
     
     P_base = float(best_result["P_base"])
     if P_base < POSITION_TOLERANCE:
-        return calculate_elastic_stress(weld, force, discretization)
+        calculate_elastic_stress(loaded_weld, discretization)
+        return
     
     scale = P_total / P_base
     
@@ -607,14 +430,6 @@ def calculate_icr_stress(
             segment=segment_ref
         ))
     
-    icr_point = (float(best_result["icr_y"]), float(best_result["icr_z"]))
-    rotation = float(best_result["icr_dist"])
-    
-    return StressResult(
-        weld=weld,
-        force=force,
-        method="icr",
-        point_stresses=point_stresses,
-        icr_point=icr_point,
-        rotation=rotation
-    )
+    loaded_weld.point_stresses = point_stresses
+    loaded_weld.icr_point = (float(best_result["icr_y"]), float(best_result["icr_z"]))
+    loaded_weld.rotation = float(best_result["icr_dist"])

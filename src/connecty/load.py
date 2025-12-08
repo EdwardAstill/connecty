@@ -1,5 +1,5 @@
 """
-Force dataclass for applied loads.
+Load dataclass for applied loads.
 
 Defines forces and moments that can be applied to a welded connection.
 """
@@ -13,11 +13,11 @@ Point = Tuple[float, float, float]
 
 
 @dataclass
-class Force:
+class Load:
     """
     Applied force and moment at a specific location.
     
-    The force is defined in the section's local coordinate system:
+    The load is defined in the section's local coordinate system:
     - x-axis: Along the member (perpendicular to cross-section, out of page)
     - y-axis: Vertical in section plane (up positive)
     - z-axis: Horizontal in section plane (right positive)
@@ -29,7 +29,7 @@ class Force:
         Mx: Torsional moment about x-axis
         My: Bending moment about y-axis
         Mz: Bending moment about z-axis
-        location: (x, y, z) point of force application
+        location: (x, y, z) point of load application
         
     Sign Conventions:
         Fx: + = tension
@@ -49,17 +49,17 @@ class Force:
     
     @property
     def x_loc(self) -> float:
-        """X-coordinate of force application."""
+        """X-coordinate of load application."""
         return self.location[0]
     
     @property
     def y_loc(self) -> float:
-        """Y-coordinate of force application."""
+        """Y-coordinate of load application."""
         return self.location[1]
     
     @property
     def z_loc(self) -> float:
-        """Z-coordinate of force application."""
+        """Z-coordinate of load application."""
         return self.location[2]
     
     @property
@@ -74,7 +74,7 @@ class Force:
     
     def at(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> Tuple[float, float, float, float, float, float]:
         """
-        Calculate equivalent force (forces and moments) at a point (x, y, z).
+        Calculate equivalent load (forces and moments) at a point (x, y, z).
         
         Returns the forces (unchanged) and total moments at the specified point,
         including applied moments plus moments from force eccentricity.
@@ -87,7 +87,7 @@ class Force:
         Returns:
             Tuple of (Fx, Fy, Fz, Mx_total, My_total, Mz_total)
         """
-        # Distance from point to force location
+        # Distance from point to load location
         dx = self.x_loc - x
         dy = self.y_loc - y
         dz = self.z_loc - z
@@ -138,7 +138,7 @@ class Force:
         moment_y: float = 0.0,
         moment_z: float = 0.0,
         at: Point = (0.0, 0.0, 0.0)
-    ) -> Force:
+    ) -> Load:
         """
         Alternative constructor with descriptive parameter names.
         
@@ -149,10 +149,10 @@ class Force:
             torsion: Torsional moment
             moment_y: Bending moment about y-axis
             moment_z: Bending moment about z-axis
-            at: Location of force application (x, y, z)
+            at: Location of load application (x, y, z)
             
         Returns:
-            Force instance
+            Load instance
         """
         return cls(
             Fx=axial,
@@ -163,3 +163,4 @@ class Force:
             Mz=moment_z,
             location=at
         )
+

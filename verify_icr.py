@@ -46,17 +46,17 @@ def verify_all():
     
     # Case 1: Pure Shear (Vertical)
     # Should show benefit due to theta-strength increase
-    f1 = Force(Fy=-100000, location=(0, 0))
+    f1 = Force(Fy=-100000, location=(0, 0, 0))
     res1 = run_comparison("Pure Shear (Concentric)", weld, f1)
     
     # Case 2: Eccentric Shear (Moderate)
     # e = 50mm (half width)
-    f2 = Force(Fy=-100000, location=(0, 50))
+    f2 = Force(Fy=-100000, location=(0, 0, 50))
     res2 = run_comparison("Eccentric Shear (e=50mm)", weld, f2)
     
     # Case 3: Eccentric Shear (Large)
     # e = 200mm
-    f3 = Force(Fy=-100000, location=(0, 200))
+    f3 = Force(Fy=-100000, location=(0, 0, 200))
     res3 = run_comparison("Eccentric Shear (e=200mm)", weld, f3)
     
     print("\n" + "=" * 60)

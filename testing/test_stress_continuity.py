@@ -231,7 +231,7 @@ def test_multiple_scenarios():
     weld_params1 = WeldParameters(weld_type="fillet", throat_thickness=4.2, leg_size=6.0)
     welded1.weld_all_segments(weld_params1)
     
-    force1 = Force(Fy=-100000, location=(0, 0))
+    force1 = Force(Fy=-100000, location=(0, 0, 0))
     passed1, results1 = test_stress_continuity(welded1, force1, discretization=200)
     all_passed = all_passed and passed1
     
@@ -242,7 +242,7 @@ def test_multiple_scenarios():
     weld_params2 = WeldParameters(weld_type="fillet", throat_thickness=4.2, leg_size=6.0)
     welded2.weld_all_segments(weld_params2)
     
-    force2 = Force(Fy=-100000, location=(50, 0))  # Eccentric
+    force2 = Force(Fy=-100000, location=(0, 50, 0))  # Eccentric
     passed2, results2 = test_stress_continuity(welded2, force2, discretization=200)
     all_passed = all_passed and passed2
     
@@ -253,7 +253,7 @@ def test_multiple_scenarios():
     weld_params3 = WeldParameters(weld_type="fillet", throat_thickness=4.2, leg_size=6.0)
     welded3.weld_all_segments(weld_params3)
     
-    force3 = Force(Fy=-80000, Fz=20000, Mx=2000000, location=(0, 0))
+    force3 = Force(Fy=-80000, Fz=20000, Mx=2000000, location=(0, 0, 0))
     passed3, results3 = test_stress_continuity(welded3, force3, discretization=200)
     all_passed = all_passed and passed3
     
@@ -264,7 +264,7 @@ def test_multiple_scenarios():
     weld_params4 = WeldParameters(weld_type="butt", throat_thickness=10.0)
     welded4.weld_all_segments(weld_params4)
     
-    force4 = Force(Fy=-50000, Mx=3e6, location=(0, 0))
+    force4 = Force(Fy=-50000, Mx=3e6, location=(0, 0, 0))
     passed4, results4 = test_stress_continuity(welded4, force4, discretization=200)
     all_passed = all_passed and passed4
     
@@ -277,7 +277,7 @@ def test_multiple_scenarios():
     welded5.add_welds([8, 9, 10, 11], weld_params5)  # Bottom flange
     welded5.calculate_properties()
     
-    force5 = Force(My=5e6, location=(0, 0))
+    force5 = Force(My=5e6, location=(0, 0, 0))
     passed5, results5 = test_stress_continuity(welded5, force5, discretization=200)
     all_passed = all_passed and passed5
     

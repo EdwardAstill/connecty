@@ -8,14 +8,13 @@ from pathlib import Path
 examples_dir = Path(__file__).parent
 
 examples = [
-    "example1_rhs_simple.py",
-    "example2_rhs_eccentric.py",
-    "example3_i_beam.py",
-    "example4_u_channel.py",
-    "example5_stress_components.py",
-    "example6_chs.py",
-    "example7_icr_rhs_eccentric.py",
-    "example8_icr_rotation_trend.py",
+    "standard_sections_analysis.py",
+    "weld_method_comparison.py",
+    "stress_components_analysis.py",
+    "bolt_group_analysis.py",
+    "good example.py",
+    "icr_rotation_eccentricity_trend.py",
+    "pjp_weld_analysis.py",
 ]
 
 print("=" * 60)
@@ -27,9 +26,18 @@ for example in examples:
     print(f"Running: {example}")
     print("─" * 60)
     
+    # Run example with examples dir in PYTHONPATH so common imports work
+    env = {"PYTHONPATH": str(examples_dir) + ";" + str(examples_dir.parent / "src")}
+    
+    # Merge with current environment
+    import os
+    current_env = os.environ.copy()
+    current_env.update(env)
+
     result = subprocess.run(
         [sys.executable, str(examples_dir / example)],
-        capture_output=False
+        capture_output=False,
+        env=current_env
     )
     
     if result.returncode != 0:

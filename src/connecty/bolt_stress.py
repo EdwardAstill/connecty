@@ -63,7 +63,7 @@ def calculate_elastic_bolt_force(
     Ip = props.Ip
     
     # Get total moment about bolt group centroid (in-plane torsion)
-    Mx_total, _, _ = force.get_moments_about(Cy, Cz)
+    Mx_total, _, _ = force.get_moments_about(0, Cy, Cz)
     
     # Convert forces to kN (input is in N)
     Fy_kN = force.Fy / 1000

@@ -75,7 +75,7 @@ def test_elastic_method_verification():
     
     # 2. Apply Load
     # Force at z=100, y=0. Fy = -10000
-    force = Force(Fy=-10000, location=(0, 100))
+    force = Force(Fy=-10000, location=(0, 0, 100))
     
     # 3. Calculate
     result = welded.calculate_weld_stress(force, discretization=21) # Ensure point at top

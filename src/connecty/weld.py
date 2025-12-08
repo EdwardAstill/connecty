@@ -29,12 +29,12 @@ ELECTRODE_STRENGTH: dict[str, float] = {
 
 
 @dataclass
-class WeldParameters:
+class WeldParams:
     """
     Parameters defining weld configuration per AISC 360.
     
     Attributes:
-        weld_type: Type of weld - "fillet", "pjp", "cjp", "plug", or "slot"
+        type: Type of weld - "fillet", "pjp", "cjp", "plug", or "slot"
         leg: Fillet weld leg size (w) in length units
         throat: Effective throat thickness (a or E) in length units
         area: Plug/slot weld area in length² units
@@ -45,7 +45,7 @@ class WeldParameters:
         t_base: Base metal thickness (for CJP checks)
         phi: Resistance factor (AISC default 0.75)
     """
-    weld_type: WeldType
+    type: WeldType
     
     # Geometry
     leg: float | None = None
@@ -79,7 +79,7 @@ class WeldParameters:
             self.throat = self.throat_thickness
         
         # Auto-calculate throat from leg for fillet welds
-        if self.weld_type == "fillet":
+        if self.type == "fillet":
             if self.throat is None and self.leg is not None:
                 # Equal leg 45° fillet: a = w × 0.707
                 self.throat = self.leg * 0.707
@@ -119,6 +119,7 @@ class WeldProperties:
     
     All properties are calculated about the weld group centroid.
     """
+    Cx: float  # Centroid x-coordinate (along member, default 0.0)
     Cy: float  # Centroid y-coordinate
     Cz: float  # Centroid z-coordinate
     A: float   # Total weld area (throat × length)
@@ -137,11 +138,11 @@ class Weld:
     
     Attributes:
         geometry: Weld path as sectiony Geometry
-        parameters: WeldParameters configuration
+        parameters: WeldParams configuration
         section: Optional Section reference for plotting
     """
     geometry: Geometry
-    parameters: WeldParameters
+    parameters: WeldParams
     section: Section | None = None
     
     # Cached properties
@@ -159,7 +160,7 @@ class Weld:
     def from_section(
         cls,
         section: Section,
-        parameters: WeldParameters,
+        parameters: WeldParams,
         contour_index: int = 0
     ) -> Weld:
         """
@@ -167,7 +168,7 @@ class Weld:
         
         Args:
             section: sectiony Section object
-            parameters: WeldParameters for the weld
+            parameters: WeldParams for the weld
             contour_index: Which contour to use (0 = outer)
             
         Returns:
@@ -262,7 +263,7 @@ class Weld:
         # Get throat thickness
         throat = self.parameters.throat
         if throat is None:
-            if self.parameters.weld_type in ("plug", "slot") and self.parameters.area is not None:
+            if self.parameters.type in ("plug", "slot") and self.parameters.area is not None:
                 # For plug/slot, use area directly
                 throat = 1.0  # Placeholder, area is used directly
             else:
@@ -273,7 +274,7 @@ class Weld:
         z_arr = np.array([p[0][1] for p in points_ds])
         ds_arr = np.array([p[1] for p in points_ds])
         
-        if self.parameters.weld_type in ("plug", "slot"):
+        if self.parameters.type in ("plug", "slot"):
             # For plug/slot, use provided area
             dA_arr = ds_arr  # Weight by length for centroid
             total_area = self.parameters.area if self.parameters.area else 0.0
@@ -299,6 +300,7 @@ class Weld:
         Ip = Iy + Iz
         
         self._properties = WeldProperties(
+            Cx=0.0,  # Weld is always on the cross-section (x=0)
             Cy=Cy,
             Cz=Cz,
             A=total_area,
@@ -320,6 +322,11 @@ class Weld:
     def L(self) -> float:
         """Total weld length."""
         return self._calculate_properties().L
+    
+    @property
+    def Cx(self) -> float:
+        """Centroid x-coordinate."""
+        return self._calculate_properties().Cx
     
     @property
     def Cy(self) -> float:
@@ -345,173 +352,10 @@ class Weld:
     def Ip(self) -> float:
         """Polar moment of inertia."""
         return self._calculate_properties().Ip
-    
-    def stress(
-        self,
-        force: Force,
-        method: str = "elastic",
-        discretization: int = 200
-    ) -> StressResult:
-        """
-        Calculate stress distribution along the weld.
-        
-        Args:
-            force: Applied Force object
-            method: Analysis method - "elastic" or "icr" (fillet only)
-            discretization: Points per segment
-            
-        Returns:
-            StressResult with stress at all points
-        """
-        from .stress import calculate_elastic_stress, calculate_icr_stress, StressResult
-        
-        # Validate method for weld type
-        valid_methods = {
-            "fillet": ["elastic", "icr"],
-            "pjp": ["elastic"],
-            "cjp": ["base_metal", "elastic"],
-            "plug": ["elastic"],
-            "slot": ["elastic"],
-        }
-        
-        weld_type = self.parameters.weld_type
-        if method not in valid_methods[weld_type]:
-            raise ValueError(f"Method '{method}' not valid for {weld_type} welds. "
-                           f"Use: {valid_methods[weld_type]}")
-        
-        # Calculate properties if needed
-        self._calculate_properties(discretization)
-        
-        if method == "elastic":
-            return calculate_elastic_stress(self, force, discretization)
-        elif method == "icr":
-            return calculate_icr_stress(self, force, discretization)
-        elif method == "base_metal":
-            return calculate_elastic_stress(self, force, discretization)  # TODO: proper base metal check
-        else:
-            raise ValueError(f"Unknown method: {method}")
 
-    def plot(
-        self,
-        stress: Union[StressResult, Sequence[StressResult], None] = None,
-        info: bool = True,
-        cmap: str = "coolwarm",
-        section: bool = True,
-        weld_linewidth: float = 5.0,
-        show: bool = True,
-        save_path: str | None = None,
-        legend: bool = False,
-        method: str | None = None,
-        force: Force | None = None
-    ):
-        """
-        Plot weld geometry or stress distribution.
+# Import Load here to avoid circular import at module level
+from .load import Load
 
-        Args:
-            stress: Optional StressResult (or list) to plot.
-            info: Show stress info (Max/Util) in title (if stress provided).
-            cmap: Colormap for stress.
-            section: Show section outline.
-            weld_linewidth: Width of weld lines.
-            show: Display the plot.
-            save_path: Path to save figure.
-            legend: Show legend.
-            method: Analysis method used for title or to trigger comparison.
-                   If method="both", plots comparison of Elastic and ICR.
-            force: Force object (required if stress is None and method is provided).
-        """
-        from .plotter import plot_stress_result, plot_weld_geometry, plot_stress_comparison
-
-        # Handle comparison case: method="both" OR multiple results provided
-        is_comparison = False
-        results = []
-
-        if isinstance(stress, (list, tuple)) and len(stress) > 1:
-            is_comparison = True
-            results = list(stress)
-        elif method == "both":
-            is_comparison = True
-            if stress is not None:
-                if isinstance(stress, (list, tuple)):
-                    results = list(stress)
-                else:
-                    results = [stress]
-                    # If single result provided but "both" requested, try to calculate others
-                    if force is None and hasattr(stress, 'force'):
-                         force = stress.force
-
-        if is_comparison:
-            # Calculate missing results if force available
-            if force is not None:
-                # Determine which methods we have
-                existing_methods = {r.method for r in results}
-                
-                if "elastic" not in existing_methods:
-                    results.append(self.stress(force, method="elastic"))
-                if "icr" not in existing_methods and self.parameters.weld_type == "fillet":
-                    results.append(self.stress(force, method="icr"))
-            
-            if len(results) >= 2:
-                # Ensure correct order: Elastic then ICR usually prefers
-                results.sort(key=lambda r: r.method)
-                return plot_stress_comparison(
-                    results,
-                    section=section,
-                    force=True,
-                    colorbar=True,
-                    cmap=cmap,
-                    weld_linewidth=weld_linewidth,
-                    show=show,
-                    save_path=save_path,
-                    info=info,
-                    legend=legend
-                )
-            elif len(results) == 1:
-                # Fallback if we only ended up with one result
-                stress = results[0]
-
-        # Standard single plot case
-        if stress is not None:
-            if isinstance(stress, (list, tuple)):
-                # If list passed but not method="both", just plot the first one?
-                # Or warn? Let's just plot the first one to be safe.
-                stress = stress[0]
-                
-            return plot_stress_result(
-                stress,
-                section=section,
-                force=True,
-                colorbar=True,
-                cmap=cmap,
-                weld_linewidth=weld_linewidth,
-                show=show,
-                save_path=save_path,
-                info=info,
-                legend=legend
-            )
-        elif force is not None and method is not None:
-             # Calculate and plot
-             result = self.stress(force, method=method)
-             return plot_stress_result(
-                result,
-                section=section,
-                force=True,
-                colorbar=True,
-                cmap=cmap,
-                weld_linewidth=weld_linewidth,
-                show=show,
-                save_path=save_path,
-                info=info,
-                legend=legend
-            )
-        else:
-            return plot_weld_geometry(
-                self,
-                section=section,
-                weld_linewidth=weld_linewidth,
-                show=show,
-                save_path=save_path
-            )
-
-# Import Force here to avoid circular import at module level
-from .force import Force
+# Legacy aliases for backward compatibility
+Force = Load
+WeldParameters = WeldParams

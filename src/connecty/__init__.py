@@ -6,31 +6,32 @@ connections per AISC 360 using Elastic and ICR methods.
 
 Example usage (Welds):
     from sectiony.library import rhs
-    from connecty import Weld, WeldParameters, Force
+    from connecty import Weld, WeldParams, Load, LoadedWeld
     
     # Create weld from section
     section = rhs(b=100, h=200, t=10, r=15)
-    params = WeldParameters(weld_type="fillet", leg=6.0, electrode="E70")
+    params = WeldParams(type="fillet", leg=6.0, electrode="E70")
     weld = Weld.from_section(section=section, parameters=params)
     
-    # Define force
-    force = Force(Fy=-100e3, location=(100, 0))
+    # Define load
+    load = Load(Fy=-100e3, location=(100, 0))
     
-    # Calculate stress (elastic or icr method)
-    result = weld.stress(force, method="elastic")
+    # Create loaded weld with analysis method
+    loaded = LoadedWeld(weld, load, method="elastic")
     
     # Access results (beamy-style)
-    print(f"Max stress: {result.max:.1f} MPa")
-    print(f"Utilization: {result.utilization():.1%}")
+    print(f"Max stress: {loaded.max:.1f} MPa")
+    print(f"Utilization: {loaded.utilization():.1%}")
     
     # Plot results
-    weld.plot(stress=result, section=True)
+    loaded.plot(section=True)
     
     # Or compare methods
-    weld.plot(force=force, method="both")
+    loaded_both = LoadedWeld(weld, load, method="both")
+    loaded_both.plot()
 
 Example usage (Bolts):
-    from connecty import BoltGroup, BoltParameters, Force
+    from connecty import BoltGroup, BoltParameters, Load
     
     # Create bolt group from pattern
     params = BoltParameters(diameter=20, grade="A325")
@@ -38,8 +39,8 @@ Example usage (Bolts):
         rows=3, cols=2, spacing_y=75, spacing_z=60, parameters=params
     )
     
-    # Define force
-    force = Force(Fy=-100e3, location=(150, 0))
+    # Define load
+    load = Load(Fy=-100e3, location=(150, 0))
     
     # Analyze (elastic or icr method)
     result = bolts.analyze(force, method="elastic")
@@ -54,7 +55,7 @@ Example usage (Bolts):
 
 from .weld import (
     Weld,
-    WeldParameters,
+    WeldParams,
     WeldProperties,
     ELECTRODE_STRENGTH,
 )
@@ -65,17 +66,18 @@ from .welded_section import (
     WeldSegment,
 )
 
-from .force import Force
+from .load import Load
 
-from .stress import (
+from .loaded_weld import LoadedWeld
+
+from .weld_stress import (
     StressComponents,
     PointStress,
-    StressResult,
     calculate_elastic_stress,
     calculate_icr_stress,
 )
 
-from .plotter import (
+from .weld_plotter import (
     plot_stress_result,
     plot_stress_comparison,
     plot_weld_geometry,
@@ -106,16 +108,16 @@ from .bolt_plotter import (
 __all__ = [
     # Main weld classes
     "Weld",
-    "WeldParameters",
+    "WeldParams",
     "WeldProperties",
     "WeldedSection",
     "WeldGroup",
     "WeldSegment",
-    "Force",
+    "Load",
+    "LoadedWeld",
     # Weld stress results
     "StressComponents",
     "PointStress",
-    "StressResult",
     # Weld functions
     "calculate_elastic_stress",
     "calculate_icr_stress",

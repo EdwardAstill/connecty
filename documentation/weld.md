@@ -390,17 +390,19 @@ print(f"f_moment_z: {components.f_moment_z}")
 
 ```python
 weld.plot(
-    stress=result,      # StressResult object (optional, plots geometry only if None)
+    force=force,        # Force object (required)
+    method="elastic",   # Analysis method: "elastic", "icr", or "both"
+    section=False,      # Show section outline (only if weld has section reference)
     info=True,          # Show stress info (max, utilization) in title
-    section=True,       # Show section outline (only if weld has section reference)
     cmap="coolwarm",    # Matplotlib colormap
     weld_linewidth=5.0, # Weld line thickness
     show=True,          # Display plot
     save_path=None,     # Save to file (use .svg extension)
-    legend=False,       # Show legend
-    method=None         # "elastic", "icr", or "both"
+    legend=False        # Show legend with applied loads
 )
 ```
+
+The plot method automatically calculates stress using `weld.stress(force, method)` based on the specified method.
 
 **Note:** `section=True` only has an effect if the `Weld` was created via `Weld.from_section()`. Otherwise, only the weld path is shown.
 

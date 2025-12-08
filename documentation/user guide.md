@@ -139,15 +139,15 @@ params = WeldParameters(
 # Use kip and inches - stresses will be in ksi
 ```
 
-### Defining Forces
+### Defining Loads
 
-The `Force` class is used for both weld and bolt analysis. It allows you to define loads in 6 degrees of freedom and specify their point of application.
+The `Load` class is used for both weld and bolt analysis. It allows you to define loads in 6 degrees of freedom and specify their point of application.
 
 ```python
-from connecty import Force
+from connecty import Load
 
 # Load applied at a specific location (y=100, z=50)
-force = Force(
+load = Load(
     Fy=-50000,      # 50 kN Downward shear
     Fz=20000,       # 20 kN Horizontal shear
     Fx=10000,       # 10 kN Axial tension
@@ -158,7 +158,7 @@ force = Force(
 )
 ```
 
-**Note:** If a force is applied away from the connection's centroid, Connecty automatically calculates the resulting eccentric moments.
+**Note:** If a load is applied away from the connection's centroid, Connecty automatically calculates the resulting eccentric moments.
 
 ---
 
@@ -297,65 +297,65 @@ For fillet welds, if only `leg` is provided, throat is calculated automatically:
 
 ### Results & Plotting <a name="weld-results"></a>
 
-Calculate stress and visualize results using the `stress()` method.
+Create a `LoadedWeld` object and access results directly. The object is created with a specified analysis method and contains all stress results.
 
 ```python
-# Calculate
-result = welded.calculate_weld_stress(force, method="elastic")
-# OR for custom geometry:
-# result = weld.stress(force, method="elastic")
+from connecty import LoadedWeld
 
-# Check capacity
-print(f"Max Stress: {result.max:.2f} MPa")
-print(f"Capacity: {result.capacity:.2f} MPa")
-print(f"Utilization: {result.utilization():.1%}")
-print(f"Adequate? {result.is_adequate()}")
+# Create loaded weld with elastic analysis
+loaded = LoadedWeld(weld, load, method="elastic")
+
+# Check capacity (results are immediately available)
+print(f"Max Stress: {loaded.max:.2f} MPa")
+print(f"Capacity: {loaded.capacity:.2f} MPa")
+print(f"Utilization: {loaded.utilization():.1%}")
+print(f"Adequate? {loaded.is_adequate()}")
 
 # Plot Resultant Stress
-weld.plot(
-    stress=result,      # StressResult
-    info=True,          # Show stats in title
+loaded.plot(
     section=True,       # Show section outline (if available)
+    info=True,          # Show stats in title
     cmap="coolwarm",    # Color map
     save_path="weld_results.svg"
 )
 
-# Plot Specific Components (Shear, Bending, etc.)
-result.plot_components(
-    components=["shear_resultant", "total_axial"],
-    save_path="weld_components.svg"
-)
+# For comparison plots (elastic vs ICR for fillet welds):
+loaded_both = LoadedWeld(weld, load, method="both")
+loaded_both.plot(save_path="comparison.svg")
 ```
 
-**Complete Result Properties:**
+**LoadedWeld Properties:**
 
 ```python
-result = weld.stress(force)
+loaded = LoadedWeld(weld, load, method="elastic")
 
 # Basic properties
-result.max              # Maximum resultant stress (MPa)
-result.min              # Minimum resultant stress (MPa)
-result.mean             # Average stress (MPa)
-result.range            # Stress range (max - min) (MPa)
-result.capacity         # Design capacity φ(0.60 × F_EXX) (MPa)
+loaded.max              # Maximum resultant stress (MPa)
+loaded.min              # Minimum resultant stress (MPa)
+loaded.mean             # Average stress (MPa)
+loaded.range            # Stress range (max - min) (MPa)
+loaded.capacity         # Design capacity φ(0.60 × F_EXX) (MPa)
+loaded.method           # Analysis method used ("elastic" or "icr")
 
 # Detailed access
-result.max_point        # PointStress object at max location
-result.all              # List of all PointStress objects
-result.icr_point        # ICR location (if ICR method used)
-result.rotation         # Rotation angle (if ICR method used)
+loaded.max_point        # PointStress object at max location
+loaded.all              # List of all PointStress objects
+loaded.point_stresses   # Same as all
+loaded.icr_point        # ICR location (if method="icr")
+loaded.rotation         # Rotation distance (if method="icr")
 
 # Methods
-result.utilization(allowable=None)  # max / allowable (uses capacity if None)
-result.is_adequate(allowable=None)  # True if utilization ≤ 1.0
-result.at(y, z)                     # StressComponents at nearest point
+loaded.utilization(allowable=None)  # max / allowable (uses capacity if None)
+loaded.is_adequate(allowable=None)  # True if utilization ≤ 1.0
+loaded.at(y, z)                     # StressComponents at nearest point
+loaded.plot(...)                    # Plot stress distribution
 ```
 
 **Accessing Stress Components:**
 
 ```python
 # Get stress at specific location
-components = result.at(y=100, z=0)
+components = loaded.at(y=100, z=0)
 
 # Individual components
 components.f_direct_y   # In-plane shear from Fy (uniform)
@@ -373,7 +373,7 @@ components.shear_resultant  # √(total_y² + total_z²)
 components.resultant    # √(total_axial² + shear_resultant²)
 
 # Access at maximum stress location
-pt = result.max_point
+pt = loaded.max_point
 print(f"Location: ({pt.y:.1f}, {pt.z:.1f})")
 print(f"Stress: {pt.stress:.1f} MPa")
 print(f"Components: {pt.components}")
@@ -382,31 +382,27 @@ print(f"Components: {pt.components}")
 **Plotting Options:**
 
 ```python
-# Plot resultant stress
-result.plot(
+# Plot with elastic method
+loaded = LoadedWeld(weld, load, method="elastic")
+loaded.plot(
     section=True,           # Show section outline (if available)
-    force=True,             # Show force arrow at application point
-    colorbar=True,         # Show stress colorbar
-    cmap="coolwarm",       # Matplotlib colormap
-    weld_linewidth=5.0,    # Weld line thickness
-    ax=None,               # Matplotlib axes (creates new if None)
-    show=True,             # Display plot
-    save_path="weld.svg"   # Save to file (.svg recommended)
+    cmap="coolwarm",        # Matplotlib colormap
+    weld_linewidth=5.0,     # Weld line thickness
+    show=True,              # Display plot
+    save_path="weld.svg"    # Save to file (.svg recommended)
 )
 
-# Compare Elastic vs ICR (stacked plots)
-result.plot(
-    force=force,
-    method="both",
+# Compare Elastic vs ICR (side-by-side plots)
+loaded_both = LoadedWeld(weld, load, method="both")
+loaded_both.plot(
     save_path="comparison.svg"
 )
 
-# Plot individual stress components
-result.plot_components(
-    components=["direct", "moment", "axial", "bending"],
-    layout="grid",         # "grid" or "row"
-    save_path="components.svg"
-)
+# ICR-specific analysis
+loaded_icr = LoadedWeld(weld, load, method="icr")
+print(f"ICR location: {loaded_icr.icr_point}")
+print(f"Rotation distance: {loaded_icr.rotation:.2f} mm")
+loaded_icr.plot()
 ```
 
 **Note:** `section=True` only has an effect if the `Weld` was created via `Weld.from_section()` or `WeldedSection`. Otherwise, only the weld path is shown.
@@ -555,57 +551,85 @@ plot_bolt_pattern(bolts, save_path="pattern.svg")
 
 ```python
 from sectiony.library import rhs
-from connecty import Weld, WeldParameters, Force
+from connecty import Weld, WeldParams, Load, LoadedWeld
 
 section = rhs(b=100, h=200, t=10, r=15)
-params = WeldParameters(
-    weld_type="fillet",
+params = WeldParams(
+    type="fillet",
     leg=6.0,              # 6mm leg → throat auto-calculated as 4.2mm
     electrode="E70"       # F_EXX = 483 MPa
 )
 
 weld = Weld.from_section(section=section, parameters=params)
-force = Force(Fy=-100e3, location=(100, 0))  # Eccentric load
-result = weld.stress(force, method="elastic")
+load = Load(Fy=-100e3, location=(100, 0))  # Eccentric load
 
-print(f"Max stress: {result.max:.1f} MPa")
-print(f"Capacity: {result.capacity:.1f} MPa")  # φ(0.60 × 483) = 217 MPa
-print(f"Utilization: {result.utilization():.1%}")
+# Create LoadedWeld with elastic method
+loaded = LoadedWeld(weld, load, method="elastic")
+
+print(f"Max stress: {loaded.max:.1f} MPa")
+print(f"Capacity: {loaded.capacity:.1f} MPa")  # φ(0.60 × 483) = 217 MPa
+print(f"Utilization: {loaded.utilization():.1%}")
+
+loaded.plot(save_path="elastic_result.svg")
 ```
 
 ### Example 2: Fillet Weld - ICR Method
 
 ```python
-# Same setup as Example 1
-result_icr = weld.stress(force, method="icr")
-print(f"ICR Max stress: {result_icr.max:.1f} MPa")
-print(f"ICR Utilization: {result_icr.utilization():.1%}")
+# Same weld and load setup
+loaded_icr = LoadedWeld(weld, load, method="icr")
+
+print(f"ICR Max stress: {loaded_icr.max:.1f} MPa")
+print(f"ICR Utilization: {loaded_icr.utilization():.1%}")
+print(f"ICR Point: {loaded_icr.icr_point}")
 # ICR typically gives lower utilization due to directional strength increase
+
+loaded_icr.plot(save_path="icr_result.svg")
+```
+
+### Example 2b: Comparing Methods
+
+```python
+# Create comparison plot (elastic and ICR side-by-side)
+loaded_both = LoadedWeld(weld, load, method="both")
+loaded_both.plot(save_path="comparison.svg")
+
+# Or manually compare
+elastic_result = LoadedWeld(weld, load, method="elastic")
+icr_result = LoadedWeld(weld, load, method="icr")
+
+print(f"Elastic util: {elastic_result.utilization():.1%}")
+print(f"ICR util: {icr_result.utilization():.1%}")
+print(f"Savings: {(1 - icr_result.utilization() / elastic_result.utilization()) * 100:.0f}%")
 ```
 
 ### Example 3: PJP Groove Weld
 
 ```python
-from connecty import Weld, WeldParameters, Force
+from connecty import Weld, WeldParams, Load, LoadedWeld
 from sectiony import Geometry, Contour, Line
 
 weld_path = Contour(segments=[Line(start=(0, -150), end=(0, 150))])
-params = WeldParameters(
-    weld_type="pjp",
+params = WeldParams(
+    type="pjp",
     throat=8.0,           # Effective throat E = 8mm
     electrode="E70"
 )
 weld = Weld(geometry=Geometry(contours=[weld_path]), parameters=params)
 
-force = Force(Fx=200e3, Mz=50e6)  # Tension + bending
-result = weld.stress(force)  # Elastic method only for PJP
+load = Load(Fx=200e3, Mz=50e6)  # Tension + bending
+loaded = LoadedWeld(weld, load, method="elastic")  # Elastic method only for PJP
+
+print(f"Max stress: {loaded.max:.1f} MPa")
+print(f"Utilization: {loaded.utilization():.1%}")
+loaded.plot()
 ```
 
 ### Example 4: CJP Weld (Base Metal Check)
 
 ```python
-params = WeldParameters(
-    weld_type="cjp",
+params = WeldParams(
+    type="cjp",
     t_base=12.0,          # 12mm plate
     F_y=345,              # Grade 345 steel yield
     F_u=450,              # Ultimate strength
@@ -613,9 +637,9 @@ params = WeldParameters(
 )
 weld = Weld(geometry=Geometry(contours=[weld_path]), parameters=params)
 
-force = Force(Fx=500e3)  # Tension
-result = weld.stress(force, method="base_metal")
-# Result is base metal utilization, not weld stress
+load = Load(Fx=500e3)  # Tension
+loaded = LoadedWeld(weld, load, method="elastic")
+# Result shows weld stress (CJP governed by filler strength)
 ```
 
 ### Example 5: Plug Weld
@@ -627,34 +651,37 @@ import math
 plug_center = Contour(segments=[
     Arc(center=(0, 0), radius=10, start_angle=0, end_angle=2*math.pi)
 ])
-params = WeldParameters(
-    weld_type="plug",
+params = WeldParams(
+    type="plug",
     area=math.pi * 10**2,  # πr² = 314 mm²
     electrode="E70"
 )
 weld = Weld(geometry=Geometry(contours=[plug_center]), parameters=params)
 
 # Plug welds resist shear only
-force = Force(Fy=-15e3, Fz=10e3)
-result = weld.stress(force)
+load = Load(Fy=-15e3, Fz=10e3)
+loaded = LoadedWeld(weld, load, method="elastic")
+
+print(f"Max stress: {loaded.max:.1f} MPa")
+loaded.plot()
 ```
 
 ### Example 6: Bolt Group - Eccentric Load
 
 ```python
-from connecty import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltParameters, Load
 
 params = BoltParameters(diameter=20, grade="A325")
 bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, parameters=params)
 
-force = Force(Fy=-100000, location=(75, 150))  # Eccentric load
+load = Load(Fy=-100000, location=(75, 150))  # Eccentric load
 
 # Elastic analysis
-result_elastic = bolts.analyze(force, method="elastic")
+result_elastic = bolts.analyze(load, method="elastic")
 print(f"Elastic max: {result_elastic.max_force:.1f} kN")
 
 # ICR analysis (more economical)
-result_icr = bolts.analyze(force, method="icr")
+result_icr = bolts.analyze(load, method="icr")
 print(f"ICR max: {result_icr.max_force:.1f} kN")
 print(f"ICR location: {result_icr.icr_point}")
 ```
@@ -665,14 +692,25 @@ print(f"ICR location: {result_icr.icr_point}")
 
 ### Main Classes
 
+**`LoadedWeld(weld, load, method="elastic", discretization=200)`**
+- `weld`: `Weld` object (required)
+- `load`: `Load` object (required)
+- `method`: `"elastic" | "icr" | "both"` (default "elastic")
+- `discretization`: Number of points (default 200)
+- Properties: `max`, `min`, `mean`, `range`, `capacity`, `method`, `max_point`, `all`, `point_stresses`, `icr_point`, `rotation`
+- Methods:
+  - `utilization(allowable=None)` → `float`
+  - `is_adequate(allowable=None)` → `bool`
+  - `at(y, z)` → `StressComponents`
+  - `plot(section=True, ...)` → `Axes`
+  - `elastic()` → `LoadedWeld` (for backward compat, creates new with method="elastic")
+  - `icr()` → `LoadedWeld` (for backward compat, creates new with method="icr")
+
 **`Weld(geometry, parameters, section=None)`**
 - `geometry`: Weld path as `sectiony.Geometry` (required)
-- `parameters`: `WeldParameters` configuration
+- `parameters`: `WeldParams` configuration
 - `section`: Optional `Section` reference for plotting
 - Properties: `A`, `L`, `Cy`, `Cz`, `Iy`, `Iz`, `Ip`
-- Methods: 
-  - `stress(force, method, discretization)` → `StressResult`
-  - `plot(stress, info, ...)` → `Axes`
 - Class methods: `from_section(section, parameters, contour_index=0)` → `Weld`
 
 **`WeldedSection(section)`**
@@ -682,11 +720,11 @@ print(f"ICR location: {result_icr.icr_point}")
   - `add_weld(segment_index, parameters)`
   - `add_welds(segment_indices, parameters)`
   - `get_segment_info(contour_index=None, include_hollows=False)`
-  - `calculate_weld_stress(force, method, discretization)` → `StressResult`
-  - `plot_weld_stress(force, method, ...)` → Axes
+  - `calculate_weld_stress(load, method, discretization)` → `LoadedWeld`
+  - `plot_weld_stress(load, method, ...)` → Axes
 
-**`WeldParameters`**
-- `weld_type`: `"fillet" | "pjp" | "cjp" | "plug" | "slot"`
+**`WeldParams`** (formerly `WeldParameters`)
+- `type`: `"fillet" | "pjp" | "cjp" | "plug" | "slot"`
 - `leg`: Fillet leg size (any length unit)
 - `throat`: Effective throat (any length unit)
 - `area`: Plug/slot area (any length² unit)
@@ -719,7 +757,7 @@ print(f"ICR location: {result_icr.icr_point}")
 - `R_n`: Override nominal capacity per bolt (any force unit; default calculation uses kN)
 - Properties: `capacity` → Design capacity φR_n (units match `R_n` or default to kN)
 
-**`Force(Fx=0, Fy=0, Fz=0, Mx=0, My=0, Mz=0, location=(0,0))`**
+**`Load(Fx=0, Fy=0, Fz=0, Mx=0, My=0, Mz=0, location=(0,0))`** (formerly `Force`)
 - `Fx`: Axial force (out-of-plane)
 - `Fy`: Vertical shear (in-plane)
 - `Fz`: Horizontal shear (in-plane)
@@ -727,17 +765,9 @@ print(f"ICR location: {result_icr.icr_point}")
 - `My`: Bending about y-axis
 - `Mz`: Bending about z-axis
 - `location`: Application point `(y, z)`
-
-### Result Classes
-
-**`StressResult`**
-- Properties: `max`, `min`, `mean`, `range`, `capacity`, `max_point`, `all`, `icr_point`, `rotation`
 - Methods:
-  - `at(y, z)` → `StressComponents`
-  - `utilization(allowable=None)` → `float`
-  - `is_adequate(allowable=None)` → `bool`
-  - `plot(section, force, colorbar, cmap, ...)` → Axes
-  - `plot_components(components, layout, ...)` → Axes
+  - `at(y, z)` → `(Fx, Fy, Fz, Mx_total, My_total, Mz_total)`
+  - `get_moments_about(y, z)` → `(Mx_total, My_total, Mz_total)` (legacy)
 
 **`BoltResult`**
 - Properties: `max_force`, `min_force`, `mean`, `capacity`, `critical_bolt`, `critical_index`, `bolt_forces`, `icr_point`

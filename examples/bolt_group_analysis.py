@@ -1,19 +1,19 @@
 """
-Example 7: Bolt Group Analysis (Elastic and ICR Methods)
+Bolt Group Analysis (Elastic and ICR Methods)
 
 Demonstrates bolt group analysis for a rectangular pattern
 of bolts with eccentric loading.
 """
-from connecty import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltParameters, Load
 from pathlib import Path
 
 
 def main():
     # ========================================
-    # Example A: Simple bolt group with eccentric load (Elastic)
+    # Case A: Simple bolt group with eccentric load (Elastic)
     # ========================================
     print("=" * 60)
-    print("Example A: Rectangular Bolt Pattern with Eccentric Load")
+    print("Case A: Rectangular Bolt Pattern with Eccentric Load")
     print("=" * 60)
     
     # Create bolt parameters
@@ -47,13 +47,13 @@ def main():
     # Applied load: 100kN at offset from centroid (creating torsion)
     # Centroid is at (75, 30). Force at (75, 150) creates eccentricity in z-direction.
     # Torsion Mx = Fz × dy - Fy × dz = 0 - (-100000) × (150-30) = 12,000,000 N·mm
-    force = Force(
+    load = Load(
         Fy=-100000,            # 100kN downward (N)
-        location=(75, 150)     # Same y as centroid, offset 120mm in z-direction
+        location=(0, 75, 150)     # Same y as centroid, offset 120mm in z-direction
     )
     
     # Analyze using elastic method
-    result_elastic = bolts.analyze(force, method="elastic")
+    result_elastic = bolts.analyze(load, method="elastic")
     
     print(f"\nElastic Method Results:")
     print(f"  Max bolt force: {result_elastic.max_force:.2f} kN")
@@ -77,17 +77,17 @@ def main():
         bolt_forces=True,
         colorbar=True,
         show=False,
-        save_path=str(gallery_dir / "example7_bolt_elastic.svg")
+        save_path=str(gallery_dir / "bolt_group_elastic.svg")
     )
     
     # ========================================
-    # Example B: Same configuration with ICR method
+    # Case B: Same configuration with ICR method
     # ========================================
     print("\n" + "=" * 60)
-    print("Example B: ICR Method Comparison")
+    print("Case B: ICR Method Comparison")
     print("=" * 60)
     
-    result_icr = bolts.analyze(force, method="icr")
+    result_icr = bolts.analyze(load, method="icr")
     
     print(f"\nICR Method Results:")
     print(f"  Max bolt force: {result_icr.max_force:.2f} kN")
@@ -107,14 +107,14 @@ def main():
         bolt_forces=True,
         colorbar=True,
         show=False,
-        save_path=str(gallery_dir / "example7_bolt_icr.svg")
+        save_path=str(gallery_dir / "bolt_group_icr.svg")
     )
     
     # ========================================
-    # Example C: Circular bolt pattern
+    # Case C: Circular bolt pattern
     # ========================================
     print("\n" + "=" * 60)
-    print("Example C: Circular Bolt Pattern")
+    print("Case C: Circular Bolt Pattern")
     print("=" * 60)
     
     # Create circular bolt pattern
@@ -132,13 +132,13 @@ def main():
     print(f"  Polar moment Ip: {circular_bolts.Ip:.0f} mm²")
     
     # Eccentric load
-    circular_force = Force(
+    circular_load = Load(
         Fy=-80000,             # 80kN downward
         Fz=30000,              # 30kN to the right
-        location=(0, 150)      # 150mm right of center
+        location=(0, 0, 150)      # 150mm right of center
     )
     
-    result_circular = circular_bolts.analyze(circular_force, method="elastic")
+    result_circular = circular_bolts.analyze(circular_load, method="elastic")
     
     print(f"\nElastic Results:")
     print(f"  Max bolt force: {result_circular.max_force:.2f} kN")
@@ -148,14 +148,14 @@ def main():
         force=True,
         bolt_forces=True,
         show=False,
-        save_path=str(gallery_dir / "example7_bolt_circular.svg")
+        save_path=str(gallery_dir / "bolt_group_circular.svg")
     )
     
     # ========================================
-    # Example D: Slip-critical connection
+    # Case D: Slip-critical connection
     # ========================================
     print("\n" + "=" * 60)
-    print("Example D: Slip-Critical Connection")
+    print("Case D: Slip-Critical Connection")
     print("=" * 60)
     
     slip_params = BoltParameters(
@@ -181,8 +181,8 @@ def main():
     print(f"  Pretension: {slip_params.pretension:.1f} kN")
     print(f"  Slip resistance per bolt: {slip_params.capacity:.1f} kN")
     
-    slip_force = Force(Fy=-50000, location=(75, 75))
-    result_slip = slip_bolts.analyze(slip_force, method="elastic")
+    slip_load = Load(Fy=-50000, location=(0, 75, 75))
+    result_slip = slip_bolts.analyze(slip_load, method="elastic")
     
     print(f"\nResults:")
     print(f"  Max bolt force: {result_slip.max_force:.2f} kN")
@@ -193,7 +193,7 @@ def main():
         force=True,
         bolt_forces=True,
         show=False,
-        save_path=str(gallery_dir / "example7_bolt_slip.svg")
+        save_path=str(gallery_dir / "bolt_group_slip_critical.svg")
     )
     
     print("\n" + "=" * 60)

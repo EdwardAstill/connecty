@@ -22,9 +22,8 @@ from sectiony.geometry import (
     CubicBezier,
 )
 
-from .weld import Weld, WeldParameters, WeldProperties
-from .force import Force
-from .stress import StressResult
+from .weld import Weld, WeldParams, WeldProperties
+from .load import Load
 
 Point = Tuple[float, float]
 
@@ -110,7 +109,7 @@ class WeldGroup:
     """
     weld: Weld
     segments: List[WeldSegment]
-    parameters: WeldParameters
+    parameters: WeldParams
 
     @property
     def properties(self) -> WeldProperties:
@@ -127,7 +126,7 @@ class WeldedSection:
             raise ValueError("Section must include geometry for welding operations")
         self.section = section
         self._segments = self._extract_segments(section)
-        self._assignments: Dict[int, WeldParameters] = {}
+        self._assignments: Dict[int, WeldParams] = {}
         self.weld_group: WeldGroup | None = None
 
     @staticmethod
@@ -174,7 +173,7 @@ class WeldedSection:
             info.append(seg.to_dict())
         return info
 
-    def add_weld(self, segment_index: int, parameters: WeldParameters) -> None:
+    def add_weld(self, segment_index: int, parameters: WeldParams) -> None:
         """
         Assign weld parameters to a specific segment.
         """
@@ -186,14 +185,14 @@ class WeldedSection:
     def add_welds(
         self,
         segment_indices: Sequence[int],
-        parameters: WeldParameters
+        parameters: WeldParams
     ) -> None:
         for idx in segment_indices:
             self.add_weld(int(idx), parameters)
 
     def weld_all_segments(
         self,
-        parameters: WeldParameters,
+        parameters: WeldParams,
         contour_index: int | None = None,
         include_hollows: bool = False
     ) -> None:
@@ -240,7 +239,7 @@ class WeldedSection:
         )
         return self.weld_group
 
-    def _resolve_parameters(self, segments: List[WeldSegment]) -> WeldParameters:
+    def _resolve_parameters(self, segments: List[WeldSegment]) -> WeldParams:
         """
         Ensure all selected segments use identical parameters.
         """
@@ -272,23 +271,23 @@ class WeldedSection:
 
     def calculate_weld_stress(
         self,
-        force: Force,
+        load: Load,
         method: str = "elastic",
         discretization: int = 200
-    ) -> StressResult:
+    ):
         """
         Run the weld stress analysis for the current assignments.
+        
+        Returns a LoadedWeld object with calculated results.
         """
+        from .loaded_weld import LoadedWeld
+        
         weld_group = self.calculate_properties()
-        return weld_group.weld.stress(
-            force=force,
-            method=method,
-            discretization=discretization,
-        )
+        return LoadedWeld(weld_group.weld, load, method=method, discretization=discretization)
 
     def plot_weld_stress(
         self,
-        force: Force,
+        load: Load,
         method: str = "elastic",
         discretization: int = 200,
         cmap: str = "coolwarm",
@@ -301,20 +300,17 @@ class WeldedSection:
         save_path: str | None = None
     ):
         """
-        Convenience wrapper around StressResult.plot with weld-specific defaults.
+        Convenience wrapper around LoadedWeld.plot with weld-specific defaults.
         """
-        result = self.calculate_weld_stress(
-            force=force,
+        loaded = self.calculate_weld_stress(
+            load=load,
             method=method,
             discretization=discretization,
         )
-        return result.plot(
+        return loaded.plot(
             section=section,
-            force=show_force,
-            colorbar=colorbar,
             cmap=cmap,
             weld_linewidth=weld_linewidth,
-            ax=ax,
             show=show,
             save_path=save_path,
         )

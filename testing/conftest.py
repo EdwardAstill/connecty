@@ -22,5 +22,5 @@ def welded_section() -> WeldedSection:
 @pytest.fixture
 def force() -> Force:
     """Default force for baseline continuity test."""
-    return Force(Fy=-100000, location=(0, 0))
+    return Force(Fy=-100000, location=(0, 0, 0))
 

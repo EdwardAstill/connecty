@@ -9,7 +9,8 @@ import math
 import numpy as np
 
 if TYPE_CHECKING:
-    from .stress import StressResult
+    from .weld_stress import LoadedWeldResult
+    from .loaded_weld import LoadedWeld
     from .weld import Weld
 
 import matplotlib.pyplot as plt
@@ -18,8 +19,281 @@ from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 
 
+def plot_loaded_weld(
+    loaded: LoadedWeld,
+    section: bool = True,
+    force: bool = True,
+    colorbar: bool = True,
+    cmap: str = "coolwarm",
+    weld_linewidth: float = 5.0,
+    ax: plt.Axes | None = None,
+    show: bool = True,
+    save_path: str | None = None,
+    info: bool = True,
+    legend: bool = False,
+) -> plt.Axes:
+    """
+    Plot stress distribution for a LoadedWeld.
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
+    else:
+        fig = ax.figure
+    
+    # Delegate to internal plotter
+    _plot_single_loaded_weld(
+        ax, 
+        loaded, 
+        section=section, 
+        force=force, 
+        colorbar=colorbar,
+        cmap=cmap, 
+        weld_linewidth=weld_linewidth,
+        info=info,
+        legend=legend
+    )
+    
+    plt.tight_layout()
+    
+    if save_path:
+        if not save_path.endswith('.svg'):
+            save_path += '.svg'
+        fig.savefig(save_path, format='svg', bbox_inches='tight')
+        print(f"Saved: {save_path}")
+    
+    if show:
+        plt.show()
+    
+    return ax
+
+
+def plot_loaded_weld_comparison(
+    loaded_list: Sequence[LoadedWeld],
+    section: bool = True,
+    force: bool = True,
+    colorbar: bool = True,
+    cmap: str = "coolwarm",
+    weld_linewidth: float = 5.0,
+    show: bool = True,
+    save_path: str | None = None,
+    info: bool = True,
+    legend: bool = False,
+) -> plt.Figure:
+    """
+    Plot multiple LoadedWeld results with a shared colorbar.
+    """
+    n = len(loaded_list)
+    if n == 0:
+        raise ValueError("No loaded welds to plot")
+
+    y_coords: list[float] = []
+    z_coords: list[float] = []
+    for loaded in loaded_list:
+        if not loaded.point_stresses:
+            continue
+        y_coords.extend(ps.y for ps in loaded.point_stresses)
+        z_coords.extend(ps.z for ps in loaded.point_stresses)
+
+    y_range = max(y_coords) - min(y_coords) if y_coords else 0.0
+    z_range = max(z_coords) - min(z_coords) if z_coords else 0.0
+
+    stack_vertically = z_range >= y_range
+
+    if stack_vertically:
+        fig, axes = plt.subplots(n, 1, figsize=(10, 5 * n))
+        fig.subplots_adjust(hspace=0.2)
+    else:
+        fig, axes = plt.subplots(1, n, figsize=(6 * n, 10))
+        fig.subplots_adjust(wspace=0.2)
+
+    if isinstance(axes, np.ndarray):
+        axes_list = list(axes.flatten())
+    else:
+        axes_list = [axes]
+        
+    # Calculate global min/max for shared color scale
+    global_min = min(loaded.min for loaded in loaded_list)
+    global_max = max(loaded.max for loaded in loaded_list)
+    
+    # Plot each result
+    for i, (loaded, ax) in enumerate(zip(loaded_list, axes_list)):
+        _plot_single_loaded_weld(
+            ax,
+            loaded,
+            section=section,
+            force=force,
+            colorbar=False,
+            cmap=cmap,
+            weld_linewidth=weld_linewidth,
+            info=info,
+            legend=legend,
+            vmin=global_min,
+            vmax=global_max
+        )
+        
+    # Add shared colorbar
+    if colorbar:
+        fig.subplots_adjust(right=0.85)
+        cbar_ax = fig.add_axes([0.90, 0.15, 0.02, 0.7])
+        
+        norm = mcolors.Normalize(vmin=global_min, vmax=global_max)
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        
+        cbar = fig.colorbar(sm, cax=cbar_ax)
+        cbar.set_label('Stress (MPa)', fontsize=12)
+        
+    if save_path:
+        if not save_path.endswith('.svg'):
+            save_path += '.svg'
+        fig.savefig(save_path, format='svg', bbox_inches='tight')
+        print(f"Saved: {save_path}")
+        
+    if show:
+        plt.show()
+        
+    return fig
+
+
+def _plot_single_loaded_weld(
+    ax: plt.Axes,
+    loaded: LoadedWeld,
+    section: bool = True,
+    force: bool = True,
+    colorbar: bool = True,
+    cmap: str = "coolwarm",
+    weld_linewidth: float = 5.0,
+    info: bool = True,
+    legend: bool = False,
+    vmin: float | None = None,
+    vmax: float | None = None
+) -> None:
+    """Internal helper to plot a single LoadedWeld onto an axes."""
+    weld = loaded.weld
+    
+    # Plot section outline if available and requested
+    if section and weld.section is not None:
+        _plot_section_outline(ax, weld.section)
+    
+    # Plot weld stress
+    _plot_loaded_weld_stress(ax, loaded, cmap, weld_linewidth, vmin, vmax)
+    
+    # Add colorbar if requested
+    if colorbar and loaded.point_stresses:
+        stress_min = vmin if vmin is not None else loaded.min
+        stress_max = vmax if vmax is not None else loaded.max
+        
+        norm = mcolors.Normalize(vmin=stress_min, vmax=stress_max)
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        
+        cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.8, aspect=30)
+        cbar.set_label('Stress (MPa)', fontsize=10)
+    
+    # Plot force arrow and centroid
+    if force:
+        _plot_force_arrow(ax, loaded.load, weld, legend=legend)
+    
+    # Plot ICR point if available
+    if loaded.icr_point is not None:
+        icr_y, icr_z = loaded.icr_point[0], loaded.icr_point[1]
+        ax.plot(icr_z, icr_y, 'ko', markersize=8)
+        
+        ax.annotate('ICR', 
+                    xy=(icr_z, icr_y), 
+                    xytext=(10, 10), 
+                    textcoords='offset points',
+                    fontsize=9,
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor='black'))
+    
+    # Formatting
+    ax.set_aspect('equal')
+    ax.set_xlabel('z', fontsize=11)
+    ax.set_ylabel('y', fontsize=11)
+    
+    # Title with key info
+    title = f"Weld Stress ({loaded.method.upper()} method)"
+    if info and loaded.point_stresses:
+        title += f"\nMax: {loaded.max:.1f} MPa | Util: {loaded.utilization():.0%}"
+    ax.set_title(title, fontsize=12)
+
+
+def _plot_loaded_weld_stress(
+    ax: plt.Axes,
+    loaded: LoadedWeld,
+    cmap: str,
+    linewidth: float,
+    vmin: float | None = None,
+    vmax: float | None = None
+) -> None:
+    """Plot weld path colored by stress."""
+    if not loaded.point_stresses:
+        return
+    
+    weld = loaded.weld
+    stress_min = vmin if vmin is not None else loaded.min
+    stress_max = vmax if vmax is not None else loaded.max
+    
+    # Normalize stresses
+    if stress_max - stress_min > 1e-12:
+        norm = mcolors.Normalize(vmin=stress_min, vmax=stress_max)
+    else:
+        norm = mcolors.Normalize(vmin=0, vmax=max(stress_max, 1))
+    
+    colormap = plt.get_cmap(cmap)
+    
+    # Group points by contour/segment for proper line plotting
+    for contour in weld.geometry.contours:
+        for segment in contour.segments:
+            seg_points = segment.discretize(resolution=100)
+            
+            if len(seg_points) < 2:
+                continue
+            
+            # Find stresses for points on this segment
+            seg_stresses = []
+            for sp in seg_points:
+                # Find nearest point stress
+                min_dist = float('inf')
+                nearest_stress = 0.0
+                for ps in loaded.point_stresses:
+                    dist = math.hypot(ps.y - sp[0], ps.z - sp[1])
+                    if dist < min_dist:
+                        min_dist = dist
+                        nearest_stress = ps.stress
+                seg_stresses.append(nearest_stress)
+            
+            # Create line segments
+            points = np.array([[p[1], p[0]] for p in seg_points])  # (z, y) for plotting
+            segments = np.array([points[:-1], points[1:]]).transpose(1, 0, 2)
+            
+            # Color by average stress of each segment
+            colors = []
+            for i in range(len(seg_stresses) - 1):
+                avg_stress = (seg_stresses[i] + seg_stresses[i + 1]) / 2
+                colors.append(colormap(norm(avg_stress)))
+            
+            lc = LineCollection(segments, colors=colors, linewidths=linewidth)
+            ax.add_collection(lc)
+    
+    # Update axis limits
+    all_y = [ps.y for ps in loaded.point_stresses]
+    all_z = [ps.z for ps in loaded.point_stresses]
+    
+    if all_y and all_z:
+        margin = max(max(all_y) - min(all_y), max(all_z) - min(all_z)) * 0.2
+        ax.set_xlim(min(all_z) - margin, max(all_z) + margin)
+        ax.set_ylim(min(all_y) - margin, max(all_y) + margin)
+
+
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib.collections import LineCollection
+from matplotlib.lines import Line2D
+
+
 def plot_stress_result(
-    result: StressResult,
+    result: LoadedWeldResult,
     section: bool = True,
     force: bool = True,
     colorbar: bool = True,
@@ -67,7 +341,7 @@ def plot_stress_result(
 
 
 def plot_stress_comparison(
-    results: Sequence[StressResult],
+    results: Sequence[LoadedWeldResult],
     section: bool = True,
     force: bool = True,
     colorbar: bool = True,
@@ -79,7 +353,11 @@ def plot_stress_comparison(
     legend: bool = False,
 ) -> plt.Figure:
     """
-    Plot multiple stress results stacked vertically with shared colorbar.
+    Plot multiple stress results with a shared colorbar.
+    
+    Layout toggles between vertical stacks for wide welds and horizontal stacks
+    for tall welds to keep the view balanced. The colorbar remains shared on the
+    right-hand side regardless of stacking.
     
     Args:
         results: List of StressResult objects to compare
@@ -92,17 +370,38 @@ def plot_stress_comparison(
     n = len(results)
     if n == 0:
         raise ValueError("No results to plot")
-        
-    fig, axes = plt.subplots(n, 1, figsize=(10, 8 * n))
-    if n == 1:
-        axes = [axes]
+
+    y_coords: list[float] = []
+    z_coords: list[float] = []
+    for result in results:
+        if not result.point_stresses:
+            continue
+        y_coords.extend(ps.y for ps in result.point_stresses)
+        z_coords.extend(ps.z for ps in result.point_stresses)
+
+    y_range = max(y_coords) - min(y_coords) if y_coords else 0.0
+    z_range = max(z_coords) - min(z_coords) if z_coords else 0.0
+
+    stack_vertically = z_range >= y_range
+
+    if stack_vertically:
+        fig, axes = plt.subplots(n, 1, figsize=(10, 5 * n))
+        fig.subplots_adjust(hspace=0.2)
+    else:
+        fig, axes = plt.subplots(1, n, figsize=(6 * n, 10))
+        fig.subplots_adjust(wspace=0.2)
+
+    if isinstance(axes, np.ndarray):
+        axes_list = list(axes.flatten())
+    else:
+        axes_list = [axes]
         
     # Calculate global min/max for shared color scale
     global_min = min(r.min for r in results)
     global_max = max(r.max for r in results)
     
     # Plot each result
-    for i, (result, ax) in enumerate(zip(results, axes)):
+    for i, (result, ax) in enumerate(zip(results, axes_list)):
         _plot_single_weld_result(
             ax,
             result,
@@ -144,7 +443,7 @@ def plot_stress_comparison(
 
 def _plot_single_weld_result(
     ax: plt.Axes,
-    result: StressResult,
+    result: LoadedWeldResult,
     section: bool = True,
     force: bool = True,
     colorbar: bool = True,
@@ -156,7 +455,7 @@ def _plot_single_weld_result(
     vmax: float | None = None
 ) -> None:
     """Internal helper to plot a single result onto an axes."""
-    weld = result.weld
+    weld = result.loaded_weld.weld
     
     # Plot section outline if available and requested
     if section and weld.section is not None:
@@ -179,7 +478,7 @@ def _plot_single_weld_result(
     
     # Plot force arrow and centroid
     if force:
-        _plot_force_arrow(ax, result.force, weld, legend=legend)
+        _plot_force_arrow(ax, result.loaded_weld.load, weld, legend=legend)
     
     # Plot ICR point if available
     if result.icr_point is not None:
@@ -275,7 +574,7 @@ def _plot_section_outline(ax: plt.Axes, section) -> None:
 
 def _plot_weld_stress(
     ax: plt.Axes,
-    result: StressResult,
+    result: LoadedWeldResult,
     cmap: str,
     linewidth: float,
     vmin: float | None = None,
@@ -285,7 +584,7 @@ def _plot_weld_stress(
     if not result.point_stresses:
         return
     
-    weld = result.weld
+    weld = result.loaded_weld.weld
     stress_min = vmin if vmin is not None else result.min
     stress_max = vmax if vmax is not None else result.max
     
@@ -346,7 +645,7 @@ def _plot_force_arrow(ax: plt.Axes, force, weld, legend: bool = False) -> None:
     Plot force application point and weld centroid with text labels on plot.
     When legend=True, also show a legend with applied load values.
     """
-    y_loc, z_loc = force.location
+    x_loc, y_loc, z_loc = force.location
     weld_cy = weld.Cy
     weld_cz = weld.Cz
     
@@ -360,7 +659,7 @@ def _plot_force_arrow(ax: plt.Axes, force, weld, legend: bool = False) -> None:
     # Always add text annotations for points
     # Calculate label offsets based on position
     def get_x_offset(z: float) -> int:
-        return -90 if z > 0 else 15
+        return -70 if z > 0 else 10
     
     # Check if points are vertically close (similar y values)
     vertically_close = abs(y_loc - weld_cy) < 50
@@ -424,7 +723,7 @@ def _plot_force_arrow(ax: plt.Axes, force, weld, legend: bool = False) -> None:
 
 
 def plot_stress_components(
-    result: StressResult,
+    result: LoadedWeldResult,
     components: List[str],
     layout: str = "grid",
     **kwargs: Any
