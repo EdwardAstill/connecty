@@ -1,187 +1,46 @@
 """
 Bolt group analysis for bolted connections.
 
-Supports elastic and ICR analysis methods per AISC 360.
+Calculates force distribution using elastic and ICR methods.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Literal, List, Tuple, TYPE_CHECKING
+from typing import List, Tuple, TYPE_CHECKING
 import math
 import numpy as np
 
 if TYPE_CHECKING:
     from .force import Force
 
+from .icr_solver import (
+    ZERO_TOLERANCE,
+    POSITION_TOLERANCE,
+    ICRSearchConfig,
+    CrawfordKulakParams,
+    calculate_perpendicular_direction,
+    calculate_search_bounds,
+    find_icr_distance,
+    crawford_kulak_force,
+)
+
 # Type aliases
 Point = Tuple[float, float]
-BoltGrade = Literal["A325", "A490", "8.8", "10.9"]
-HoleType = Literal["STD", "OVS", "SSL", "LSL"]
-ThreadCondition = Literal["N", "X"]  # N = threads Not excluded, X = threads eXcluded
-
-
-# Bolt material properties (nominal shear strength, MPa)
-# Per AISC 360 Table J3.2
-BOLT_SHEAR_STRENGTH: dict[str, dict[str, float]] = {
-    "A325": {"N": 372.0, "X": 457.0},   # F_nv = 54 ksi (N) or 68 ksi (X)
-    "A490": {"N": 457.0, "X": 579.0},   # F_nv = 68 ksi (N) or 84 ksi (X)
-    # Metric grades (MPa)
-    "8.8": {"N": 372.0, "X": 457.0},    # Similar to A325
-    "10.9": {"N": 457.0, "X": 579.0},   # Similar to A490
-}
-
-# Slip-critical surface class factors (μ) per AISC 360 Table J3.1
-SLIP_CLASS_FACTORS: dict[str, float] = {
-    "A": 0.30,  # Class A (unpainted clean mill scale, or Class A coating)
-    "B": 0.50,  # Class B (unpainted blast-cleaned, or Class B coating)
-    "C": 0.35,  # Class C (hot-dipped galvanized with wire brushed surfaces)
-}
-
-# Minimum bolt pretension (kN) per AISC Table J3.1
-BOLT_PRETENSION: dict[str, dict[float, float]] = {
-    # A325 / 8.8
-    "A325": {
-        16: 91.0, 20: 142.0, 22: 176.0, 24: 205.0,
-        27: 267.0, 30: 326.0, 36: 475.0
-    },
-    # A490 / 10.9
-    "A490": {
-        16: 114.0, 20: 179.0, 22: 221.0, 24: 257.0,
-        27: 334.0, 30: 408.0, 36: 595.0
-    },
-}
-BOLT_PRETENSION["8.8"] = BOLT_PRETENSION["A325"]
-BOLT_PRETENSION["10.9"] = BOLT_PRETENSION["A490"]
 
 
 @dataclass
 class BoltParameters:
     """
-    Parameters defining bolt configuration per AISC 360.
+    Parameters defining bolt configuration.
     
     Attributes:
-        diameter: Bolt diameter in mm
-        grade: Bolt grade (A325, A490, 8.8, 10.9)
-        threads_excluded: Thread condition - True for X (excluded), False for N (not excluded)
-        hole_type: Hole type - STD, OVS (oversized), SSL/LSL (slotted)
-        shear_planes: Number of shear planes (1 for single, 2 for double)
-        slip_critical: If True, uses slip resistance instead of shear capacity
-        slip_class: Surface class for slip-critical connections (A, B, C)
-        phi: Resistance factor (0.75 for bearing, 0.85/1.0 for slip-critical)
+        diameter: Bolt diameter in mm (used for visualization and ICR calculations)
     """
     diameter: float
-    grade: BoltGrade = "A325"
-    threads_excluded: bool = False
-    hole_type: HoleType = "STD"
-    shear_planes: int = 1
-    slip_critical: bool = False
-    slip_class: str = "B"
-    phi: float = 0.75
-    
-    # Override values
-    F_nv: float | None = None  # Override nominal shear strength
-    R_n: float | None = None   # Override nominal capacity per bolt
     
     def __post_init__(self) -> None:
-        """Validate parameters and calculate derived values."""
+        """Validate parameters."""
         if self.diameter <= 0:
             raise ValueError("Bolt diameter must be positive")
-        if self.grade not in BOLT_SHEAR_STRENGTH:
-            raise ValueError(f"Unknown bolt grade '{self.grade}'. "
-                           f"Valid: {list(BOLT_SHEAR_STRENGTH.keys())}")
-        if self.shear_planes < 1:
-            raise ValueError("shear_planes must be at least 1")
-        if self.slip_critical and self.slip_class not in SLIP_CLASS_FACTORS:
-            raise ValueError(f"Unknown slip class '{self.slip_class}'. "
-                           f"Valid: {list(SLIP_CLASS_FACTORS.keys())}")
-        
-        # Set appropriate phi for slip-critical
-        if self.slip_critical and self.phi == 0.75:
-            # Default phi for slip-critical depends on hole type
-            if self.hole_type == "STD":
-                self.phi = 1.0  # Standard holes
-            else:
-                self.phi = 0.85  # Oversized/slotted holes
-    
-    @property
-    def thread_condition(self) -> ThreadCondition:
-        """Get thread condition code."""
-        return "X" if self.threads_excluded else "N"
-    
-    @property
-    def area(self) -> float:
-        """Bolt shank area (mm²)."""
-        return math.pi * (self.diameter / 2) ** 2
-    
-    @property
-    def nominal_shear_strength(self) -> float:
-        """
-        Nominal shear strength F_nv (MPa).
-        
-        Per AISC 360 Table J3.2.
-        """
-        if self.F_nv is not None:
-            return self.F_nv
-        return BOLT_SHEAR_STRENGTH[self.grade][self.thread_condition]
-    
-    @property
-    def pretension(self) -> float:
-        """
-        Minimum bolt pretension T_b (kN).
-        
-        Per AISC 360 Table J3.1. Interpolates for non-standard diameters.
-        """
-        pretension_table = BOLT_PRETENSION[self.grade]
-        diameters = sorted(pretension_table.keys())
-        
-        # Exact match
-        if self.diameter in pretension_table:
-            return pretension_table[self.diameter]
-        
-        # Interpolate
-        if self.diameter < diameters[0]:
-            # Extrapolate below minimum
-            ratio = (self.diameter / diameters[0]) ** 2
-            return pretension_table[diameters[0]] * ratio
-        elif self.diameter > diameters[-1]:
-            # Extrapolate above maximum
-            ratio = (self.diameter / diameters[-1]) ** 2
-            return pretension_table[diameters[-1]] * ratio
-        else:
-            # Linear interpolation
-            for i, d in enumerate(diameters):
-                if d > self.diameter:
-                    d0, d1 = diameters[i - 1], d
-                    t0, t1 = pretension_table[d0], pretension_table[d1]
-                    t = (self.diameter - d0) / (d1 - d0)
-                    return t0 + t * (t1 - t0)
-        
-        return 0.0
-    
-    @property
-    def capacity(self) -> float:
-        """
-        Design capacity φR_n per bolt (kN).
-        
-        For bearing-type: φR_n = φ × F_nv × A_b × n_s
-        For slip-critical: φR_n = φ × μ × D_u × h_f × T_b × n_s
-        """
-        if self.R_n is not None:
-            return self.phi * self.R_n
-        
-        if self.slip_critical:
-            # Slip resistance per AISC Eq. J3-4
-            mu = SLIP_CLASS_FACTORS[self.slip_class]
-            D_u = 1.13  # Ratio of mean installed pretension to specified minimum
-            h_f = 1.0   # Filler factor (1.0 for no fillers)
-            T_b = self.pretension  # kN
-            R_n = mu * D_u * h_f * T_b * self.shear_planes
-        else:
-            # Shear capacity per AISC Eq. J3-1
-            # R_n = F_nv × A_b (per shear plane)
-            # Convert to kN: MPa × mm² = N, divide by 1000 for kN
-            R_n = self.nominal_shear_strength * self.area * self.shear_planes / 1000
-        
-        return self.phi * R_n
 
 
 @dataclass
@@ -230,7 +89,7 @@ class BoltGroup:
         cols: int,
         spacing_y: float,
         spacing_z: float,
-        parameters: BoltParameters,
+        diameter: float,
         origin: Point = (0.0, 0.0)
     ) -> BoltGroup:
         """
@@ -241,7 +100,7 @@ class BoltGroup:
             cols: Number of columns (z-direction)
             spacing_y: Spacing between rows (mm)
             spacing_z: Spacing between columns (mm)
-            parameters: BoltParameters for all bolts
+            diameter: Bolt diameter in mm
             origin: (y, z) location of bottom-left bolt
             
         Returns:
@@ -259,6 +118,7 @@ class BoltGroup:
                 z = z0 + j * spacing_z
                 positions.append((y, z))
         
+        parameters = BoltParameters(diameter=diameter)
         return cls(positions=positions, parameters=parameters)
     
     @classmethod
@@ -266,7 +126,7 @@ class BoltGroup:
         cls,
         n: int,
         radius: float,
-        parameters: BoltParameters,
+        diameter: float,
         center: Point = (0.0, 0.0),
         start_angle: float = 0.0
     ) -> BoltGroup:
@@ -276,7 +136,7 @@ class BoltGroup:
         Args:
             n: Number of bolts
             radius: Circle radius (mm)
-            parameters: BoltParameters for all bolts
+            diameter: Bolt diameter in mm
             center: (y, z) center of circle
             start_angle: Starting angle in degrees (0 = +z direction)
             
@@ -297,6 +157,7 @@ class BoltGroup:
             z = cz + radius * math.cos(angle)
             positions.append((y, z))
         
+        parameters = BoltParameters(diameter=diameter)
         return cls(positions=positions, parameters=parameters)
     
     def _calculate_properties(self) -> BoltProperties:
@@ -378,12 +239,10 @@ class BoltGroup:
         Returns:
             BoltResult with force on each bolt
         """
-        from .bolt_stress import calculate_elastic_bolt_force, calculate_icr_bolt_force
-        
         if method == "elastic":
-            return calculate_elastic_bolt_force(self, force)
+            return _calculate_elastic_bolt_force(self, force)
         elif method == "icr":
-            return calculate_icr_bolt_force(self, force)
+            return _calculate_icr_bolt_force(self, force)
         else:
             raise ValueError(f"Unknown method: {method}. Use 'elastic' or 'icr'.")
 
@@ -473,11 +332,6 @@ class BoltResult:
         return float(np.mean(forces)) if len(forces) > 0 else 0.0
     
     @property
-    def capacity(self) -> float:
-        """Design capacity per bolt φR_n (kN)."""
-        return self.bolt_group.parameters.capacity
-    
-    @property
     def critical_bolt(self) -> BoltForce | None:
         """BoltForce at maximum force location."""
         if not self.bolt_forces:
@@ -501,26 +355,6 @@ class BoltResult:
     def forces(self) -> List[BoltForce]:
         """All bolt forces."""
         return self.bolt_forces
-    
-    def utilization(self, capacity: float | None = None) -> float:
-        """
-        Calculate utilization ratio.
-        
-        Args:
-            capacity: Override capacity (kN). If None, uses bolt capacity.
-            
-        Returns:
-            max_force / capacity (< 1.0 means acceptable)
-        """
-        if capacity is None:
-            capacity = self.capacity
-        if capacity <= 0:
-            raise ValueError("Capacity must be positive")
-        return self.max_force / capacity
-    
-    def is_adequate(self, capacity: float | None = None) -> bool:
-        """Check if bolt group is adequate (utilization ≤ 1.0)."""
-        return self.utilization(capacity) <= 1.0
     
     def plot(
         self,
@@ -558,6 +392,268 @@ class BoltResult:
             show=show,
             save_path=save_path
         )
+
+
+def _calculate_elastic_bolt_force(
+    bolt_group: BoltGroup,
+    force: Force
+) -> BoltResult:
+    """
+    Calculate bolt forces using the Elastic Method.
+    
+    The elastic method:
+    1. Direct shear: R_p = P / n (uniform, all bolts share equally)
+    2. Moment shear: R_m = M × r / Σr² (perpendicular to radius, proportional to distance)
+    3. Vector sum for resultant
+    
+    Args:
+        bolt_group: BoltGroup object
+        force: Applied Force
+        
+    Returns:
+        BoltResult with force at each bolt
+    """
+    props = bolt_group._calculate_properties()
+    
+    n = props.n
+    Cy, Cz = props.Cy, props.Cz
+    Ip = props.Ip
+    
+    # Get total moment about bolt group centroid (in-plane torsion)
+    Mx_total, _, _ = force.get_moments_about(0, Cy, Cz)
+    
+    # Convert forces to kN (input is in N)
+    Fy_kN = force.Fy / 1000
+    Fz_kN = force.Fz / 1000
+    Mx_kNmm = Mx_total / 1000  # N·mm to kN·mm
+    
+    bolt_forces: List[BoltForce] = []
+    
+    for (y, z) in bolt_group.positions:
+        # Distance from centroid
+        dy = y - Cy
+        dz = z - Cz
+        
+        # Direct shear (uniform): R = P / n
+        R_direct_y = Fy_kN / n if n > 0 else 0.0
+        R_direct_z = Fz_kN / n if n > 0 else 0.0
+        
+        # Moment shear (perpendicular to radius, linear with distance)
+        # R_m = M × r / Σr², direction perpendicular to (dy, dz)
+        # Perpendicular direction (CCW): (-dz, dy)
+        R_moment_y = 0.0
+        R_moment_z = 0.0
+        
+        if Ip > ZERO_TOLERANCE:
+            # r_y = -M × dz / Ip (y-component, perpendicular)
+            # r_z = M × dy / Ip (z-component, perpendicular)
+            R_moment_y = -Mx_kNmm * dz / Ip
+            R_moment_z = Mx_kNmm * dy / Ip
+        
+        # Total force on bolt
+        total_Fy = R_direct_y + R_moment_y
+        total_Fz = R_direct_z + R_moment_z
+        
+        bolt_forces.append(BoltForce(
+            point=(y, z),
+            Fy=total_Fy,
+            Fz=total_Fz
+        ))
+    
+    return BoltResult(
+        bolt_group=bolt_group,
+        force=force,
+        method="elastic",
+        bolt_forces=bolt_forces
+    )
+
+
+def _calculate_icr_bolt_force(
+    bolt_group: BoltGroup,
+    force: Force,
+    max_iterations: int = 100,
+    tolerance: float = 1e-6
+) -> BoltResult:
+    """
+    Calculate bolt forces using the Instantaneous Center of Rotation (ICR) method.
+    
+    The ICR method:
+    1. Iteratively finds the center of rotation
+    2. Bolt deformation is proportional to distance from ICR
+    3. Uses non-linear load-deformation curve: R = R_ult (1 - e^(-μΔ))^λ
+    
+    The Crawford-Kulak model parameters:
+    - μ = 10 (curve shape parameter)
+    - λ = 0.55 (curve shape parameter)
+    - Δ_max = 0.34 in = 8.64 mm (ultimate deformation)
+    
+    Args:
+        bolt_group: BoltGroup object
+        force: Applied Force
+        max_iterations: Maximum solver iterations
+        tolerance: Convergence tolerance
+        
+    Returns:
+        BoltResult with ICR-specific data
+    """
+    props = bolt_group._calculate_properties()
+    
+    Cy, Cz = props.Cy, props.Cz
+    
+    # Get applied loads (convert to kN)
+    Mx_total, _, _ = force.get_moments_about(Cy, Cz)
+    Fy_app = force.Fy / 1000  # kN
+    Fz_app = force.Fz / 1000  # kN
+    Mx_app = Mx_total / 1000  # kN·mm
+    
+    # Total in-plane shear
+    P_total = math.hypot(Fy_app, Fz_app)
+    
+    # If no moment or no shear, fall back to elastic
+    if P_total < ZERO_TOLERANCE or abs(Mx_app) < ZERO_TOLERANCE:
+        return _calculate_elastic_bolt_force(bolt_group, force)
+    
+    # Prepare bolt data
+    y_arr = np.array([p[0] for p in bolt_group.positions], dtype=float)
+    z_arr = np.array([p[1] for p in bolt_group.positions], dtype=float)
+    
+    # Bolt ultimate capacity (kN) - use typical value for standard bolts
+    # This is just for the force distribution shape, not actual capacity checking
+    R_ult = 100.0  # kN, typical for reference
+    
+    # Crawford-Kulak parameters
+    ck_params = CrawfordKulakParams()
+    
+    # ICR search setup
+    perp_y, perp_z = calculate_perpendicular_direction(Fy_app, Fz_app)
+    eccentricity = abs(Mx_app) / P_total
+    moment_sign = -1.0 if Mx_app > 0 else 1.0
+    target_ratio = -Mx_app / P_total
+    
+    dist_min, dist_max = calculate_search_bounds(
+        y_arr, z_arr, eccentricity,
+        characteristic_size=bolt_group.parameters.diameter
+    )
+    
+    def evaluate_icr(icr_dist: float) -> Tuple[float, dict] | None:
+        """Evaluate ICR solution for a given distance from centroid."""
+        icr_offset = moment_sign * icr_dist
+        icr_y = Cy + perp_y * icr_offset
+        icr_z = Cz + perp_z * icr_offset
+        
+        # Distance from each bolt to ICR
+        dy_icr = y_arr - icr_y
+        dz_icr = z_arr - icr_z
+        c_arr = np.hypot(dy_icr, dz_icr)
+        c_arr = np.where(c_arr < POSITION_TOLERANCE, POSITION_TOLERANCE, c_arr)
+        
+        # Maximum distance determines reference deformation
+        c_max = float(np.max(c_arr))
+        if c_max < POSITION_TOLERANCE:
+            return None
+        
+        # Deformation proportional to distance from ICR
+        # Critical bolt (farthest) is at ultimate deformation
+        delta_arr = ck_params.delta_max * c_arr / c_max
+        
+        # Load-deformation curve
+        R_arr = crawford_kulak_force(delta_arr, R_ult, ck_params)
+        
+        # Force direction perpendicular to radius from ICR (CCW)
+        dir_y = -dz_icr / c_arr
+        dir_z = dy_icr / c_arr
+        
+        # Sum forces
+        R_y_arr = R_arr * dir_y
+        R_z_arr = R_arr * dir_z
+        
+        sum_Fy = float(np.sum(R_y_arr))
+        sum_Fz = float(np.sum(R_z_arr))
+        
+        # Check direction matches applied load
+        dot = Fy_app * sum_Fy + Fz_app * sum_Fz
+        if dot < 0:
+            # Flip direction
+            R_y_arr = -R_y_arr
+            R_z_arr = -R_z_arr
+            dir_y = -dir_y
+            dir_z = -dir_z
+            sum_Fy = -sum_Fy
+            sum_Fz = -sum_Fz
+        
+        P_base = math.hypot(sum_Fy, sum_Fz)
+        if P_base < POSITION_TOLERANCE:
+            return None
+        
+        # Sum moments about centroid
+        dy_cent = y_arr - Cy
+        dz_cent = z_arr - Cz
+        sum_M = float(np.sum(dy_cent * R_z_arr - dz_cent * R_y_arr))
+        
+        ratio = sum_M / P_base
+        
+        return ratio, {
+            "icr_y": icr_y,
+            "icr_z": icr_z,
+            "R_arr": R_arr,
+            "dir_y": dir_y,
+            "dir_z": dir_z,
+            "P_base": P_base
+        }
+    
+    # Run ICR search
+    config = ICRSearchConfig(
+        max_iterations=max_iterations,
+        tolerance=tolerance,
+        refine_bisection=True
+    )
+    
+    result = find_icr_distance(
+        evaluate_icr,
+        target_ratio,
+        dist_min,
+        dist_max,
+        eccentricity,
+        config
+    )
+    
+    if result is None:
+        # Fall back to elastic method
+        return _calculate_elastic_bolt_force(bolt_group, force)
+    
+    best_distance, best_data, _ = result
+    
+    # Scale forces to match applied load
+    P_base = float(best_data["P_base"])
+    if P_base < POSITION_TOLERANCE:
+        return _calculate_elastic_bolt_force(bolt_group, force)
+    
+    scale = P_total / P_base
+    
+    R_arr = best_data["R_arr"] * scale
+    dir_y_arr = best_data["dir_y"]
+    dir_z_arr = best_data["dir_z"]
+    
+    bolt_forces: List[BoltForce] = []
+    
+    for idx, (y, z) in enumerate(bolt_group.positions):
+        R = float(R_arr[idx])
+        
+        bolt_forces.append(BoltForce(
+            point=(y, z),
+            Fy=R * float(dir_y_arr[idx]),
+            Fz=R * float(dir_z_arr[idx])
+        ))
+    
+    icr_point = (float(best_data["icr_y"]), float(best_data["icr_z"]))
+    
+    return BoltResult(
+        bolt_group=bolt_group,
+        force=force,
+        method="icr",
+        bolt_forces=bolt_forces,
+        icr_point=icr_point
+    )
 
 
 # Import Force here to avoid circular import at module level

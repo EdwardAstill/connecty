@@ -143,9 +143,9 @@ def plot_bolt_result(
     
     # Title with key info
     title = f"Bolt Group Analysis ({result.method.upper()} method)"
-    title += f"\n{bolt_group.n} × M{bolt_group.parameters.diameter:.0f} {bolt_group.parameters.grade}"
+    title += f"\n{bolt_group.n} × M{bolt_group.parameters.diameter:.0f} bolts"
     if result.bolt_forces:
-        title += f" | Max: {result.max_force:.1f} kN | Util: {result.utilization():.0%}"
+        title += f" | Max Force: {result.max_force:.1f} kN"
     ax.set_title(title, fontsize=12)
     
     plt.tight_layout()
@@ -267,7 +267,7 @@ def plot_bolt_pattern(
     ax.set_ylim(min(y_coords) - margin, max(y_coords) + margin)
     
     # Title
-    title = f"Bolt Pattern: {bolt_group.n} × M{bolt_diameter:.0f} {bolt_group.parameters.grade}"
+    title = f"Bolt Pattern: {bolt_group.n} × M{bolt_diameter:.0f} bolts"
     ax.set_title(title, fontsize=12)
     
     plt.tight_layout()

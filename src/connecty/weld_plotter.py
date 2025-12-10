@@ -214,7 +214,7 @@ def _plot_single_loaded_weld(
     # Title with key info
     title = f"Weld Stress ({loaded.method.upper()} method)"
     if info and loaded.point_stresses:
-        title += f"\nMax: {loaded.max:.1f} MPa | Util: {loaded.utilization():.0%}"
+        title += f"\nMax Stress: {loaded.max:.1f} MPa"
     ax.set_title(title, fontsize=12)
 
 
@@ -501,7 +501,7 @@ def _plot_single_weld_result(
     # Title with key info
     title = f"Weld Stress ({result.method.upper()} method)"
     if info and result.point_stresses:
-        title += f"\nMax: {result.max:.1f} MPa | Util: {result.utilization():.0%}"
+        title += f"\nMax Stress: {result.max:.1f} MPa"
     ax.set_title(title, fontsize=12)
 
 

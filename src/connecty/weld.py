@@ -17,33 +17,16 @@ if TYPE_CHECKING:
 Point = Tuple[float, float]
 WeldType = Literal["fillet", "pjp", "cjp", "plug", "slot"]
 
-# Electrode strength lookup (MPa)
-ELECTRODE_STRENGTH: dict[str, float] = {
-    "E60": 414.0,
-    "E70": 483.0,
-    "E80": 552.0,
-    "E90": 621.0,
-    "E100": 690.0,
-    "E110": 759.0,
-}
-
-
 @dataclass
 class WeldParams:
     """
-    Parameters defining weld configuration per AISC 360.
+    Parameters defining weld configuration.
     
     Attributes:
         type: Type of weld - "fillet", "pjp", "cjp", "plug", or "slot"
         leg: Fillet weld leg size (w) in length units
         throat: Effective throat thickness (a or E) in length units
         area: Plug/slot weld area in length² units
-        electrode: Electrode classification (E60, E70, etc.)
-        F_EXX: Override electrode tensile strength (stress units)
-        F_y: Base metal yield strength (for CJP checks)
-        F_u: Base metal ultimate strength (for CJP checks)
-        t_base: Base metal thickness (for CJP checks)
-        phi: Resistance factor (AISC default 0.75)
     """
     type: WeldType
     
@@ -55,21 +38,6 @@ class WeldParams:
     # Legacy aliases for compatibility
     leg_size: float | None = None
     throat_thickness: float | None = None
-    
-    # Material
-    electrode: str = "E70"
-    F_EXX: float | None = None
-    strength: float | None = None  # Allowable stress override (MPa)
-    
-    # Base metal (for CJP)
-    F_y: float | None = None
-    F_u: float | None = None
-    t_base: float | None = None
-    
-    # Resistance factor
-    phi: float = 0.75
-    
-    _capacity_override: float | None = field(default=None, init=False, repr=False)
     
     def __post_init__(self) -> None:
         # Apply alias fields if provided
@@ -86,30 +54,6 @@ class WeldParams:
             elif self.throat is not None and self.leg is None:
                 # Back-calculate leg from throat
                 self.leg = self.throat / 0.707
-        
-        # Lookup electrode strength if not provided
-        if self.F_EXX is None:
-            if self.electrode in ELECTRODE_STRENGTH:
-                self.F_EXX = ELECTRODE_STRENGTH[self.electrode]
-            else:
-                raise ValueError(f"Unknown electrode '{self.electrode}'. "
-                               f"Valid: {list(ELECTRODE_STRENGTH.keys())} or provide F_EXX directly.")
-        
-        if self.strength is not None:
-            self._capacity_override = self.strength
-    
-    @property
-    def capacity(self) -> float:
-        """
-        Design capacity: φ(0.60 × F_EXX) in stress units.
-        
-        Per AISC 360 Table J2.5.
-        """
-        if self._capacity_override is not None:
-            return self._capacity_override
-        if self.F_EXX is None:
-            raise ValueError("F_EXX not set")
-        return self.phi * 0.60 * self.F_EXX
 
 
 @dataclass

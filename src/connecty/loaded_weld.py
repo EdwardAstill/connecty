@@ -37,7 +37,7 @@ class LoadedWeld:
         >>> from connecty import Weld, WeldParams, Load, LoadedWeld
         >>> 
         >>> section = rhs(b=100, h=200, t=10, r=15)
-        >>> params = WeldParams(type="fillet", leg=6.0, electrode="E70")
+        >>> params = WeldParams(type="fillet", leg=6.0)
         >>> weld = Weld.from_section(section, params)
         >>> 
         >>> load = Load(Fy=-100e3, location=(50, 0))
@@ -45,7 +45,6 @@ class LoadedWeld:
         >>> # Analyze using elastic method
         >>> loaded = LoadedWeld(weld, load, method="elastic")
         >>> print(f"Max stress: {loaded.max:.1f} MPa")
-        >>> print(f"Utilization: {loaded.utilization():.1%}")
         >>> 
         >>> # Or use ICR method (for fillet welds)
         >>> loaded_icr = LoadedWeld(weld, load, method="icr")
@@ -141,11 +140,6 @@ class LoadedWeld:
         return self.max - self.min
     
     @property
-    def capacity(self) -> float:
-        """Design capacity φ(0.60 × F_EXX) from weld parameters."""
-        return self.weld.parameters.capacity
-    
-    @property
     def max_point(self):
         """PointStress at maximum stress location."""
         if not self.point_stresses:
@@ -186,26 +180,6 @@ class LoadedWeld:
                 nearest = ps
         
         return nearest.components
-    
-    def utilization(self, allowable: float | None = None) -> float:
-        """
-        Calculate utilization ratio.
-        
-        Args:
-            allowable: Allowable stress. If None, uses capacity from parameters.
-            
-        Returns:
-            max_stress / allowable (< 1.0 means acceptable)
-        """
-        if allowable is None:
-            allowable = self.capacity
-        if allowable <= 0:
-            raise ValueError("Allowable stress must be positive")
-        return self.max / allowable
-    
-    def is_adequate(self, allowable: float | None = None) -> bool:
-        """Check if weld is adequate (utilization ≤ 1.0)."""
-        return self.utilization(allowable) <= 1.0
     
     
     def plot(
