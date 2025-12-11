@@ -2,30 +2,26 @@
 
 ## Overview
 
-The bolt analysis module follows the same architectural patterns as the weld module, providing elastic and ICR analysis methods for bolted connections. It uses the same `Force` class for loading and follows the AISC 360 design provisions.
+The bolt analysis module calculates **force distribution** on bolt groups using elastic and ICR methods per AISC 360. It focuses on geometry and force calculation—leave design checks and capacity comparisons to your application.
 
 ---
 
-## Bolt Types & Analysis Methods
+## Analysis Methods
 
-| Bolt Type | Analysis Methods | Key Variable | Strength Limit |
-|-----------|------------------|--------------|----------------|
-| **Bearing** | Elastic, ICR | Diameter ($d_b$) | Shear/Bearing capacity ($\phi R_n$) |
-| **Slip-Critical** | Elastic, ICR | Diameter ($d_b$) | Slip resistance ($\phi R_n$) |
-
-### Analysis Method Summary
+Connecty provides two methods for calculating force at each bolt location:
 
 **Elastic Method**
 - Conservative vector analysis
-- Superimposes direct shear ($P/n$) and torsional shear ($Tr/J$)
-- Assumes rigid plate behavior
-- Check: $f_{resultant} \leq \phi R_n$
+- Superimposes direct shear ($P/n$) and torsional shear ($Tr/I_p$)
+- Assumes rigid connection behavior
+- Output: Force vector at each bolt
 
 **ICR Method**
 - Iterative Instantaneous Center of Rotation method
-- Accounts for non-linear load-deformation behavior of bolts
-- Uses Crawford-Kulak or similar load-deformation curves: $R = R_{ult}(1 - e^{-\mu \Delta})^\lambda$
-- More economical for eccentrically loaded bolt groups
+- Accounts for non-linear load-deformation behavior
+- Uses Crawford-Kulak load-deformation curves: $R = R_{ult}(1 - e^{-\mu \Delta})^\lambda$
+- More accurate force distribution for eccentrically loaded bolt groups
+- Output: Force vector at each bolt
 
 ---
 
@@ -41,7 +37,7 @@ from connecty import BoltGroup, BoltParameters
 # Option A: Explicit coordinates
 bolts = BoltGroup(
     positions=[(0, 0), (0, 75), (0, 150)],
-    parameters=BoltParameters(diameter=20, grade="A325")
+    parameters=BoltParameters(diameter=20)
 )
 
 # Option B: Pattern generation (rectangular)
@@ -50,7 +46,7 @@ bolts = BoltGroup.from_pattern(
     cols=2, 
     spacing_y=75, 
     spacing_z=60,
-    parameters=params,
+    diameter=20,
     origin=(0, 0)
 )
 
@@ -58,7 +54,7 @@ bolts = BoltGroup.from_pattern(
 bolts = BoltGroup.from_circle(
     n=8,
     radius=100,
-    parameters=params,
+    diameter=20,
     center=(0, 0),
     start_angle=0
 )
@@ -66,22 +62,17 @@ bolts = BoltGroup.from_circle(
 
 ### 2. `BoltParameters`
 
-Configuration for bolt properties.
+Configuration for bolt geometry (for visualization and ICR calculations).
 
 ```python
 from connecty import BoltParameters
 
 params = BoltParameters(
-    diameter=20,              # Bolt diameter (mm)
-    grade="A325",             # Grade (A325, A490, 8.8, 10.9)
-    threads_excluded=False,   # Threads condition (X or N)
-    hole_type="STD",          # Standard, Oversized, Slotted
-    shear_planes=1,           # Single or double shear
-    slip_critical=False,      # Use slip resistance instead of shear
-    slip_class="B",           # Surface class (A, B, C)
-    phi=0.75                  # Resistance factor
+    diameter=20  # Bolt diameter in mm
 )
 ```
+
+That's it! Only diameter is needed. Material properties are outside the scope of force calculation.
 
 ### 3. `Force` (Shared)
 
@@ -99,65 +90,70 @@ force = Force(
 
 ---
 
-## Analysis Methods
+## Analysis Workflow
 
-The API mirrors the weld workflow:
+The API is straightforward:
 
 ```python
 from connecty import BoltGroup, BoltParameters, Force
 
 # Setup
-params = BoltParameters(diameter=20, grade="A325")
-bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, parameters=params)
+params = BoltParameters(diameter=20)
+bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
 force = Force(Fy=-100000, location=(75, 150))
 
 # Elastic analysis
 result = bolts.analyze(force, method="elastic")
 print(f"Max bolt force: {result.max_force:.1f} kN")
-print(f"Utilization: {result.utilization():.1%}")
 
-# ICR analysis (more economical for eccentric loads)
+# ICR analysis (more accurate for eccentric loads)
 result_icr = bolts.analyze(force, method="icr")
 print(f"ICR Max force: {result_icr.max_force:.1f} kN")
 ```
 
 ### Elastic Method Details
-1. **Centroid**: Calculated from bolt coordinates: $C_y = \frac{\sum y_i}{n}$, $C_z = \frac{\sum z_i}{n}$
-2. **Polar Moment**: $I_p = \sum (y_i^2 + z_i^2)$ about centroid
+
+1. **Centroid**: Calculated from bolt coordinates
+   - $C_y = \frac{\sum y_i}{n}$, $C_z = \frac{\sum z_i}{n}$
+
+2. **Polar Moment**: $I_p = \sum (dy_i^2 + dz_i^2)$ about centroid
+
 3. **Direct Shear**: $R_{direct} = P / n$ (uniform distribution)
-4. **Torsional Shear**: $R_{torsion} = \frac{M \cdot r}{I_p}$ (perpendicular to radius, linear with distance)
+
+4. **Torsional Shear**: $R_{torsion} = \frac{M \cdot r}{I_p}$ (perpendicular to radius)
+
 5. **Superposition**: Vector sum of direct and torsional components
 
 ### ICR Method Details
+
 1. **Iterative Solver**: Finds instantaneous center of rotation satisfying equilibrium
-2. **Load-Deformation**: Crawford-Kulak model: $R = R_{ult}(1 - e^{-\mu\Delta/\Delta_{max}})^\lambda$
-3. **Parameters**: $\mu = 10$, $\lambda = 0.55$, $\Delta_{max} = 8.64$ mm
-4. **Benefit**: Accounts for ductile redistribution, typically 15-30% more economical
+
+2. **Load-Deformation**: Crawford-Kulak model
+   - $R = R_{ult}(1 - e^{-\mu\Delta/\Delta_{max}})^\lambda$
+   - $\mu = 10$, $\lambda = 0.55$, $\Delta_{max} = 8.64$ mm
+
+3. **Benefit**: Accounts for ductile redistribution; typically yields more realistic force distribution than elastic method
 
 ---
 
 ## Result Access
 
-`BoltResult` class (similar to `StressResult`):
+`BoltResult` provides force data at each bolt:
 
 ```python
 result = bolts.analyze(force, method="elastic")
 
-# Key properties
+# Properties
 result.max_force       # Maximum resultant force on any bolt (kN)
 result.min_force       # Minimum resultant force on any bolt (kN)
 result.mean            # Average bolt force (kN)
 result.critical_bolt   # BoltForce object at max location
 result.critical_index  # Index of most stressed bolt
-result.capacity        # Design capacity per bolt φRn (kN)
-result.bolt_forces     # List of BoltForce objects
-
-# Methods
-result.utilization()   # max_force / capacity
-result.is_adequate()   # True if utilization ≤ 1.0
+result.bolt_forces     # List of all BoltForce objects
 
 # ICR-specific
-result.icr_point       # (y, z) location of ICR (if ICR method used)
+result.icr_point       # (y, z) location of instantaneous center
+result.method          # "elastic" or "icr"
 ```
 
 ### BoltForce Object
@@ -194,7 +190,7 @@ Features:
 - Reaction forces shown as arrows at each bolt
 - Applied load location marked with red ×
 - ICR point shown (if ICR method used)
-- Title includes bolt count, size, grade, max force, and utilization
+- Title shows bolt count, size, and max force
 
 ### Pattern Visualization
 
@@ -205,3 +201,26 @@ from connecty.bolt_plotter import plot_bolt_pattern
 plot_bolt_pattern(bolts, save_path="pattern.svg")
 ```
 
+---
+
+## Design Checks
+
+Connecty outputs forces only. To check adequacy:
+
+```python
+result = bolts.analyze(force, method="elastic")
+
+# Get your bolt capacity from tables or calculation
+bolt_capacity_kN = 150  # Example: A325 M20 bearing-type
+
+# Check utilization
+max_force = result.max_force
+utilization = max_force / bolt_capacity_kN
+
+if utilization <= 1.0:
+    print(f"OK: Utilization {utilization:.1%}")
+else:
+    print(f"NOT OK: Utilization {utilization:.1%}")
+```
+
+This approach gives you full control over capacity definitions, phi factors, and design philosophy.

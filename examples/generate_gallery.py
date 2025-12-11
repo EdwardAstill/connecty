@@ -9,29 +9,43 @@ project_root = Path(__file__).parent.parent
 src_dir = project_root / "src"
 sys.path.insert(0, str(src_dir))
 
-# Import and run each example
-examples = [
-    ("example1_rhs_simple", "Simple RHS with vertical load"),
-    ("example2_rhs_eccentric", "RHS with eccentric load and torsion"),
-    ("example3_i_beam", "I-beam with selective welding"),
-    ("example4_u_channel", "U-channel with combined loading"),
-    ("example5_stress_components", "Stress component breakdown"),
-    ("example6_chs", "Circular hollow section"),
+print("=" * 60)
+print("CONNECTY GALLERY GENERATION")
+print("=" * 60)
+
+# Import and run each example module
+example_modules = [
+    ("standard_sections_analysis", "Standard sections with various loads"),
+    ("weld_method_comparison", "Elastic vs ICR method comparison"),
+    ("stress_components_analysis", "Detailed stress component breakdown"),
+    ("icr_rotation_eccentricity_trend", "ICR rotation with eccentricity"),
+    ("pjp_weld_analysis", "PJP weld analysis example"),
+    ("good example", "Eccentrically loaded RHS with ICR"),
+    ("bolt_group_analysis", "Bolt group force analysis"),
 ]
 
-print("Generating gallery images...\n")
+print()
 
-for module_name, description in examples:
-    print(f"Running {module_name}: {description}")
+for module_name, description in example_modules:
+    print(f"Running: {description}")
+    print(f"  Module: {module_name}")
     try:
         # Import the module
-        module = __import__(module_name, fromlist=[''])
-        print(f"✓ {module_name} completed\n")
+        module = __import__(module_name, fromlist=['run'])
+        
+        # Run if it has a run() function
+        if hasattr(module, 'run'):
+            module.run()
+        elif hasattr(module, 'main'):
+            module.main()
+        
+        print(f"  ✓ Completed\n")
     except Exception as e:
-        print(f"✗ {module_name} failed: {e}\n")
+        print(f"  ✗ Failed: {e}\n")
         import traceback
         traceback.print_exc()
 
+print("=" * 60)
 print("Gallery generation complete!")
-print(f"\nCheck the gallery/ directory for SVG files.")
-
+print("Check the gallery/ directory for SVG files.")
+print("=" * 60)

@@ -1,8 +1,8 @@
 """
 Bolt Group Analysis (Elastic and ICR Methods)
 
-Demonstrates bolt group analysis for a rectangular pattern
-of bolts with eccentric loading.
+Demonstrates bolt group force distribution for rectangular and circular
+bolt patterns with eccentric loading.
 """
 from connecty import BoltGroup, BoltParameters, Load
 from pathlib import Path
@@ -10,19 +10,14 @@ from pathlib import Path
 
 def main():
     # ========================================
-    # Case A: Simple bolt group with eccentric load (Elastic)
+    # Case A: Rectangular bolt pattern with eccentric load
     # ========================================
     print("=" * 60)
     print("Case A: Rectangular Bolt Pattern with Eccentric Load")
     print("=" * 60)
     
-    # Create bolt parameters
-    params = BoltParameters(
-        diameter=20,          # M20 bolts
-        grade="A325",         # A325 grade
-        threads_excluded=False,  # Threads NOT excluded (N condition)
-        shear_planes=1        # Single shear
-    )
+    # Create bolt parameters (geometry only)
+    params = BoltParameters(diameter=20)  # M20 bolts
     
     # Create bolt group from rectangular pattern
     # 3 rows × 2 columns, 75mm vertical spacing, 60mm horizontal spacing
@@ -31,25 +26,22 @@ def main():
         cols=2,
         spacing_y=75,      # 75mm between rows
         spacing_z=60,      # 60mm between columns
-        parameters=params,
-        origin=(0, 0)      # Bottom-left bolt at origin
+        diameter=20
     )
     
     # Print bolt group properties
     print(f"\nBolt Group Properties:")
     print(f"  Number of bolts: {bolts.n}")
     print(f"  Bolt diameter: {params.diameter} mm")
-    print(f"  Grade: {params.grade}")
-    print(f"  Capacity per bolt: {params.capacity:.1f} kN")
     print(f"  Centroid: ({bolts.Cy:.1f}, {bolts.Cz:.1f}) mm")
     print(f"  Polar moment Ip: {bolts.Ip:.0f} mm²")
     
-    # Applied load: 100kN at offset from centroid (creating torsion)
+    # Applied load: 100 kN at offset from centroid (creating torsion)
     # Centroid is at (75, 30). Force at (75, 150) creates eccentricity in z-direction.
     # Torsion Mx = Fz × dy - Fy × dz = 0 - (-100000) × (150-30) = 12,000,000 N·mm
     load = Load(
-        Fy=-100000,            # 100kN downward (N)
-        location=(0, 75, 150)     # Same y as centroid, offset 120mm in z-direction
+        Fy=-100000,            # 100 kN downward (N)
+        location=(0, 75, 150)  # Offset 120 mm in z-direction from centroid
     )
     
     # Analyze using elastic method
@@ -58,9 +50,8 @@ def main():
     print(f"\nElastic Method Results:")
     print(f"  Max bolt force: {result_elastic.max_force:.2f} kN")
     print(f"  Min bolt force: {result_elastic.min_force:.2f} kN")
+    print(f"  Mean force: {result_elastic.mean:.2f} kN")
     print(f"  Critical bolt index: {result_elastic.critical_index}")
-    print(f"  Utilization: {result_elastic.utilization():.1%}")
-    print(f"  Adequate: {'✓' if result_elastic.is_adequate() else '✗'}")
     
     # Show force at each bolt
     print(f"\n  Individual bolt forces:")
@@ -81,7 +72,7 @@ def main():
     )
     
     # ========================================
-    # Case B: Same configuration with ICR method
+    # Case B: ICR method comparison
     # ========================================
     print("\n" + "=" * 60)
     print("Case B: ICR Method Comparison")
@@ -92,10 +83,14 @@ def main():
     print(f"\nICR Method Results:")
     print(f"  Max bolt force: {result_icr.max_force:.2f} kN")
     print(f"  Min bolt force: {result_icr.min_force:.2f} kN")
+    print(f"  Mean force: {result_icr.mean:.2f} kN")
     print(f"  Critical bolt index: {result_icr.critical_index}")
-    print(f"  Utilization: {result_icr.utilization():.1%}")
-    print(f"  ICR location: ({result_icr.icr_point[0]:.1f}, {result_icr.icr_point[1]:.1f}) mm" 
-          if result_icr.icr_point else "  ICR: N/A")
+    if result_icr.icr_point:
+        print(f"  ICR location: ({result_icr.icr_point[0]:.1f}, {result_icr.icr_point[1]:.1f}) mm")
+    
+    # Compare methods
+    reduction = (1 - result_icr.max_force / result_elastic.max_force) * 100
+    print(f"\n  ICR vs Elastic: {reduction:.0f}% reduction in max force")
     
     print(f"\n  Individual bolt forces:")
     for i, bf in enumerate(result_icr.bolt_forces):
@@ -119,11 +114,11 @@ def main():
     
     # Create circular bolt pattern
     circular_bolts = BoltGroup.from_circle(
-        n=8,                   # 8 bolts
-        radius=100,            # 100mm radius
-        parameters=params,
+        n=8,              # 8 bolts
+        radius=100,       # 100 mm radius
+        diameter=20,
         center=(0, 0),
-        start_angle=22.5       # Start 22.5° from vertical for symmetry
+        start_angle=22.5  # Start 22.5° from vertical for symmetry
     )
     
     print(f"\nCircular Bolt Group Properties:")
@@ -133,16 +128,16 @@ def main():
     
     # Eccentric load
     circular_load = Load(
-        Fy=-80000,             # 80kN downward
-        Fz=30000,              # 30kN to the right
-        location=(0, 0, 150)      # 150mm right of center
+        Fy=-80000,             # 80 kN downward
+        Fz=30000,              # 30 kN to the right
+        location=(0, 0, 150)   # 150 mm right of center
     )
     
     result_circular = circular_bolts.analyze(circular_load, method="elastic")
     
     print(f"\nElastic Results:")
     print(f"  Max bolt force: {result_circular.max_force:.2f} kN")
-    print(f"  Utilization: {result_circular.utilization():.1%}")
+    print(f"  Mean force: {result_circular.mean:.2f} kN")
     
     result_circular.plot(
         force=True,
@@ -152,49 +147,28 @@ def main():
     )
     
     # ========================================
-    # Case D: Slip-critical connection
+    # Case D: Design check example
     # ========================================
     print("\n" + "=" * 60)
-    print("Case D: Slip-Critical Connection")
+    print("Case D: Design Check Example")
     print("=" * 60)
     
-    slip_params = BoltParameters(
-        diameter=20,
-        grade="A325",
-        threads_excluded=False,
-        slip_critical=True,    # Slip-critical design
-        slip_class="B",        # Class B surface (blast-cleaned)
-        shear_planes=1
-    )
+    # Use rectangular bolt pattern
+    design_load = Load(Fy=-100000, location=(0, 75, 150))
+    design_result = bolts.analyze(design_load, method="elastic")
     
-    slip_bolts = BoltGroup.from_pattern(
-        rows=2,
-        cols=3,
-        spacing_y=75,
-        spacing_z=75,
-        parameters=slip_params
-    )
+    # Define bolt capacity (A325 M20 bearing-type)
+    # Nominal shear strength: 372 MPa
+    # Area: π(20/2)² = 314.16 mm²
+    # φ × Fnv × A / 1000 = 0.75 × 372 × 314.16 / 1000 ≈ 87.8 kN
+    bolt_capacity_kN = 87.8
     
-    print(f"\nSlip-Critical Bolt Properties:")
-    print(f"  Grade: {slip_params.grade}")
-    print(f"  Surface class: {slip_params.slip_class}")
-    print(f"  Pretension: {slip_params.pretension:.1f} kN")
-    print(f"  Slip resistance per bolt: {slip_params.capacity:.1f} kN")
-    
-    slip_load = Load(Fy=-50000, location=(0, 75, 75))
-    result_slip = slip_bolts.analyze(slip_load, method="elastic")
-    
-    print(f"\nResults:")
-    print(f"  Max bolt force: {result_slip.max_force:.2f} kN")
-    print(f"  Utilization: {result_slip.utilization():.1%}")
-    print(f"  Adequate: {'✓' if result_slip.is_adequate() else '✗'}")
-    
-    result_slip.plot(
-        force=True,
-        bolt_forces=True,
-        show=False,
-        save_path=str(gallery_dir / "bolt_group_slip_critical.svg")
-    )
+    print(f"\nDesign Check (A325 M20 Bearing):")
+    print(f"  Max bolt force: {design_result.max_force:.2f} kN")
+    print(f"  Bolt capacity: {bolt_capacity_kN:.2f} kN")
+    utilization = design_result.max_force / bolt_capacity_kN
+    print(f"  Utilization: {utilization:.1%}")
+    print(f"  Status: {'✓ PASS' if utilization <= 1.0 else '✗ FAIL'}")
     
     print("\n" + "=" * 60)
     print("All examples complete! Check gallery/ for saved plots.")
@@ -203,4 +177,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

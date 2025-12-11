@@ -10,7 +10,7 @@ Example usage (Welds):
     
     # Create weld from section
     section = rhs(b=100, h=200, t=10, r=15)
-    params = WeldParams(type="fillet", leg=6.0, electrode="E70")
+    params = WeldParams(type="fillet", leg=6.0)
     weld = Weld.from_section(section=section, parameters=params)
     
     # Define load
@@ -21,33 +21,37 @@ Example usage (Welds):
     
     # Access results (beamy-style)
     print(f"Max stress: {loaded.max:.1f} MPa")
-    print(f"Utilization: {loaded.utilization():.1%}")
     
     # Plot results
     loaded.plot(section=True)
     
-    # Or compare methods
-    loaded_both = LoadedWeld(weld, load, method="both")
-    loaded_both.plot()
+    # Design check (you define allowable)
+    allowable_stress = 0.75 * 0.60 * 483.0  # E70 electrode
+    if loaded.max <= allowable_stress:
+        print(f"OK: {loaded.max/allowable_stress:.1%}")
 
 Example usage (Bolts):
     from connecty import BoltGroup, BoltParameters, Load
     
     # Create bolt group from pattern
-    params = BoltParameters(diameter=20, grade="A325")
+    params = BoltParameters(diameter=20)
     bolts = BoltGroup.from_pattern(
-        rows=3, cols=2, spacing_y=75, spacing_z=60, parameters=params
+        rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20
     )
     
     # Define load
     load = Load(Fy=-100e3, location=(150, 0))
     
     # Analyze (elastic or icr method)
-    result = bolts.analyze(force, method="elastic")
+    result = bolts.analyze(load, method="elastic")
     
     # Access results
     print(f"Max force: {result.max_force:.1f} kN")
-    print(f"Utilization: {result.utilization():.1%}")
+    
+    # Design check (you define capacity)
+    bolt_capacity = 87.8  # kN (A325 M20)
+    if result.max_force <= bolt_capacity:
+        print(f"OK: {result.max_force/bolt_capacity:.1%}")
     
     # Plot
     result.plot(force=True, bolt_forces=True)
@@ -57,7 +61,6 @@ from .weld import (
     Weld,
     WeldParams,
     WeldProperties,
-    ELECTRODE_STRENGTH,
 )
 
 from .welded_section import (
@@ -90,14 +93,6 @@ from .bolt import (
     BoltProperties,
     BoltForce,
     BoltResult,
-    BOLT_SHEAR_STRENGTH,
-    SLIP_CLASS_FACTORS,
-    BOLT_PRETENSION,
-)
-
-from .bolt_stress import (
-    calculate_elastic_bolt_force,
-    calculate_icr_bolt_force,
 )
 
 from .bolt_plotter import (
@@ -125,8 +120,6 @@ __all__ = [
     "plot_stress_comparison",
     "plot_weld_geometry",
     "plot_stress_components",
-    # Weld data
-    "ELECTRODE_STRENGTH",
     # Bolt classes
     "BoltGroup",
     "BoltParameters",
@@ -134,14 +127,8 @@ __all__ = [
     "BoltForce",
     "BoltResult",
     # Bolt functions
-    "calculate_elastic_bolt_force",
-    "calculate_icr_bolt_force",
     "plot_bolt_result",
     "plot_bolt_pattern",
-    # Bolt data
-    "BOLT_SHEAR_STRENGTH",
-    "SLIP_CLASS_FACTORS",
-    "BOLT_PRETENSION",
 ]
 
 __version__ = "0.3.0"
