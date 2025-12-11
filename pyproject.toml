@@ -13,7 +13,7 @@ dependencies = [
 
 [tool.uv.sources]
 connecty = { workspace = true }
-sectiony = { path = "../sectiony", editable = true }
+sectiony = { git = "https://github.com/EdwardAstill/sectiony" }
 
 [build-system]
 requires = ["hatchling"]
