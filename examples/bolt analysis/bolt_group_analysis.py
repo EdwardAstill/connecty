@@ -52,12 +52,16 @@ def main():
     print(f"  Min bolt force: {result_elastic.min_force:.2f} kN")
     print(f"  Mean force: {result_elastic.mean:.2f} kN")
     print(f"  Critical bolt index: {result_elastic.critical_index}")
+    print(f"\n  Max shear stress: {result_elastic.max_stress:.1f} MPa")
+    print(f"  Min shear stress: {result_elastic.min_stress:.1f} MPa")
+    print(f"  Mean shear stress: {result_elastic.mean_stress:.1f} MPa")
     
     # Show force at each bolt
-    print(f"\n  Individual bolt forces:")
+    print(f"\n  Individual bolt forces and stresses:")
     for i, bf in enumerate(result_elastic.bolt_forces):
         print(f"    Bolt {i+1} at ({bf.y:.0f}, {bf.z:.0f}): "
-              f"Fy={bf.Fy:.2f} kN, Fz={bf.Fz:.2f} kN, R={bf.resultant:.2f} kN")
+              f"Fy={bf.Fy:.2f} kN, Fz={bf.Fz:.2f} kN, R={bf.resultant:.2f} kN, "
+              f"τ={bf.shear_stress:.1f} MPa")
     
     # Plot elastic results
         gallery_dir = Path(__file__).resolve().parents[2] / "gallery"
@@ -85,17 +89,22 @@ def main():
     print(f"  Min bolt force: {result_icr.min_force:.2f} kN")
     print(f"  Mean force: {result_icr.mean:.2f} kN")
     print(f"  Critical bolt index: {result_icr.critical_index}")
+    print(f"  Max shear stress: {result_icr.max_stress:.1f} MPa")
+    print(f"  Mean shear stress: {result_icr.mean_stress:.1f} MPa")
     if result_icr.icr_point:
         print(f"  ICR location: ({result_icr.icr_point[0]:.1f}, {result_icr.icr_point[1]:.1f}) mm")
     
     # Compare methods
     reduction = (1 - result_icr.max_force / result_elastic.max_force) * 100
+    stress_reduction = (1 - result_icr.max_stress / result_elastic.max_stress) * 100
     print(f"\n  ICR vs Elastic: {reduction:.0f}% reduction in max force")
+    print(f"  ICR vs Elastic: {stress_reduction:.0f}% reduction in max stress")
     
-    print(f"\n  Individual bolt forces:")
+    print(f"\n  Individual bolt forces and stresses:")
     for i, bf in enumerate(result_icr.bolt_forces):
         print(f"    Bolt {i+1} at ({bf.y:.0f}, {bf.z:.0f}): "
-              f"Fy={bf.Fy:.2f} kN, Fz={bf.Fz:.2f} kN, R={bf.resultant:.2f} kN")
+              f"Fy={bf.Fy:.2f} kN, Fz={bf.Fz:.2f} kN, R={bf.resultant:.2f} kN, "
+              f"τ={bf.shear_stress:.1f} MPa")
     
     result_icr.plot(
         force=True,
@@ -138,6 +147,8 @@ def main():
     print(f"\nElastic Results:")
     print(f"  Max bolt force: {result_circular.max_force:.2f} kN")
     print(f"  Mean force: {result_circular.mean:.2f} kN")
+    print(f"  Max shear stress: {result_circular.max_stress:.1f} MPa")
+    print(f"  Mean shear stress: {result_circular.mean_stress:.1f} MPa")
     
     result_circular.plot(
         force=True,
@@ -165,6 +176,7 @@ def main():
     
     print(f"\nDesign Check (A325 M20 Bearing):")
     print(f"  Max bolt force: {design_result.max_force:.2f} kN")
+    print(f"  Max shear stress: {design_result.max_stress:.1f} MPa")
     print(f"  Bolt capacity: {bolt_capacity_kN:.2f} kN")
     utilization = design_result.max_force / bolt_capacity_kN
     print(f"  Utilization: {utilization:.1%}")

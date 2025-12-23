@@ -267,6 +267,7 @@ class BoltForce:
     point: Point
     Fy: float  # Force in y-direction (kN)
     Fz: float  # Force in z-direction (kN)
+    diameter: float = 0.0  # Bolt diameter (mm)
     
     @property
     def y(self) -> float:
@@ -287,6 +288,42 @@ class BoltForce:
     def angle(self) -> float:
         """Angle of resultant force (degrees from +z axis)."""
         return math.degrees(math.atan2(self.Fy, self.Fz))
+    
+    @property
+    def area(self) -> float:
+        """Cross-sectional area of bolt (mm²)."""
+        if self.diameter <= 0:
+            return 0.0
+        return math.pi * (self.diameter / 2) ** 2
+    
+    @property
+    def shear_stress(self) -> float:
+        """
+        Shear stress through bolt cross-section (MPa).
+        
+        Calculated as: τ = V / A
+        where V is resultant force (kN) and A is bolt area (mm²)
+        
+        Returns 0.0 if diameter is not set.
+        """
+        if self.area <= 0:
+            return 0.0
+        # Convert kN to N, divide by mm² to get MPa (N/mm²)
+        return (self.resultant * 1000.0) / self.area
+    
+    @property
+    def shear_stress_y(self) -> float:
+        """Shear stress from y-component force only (MPa)."""
+        if self.area <= 0:
+            return 0.0
+        return (abs(self.Fy) * 1000.0) / self.area
+    
+    @property
+    def shear_stress_z(self) -> float:
+        """Shear stress from z-component force only (MPa)."""
+        if self.area <= 0:
+            return 0.0
+        return (abs(self.Fz) * 1000.0) / self.area
 
 
 @dataclass
@@ -342,6 +379,42 @@ class BoltResult:
         """Average bolt force (kN)."""
         forces = self._get_forces()
         return float(np.mean(forces)) if len(forces) > 0 else 0.0
+    
+    @property
+    def max_stress(self) -> float:
+        """
+        Maximum shear stress on any bolt (MPa).
+        
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.shear_stress for bf in self.bolt_forces]
+        return float(np.max(stresses)) if stresses else 0.0
+    
+    @property
+    def min_stress(self) -> float:
+        """
+        Minimum shear stress on any bolt (MPa).
+        
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.shear_stress for bf in self.bolt_forces]
+        return float(np.min(stresses)) if stresses else 0.0
+    
+    @property
+    def mean_stress(self) -> float:
+        """
+        Average shear stress across bolts (MPa).
+        
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.shear_stress for bf in self.bolt_forces]
+        return float(np.mean(stresses)) if stresses else 0.0
     
     @property
     def critical_bolt(self) -> BoltForce | None:
@@ -479,7 +552,8 @@ def _calculate_elastic_bolt_force(
         bolt_forces.append(BoltForce(
             point=(y, z),
             Fy=total_Fy,
-            Fz=total_Fz
+            Fz=total_Fz,
+            diameter=bolt_group.parameters.diameter
         ))
     
     return BoltResult(
@@ -664,7 +738,8 @@ def _calculate_icr_bolt_force(
         bolt_forces.append(BoltForce(
             point=(y, z),
             Fy=R * float(dir_y_arr[idx]),
-            Fz=R * float(dir_z_arr[idx])
+            Fz=R * float(dir_z_arr[idx]),
+            diameter=bolt_group.parameters.diameter
         ))
     
     icr_point = (float(best_data["icr_y"]), float(best_data["icr_z"]))

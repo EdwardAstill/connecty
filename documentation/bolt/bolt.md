@@ -167,7 +167,19 @@ for bf in result.bolt_forces:
     print(f"  Fz = {bf.Fz:.2f} kN")
     print(f"  Resultant = {bf.resultant:.2f} kN")
     print(f"  Angle = {bf.angle:.1f}°")
+    print(f"  Shear stress = {bf.shear_stress:.1f} MPa")
 ```
+
+**Shear Stress Calculation:**
+
+The `shear_stress` property calculates τ = V / A where:
+- V = resultant force (kN)
+- A = bolt cross-sectional area (mm²)
+- τ = shear stress (MPa)
+
+**Important:** The shear stress calculation is the same for both bearing-type and slip-critical connections:
+- **Bearing-type**: Shear stress is the primary resistance mechanism (checked against φFnv per AISC J3.6)
+- **Slip-critical**: Shear stress represents the post-slip capacity; primary resistance comes from friction between plates (AISC J3.8-J3.9). AISC requires checking both slip resistance AND shear/bearing limit states.
 
 ---
 
@@ -203,24 +215,200 @@ plot_bolt_pattern(bolts, save_path="pattern.svg")
 
 ---
 
-## Design Checks
+## Design Checks (AISC 360-22)
 
-Connecty outputs forces only. To check adequacy:
+Connecty provides **automatic AISC 360-22 checks** for A325 and A490 bolts, supporting both bearing-type and slip-critical connections. Checks include shear, tension, bearing/tear-out, and slip resistance limits with per-bolt utilization reporting.
+
+### Quick Start
 
 ```python
-result = bolts.analyze(force, method="elastic")
+from connecty import BoltGroup, BoltDesignParams, Load
 
-# Get your bolt capacity from tables or calculation
-bolt_capacity_kN = 150  # Example: A325 M20 bearing-type
+# Create bolt group
+bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
+force = Load(Fy=-100000, Fz=30000, location=(75, 150))
 
-# Check utilization
-max_force = result.max_force
-utilization = max_force / bolt_capacity_kN
+# Define design parameters (A325, standard holes, bearing-type)
+design = BoltDesignParams(
+    grade="A325",
+    hole_type="standard",
+    slot_orientation="perpendicular",
+    threads_in_shear_plane=True,
+    slip_class="A",
+    n_s=1,
+    fillers=0,
+    plate_fu=450.0,      # MPa
+    plate_thickness=12.0, # mm
+    edge_distance_y=50.0, # mm
+    edge_distance_z=50.0  # mm
+)
 
-if utilization <= 1.0:
-    print(f"OK: Utilization {utilization:.1%}")
+# Run check
+check = bolts.check_aisc(
+    force=force,
+    design=design,
+    method="elastic",
+    connection_type="bearing"
+)
+
+# Access results
+print(f"Governing utilization: {check.governing_utilization:.2f}")
+print(f"Governing bolt: {check.governing_bolt_index}")
+print(f"Governing limit state: {check.governing_limit_state}")
+
+if check.governing_utilization <= 1.0:
+    print("PASS")
 else:
-    print(f"NOT OK: Utilization {utilization:.1%}")
+    print("FAIL")
 ```
 
-This approach gives you full control over capacity definitions, phi factors, and design philosophy.
+### BoltDesignParams
+
+Defines all design-only inputs required for AISC checks. This dataclass captures material properties, geometry, and connection details not needed for analysis:
+
+```python
+from connecty import BoltDesignParams
+
+design = BoltDesignParams(
+    # Grade and bolt geometry
+    grade="A325",              # "A325" or "A490"
+    hole_type="standard",      # "standard", "oversize", "short_slotted", "long_slotted"
+    slot_orientation="perpendicular",  # "perpendicular" or "parallel" (for slotted holes)
+    threads_in_shear_plane=True,  # Threads in or excluded from shear plane
+    
+    # Slip-critical parameters
+    slip_class="A",            # "A" (μ=0.30) or "B" (μ=0.50)
+    n_s=1,                      # Number of slip planes
+    fillers=0,                  # Count of fillers (affects h_f factor)
+    
+    # Connected material properties
+    plate_fu=450.0,             # Ultimate tensile stress (MPa)
+    plate_thickness=12.0,       # Plate thickness (mm)
+    edge_distance_y=50.0,       # Edge distance in y-direction (mm)
+    edge_distance_z=50.0,       # Edge distance in z-direction (mm)
+    
+    # Optional overrides
+    tension_per_bolt=None,      # kN override (if None, derives from Fx/n)
+    n_b_tension=None,           # Bolts carrying applied tension (for k_sc reduction)
+    pretension_override=None    # kN override (if None, uses AISC Table J3.1)
+)
+```
+
+### BoltCheckResult
+
+Returned by `check_aisc()` with complete utilization information:
+
+```python
+check = bolts.check_aisc(force, design, connection_type="bearing")
+
+# Summary properties
+print(check.governing_utilization)    # Max util across all bolts/limit states
+print(check.governing_bolt_index)     # Index of critical bolt
+print(check.governing_limit_state)    # "shear", "tension", "bearing", or "slip"
+print(check.connection_type)          # "bearing" or "slip-critical"
+print(check.method)                   # "elastic" or "icr"
+
+# Per-bolt details for reporting
+for detail in check.details:
+    print(f"Bolt {detail.bolt_index}:")
+    print(f"  Shear demand: {detail.shear_demand:.2f} kN")
+    print(f"  Tension demand: {detail.tension_demand:.2f} kN")
+    print(f"  Shear util: {detail.shear_util:.3f}")
+    print(f"  Tension util: {detail.tension_util:.3f}")
+    print(f"  Bearing util: {detail.bearing_util:.3f}")
+    if detail.slip_util is not None:
+        print(f"  Slip util: {detail.slip_util:.3f}")
+    print(f"  Governing: {detail.governing_util:.3f} ({detail.governing_limit_state})")
+
+# Dictionary export (for tables/reports)
+info_dict = check.info  # Nested dict with all results
+```
+
+### Connection Types
+
+**Bearing-Type**
+```python
+check = bolts.check_aisc(force, design, connection_type="bearing")
+```
+Checks J3.6, J3.7, J3.10:
+- Shear rupture: $U_V = \frac{V_u}{\phi F_{nv} A_b}$
+- Tension rupture (with J3.7 interaction): $U_T = \frac{T_u}{\phi F'_{nt} A_b}$
+- Bearing/tear-out: $U_{bear} = \frac{V_u}{\phi R_n}$ where $R_n = \min(2.4dtF_u, 1.2l_ctF_u)$
+
+**Slip-Critical**
+```python
+check = bolts.check_aisc(force, design, connection_type="slip-critical")
+```
+Checks J3.8–J3.9 (plus all bearing-type):
+- Slip resistance: $U_{slip} = \frac{V_u}{\phi \mu D_u h_f T_b n_s k_{sc}}$
+
+Where:
+- $\phi = 1.00$ (standard holes, short slots ⊥ load), 0.85 (oversize, short slots ∥), 0.70 (long slots)
+- $\mu = 0.30$ (Class A) or 0.50 (Class B)
+- $D_u = 1.13$ (mean installed pretension multiplier)
+- $h_f = 1.0$ (≤1 filler) or 0.85 (≥2 fillers)
+- $T_b$ = pretension from AISC Table J3.1
+- $k_{sc} = \max(0, 1 - T_u / (D_u T_b n_b))$ (combined tension–shear reduction)
+
+### Examples
+
+**Bearing-Type Check**
+```python
+from connecty import BoltGroup, BoltDesignParams, Load
+
+bolts = BoltGroup.from_pattern(rows=2, cols=3, spacing_y=80, spacing_z=70, diameter=20)
+force = Load(Fy=-100000, Fz=25000, location=(40, 120))
+
+design = BoltDesignParams(
+    grade="A325",
+    hole_type="standard",
+    threads_in_shear_plane=True,
+    plate_fu=450.0,
+    plate_thickness=14.0,
+    edge_distance_y=55.0,
+    edge_distance_z=60.0
+)
+
+check = bolts.check_aisc(force, design, method="elastic", connection_type="bearing")
+print(f"Utilization: {check.governing_utilization:.1%}")
+```
+
+**Slip-Critical Check (A325 Class B)**
+```python
+design = BoltDesignParams(
+    grade="A325",
+    hole_type="short_slotted",
+    slot_orientation="perpendicular",
+    threads_in_shear_plane=False,
+    slip_class="B",
+    n_s=2,
+    fillers=0,
+    plate_fu=450.0,
+    plate_thickness=14.0,
+    edge_distance_y=55.0,
+    edge_distance_z=60.0,
+    n_b_tension=6  # All 6 bolts carry applied tension
+)
+
+check = bolts.check_aisc(force, design, method="elastic", connection_type="slip-critical")
+print(f"Utilization: {check.governing_utilization:.1%}")
+```
+
+### AISC Reference Data
+
+The following AISC 360-22 data are built into the checker:
+
+**Table J3.1 (Minimum Pretension, kN)**
+| Bolt Size | A325 | A490 |
+|-----------|------|------|
+| M20       | 142  | 179  |
+| M22       | 176  | 221  |
+| M24       | 205  | 257  |
+
+**Table J3.2 (Nominal Stresses, MPa)**
+| Grade | $F_{nt}$ | $F_{nv}$ (N) | $F_{nv}$ (X) |
+|-------|----------|--------------|-------------|
+| A325  | 620      | 370          | 470         |
+| A490  | 780      | 470          | 580         |
+
+For complete AISC 360-22 standard reference, see [../standards/AISC 360-22.md](../standards/AISC%20360-22.md).

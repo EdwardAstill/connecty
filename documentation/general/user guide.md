@@ -324,32 +324,96 @@ result.plot(
 
 ## 5. Design Checks
 
-Connecty outputs **forces and stresses only**. You handle design checks.
+Connecty provides automatic design checks for **bolts** (AISC 360-22), and outputs-only for **welds** (you define allowable stress).
 
-### Bolt Design Check
+### Bolt Design Check (Automatic AISC 360-22)
+
+Connecty automatically checks A325 and A490 bolts for bearing-type and slip-critical connections.
 
 ```python
-from connecty import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltDesignParams, Load
 
-# ... analyze bolt group ...
-result = bolts.analyze(force, method="elastic")
+# Create bolt group
+bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
+force = Load(Fy=-100000, Fz=30000, location=(75, 150))
 
-# Define your capacity (from tables, material properties, etc.)
-# Example: A325 M20 bearing-type bolt
-F_nv = 372.0  # MPa (nominal shear strength)
-area = 314.0  # mm² (M20 area)
-phi = 0.75    # resistance factor
-capacity_kN = (phi * F_nv * area) / 1000
+# Design parameters (material and geometry inputs)
+design = BoltDesignParams(
+    grade="A325",
+    hole_type="standard",
+    threads_in_shear_plane=True,
+    slip_class="A",
+    n_s=1,
+    fillers=0,
+    plate_fu=450.0,
+    plate_thickness=12.0,
+    edge_distance_y=50.0,
+    edge_distance_z=50.0
+)
 
-# Check adequacy
-utilization = result.max_force / capacity_kN
-if utilization <= 1.0:
-    print(f"PASS: {utilization:.1%}")
+# Automatic check (bearing-type)
+check = bolts.check_aisc(
+    force=force,
+    design=design,
+    method="elastic",
+    connection_type="bearing"
+)
+
+# Results
+print(f"Utilization: {check.governing_utilization:.2f}")
+print(f"Limit state: {check.governing_limit_state}")
+
+if check.governing_utilization <= 1.0:
+    print("PASS")
 else:
-    print(f"FAIL: {utilization:.1%}")
+    print("FAIL")
 ```
 
+**Key Features:**
+- Automatic per-bolt force distribution (elastic or ICR method)
+- AISC J3.6/J3.7 (shear + tension with interaction)
+- AISC J3.10 (bearing and tear-out)
+- AISC J3.8–J3.9 (slip resistance for slip-critical connections)
+- Per-bolt utilization for each limit state
+- Identification of governing limit state and critical bolt
+
+**Connection Types:**
+
+```python
+# Bearing-type (default)
+check = bolts.check_aisc(force, design, connection_type="bearing")
+
+# Slip-critical
+check = bolts.check_aisc(force, design, connection_type="slip-critical")
+```
+
+**Example: Slip-Critical (A325 Class B)**
+
+```python
+design = BoltDesignParams(
+    grade="A325",
+    hole_type="short_slotted",
+    slot_orientation="perpendicular",
+    threads_in_shear_plane=False,
+    slip_class="B",
+    n_s=2,
+    fillers=0,
+    plate_fu=450.0,
+    plate_thickness=14.0,
+    edge_distance_y=55.0,
+    edge_distance_z=60.0,
+    n_b_tension=6  # All 6 bolts carry tension
+)
+
+check = bolts.check_aisc(force, design, method="elastic", connection_type="slip-critical")
+print(f"Slip-critical utilization: {check.governing_utilization:.1%}")
+```
+
+For detailed parameter documentation, see [../bolt/bolt.md](../bolt/bolt.md).
+
 ### Weld Design Check
+
+Connecty outputs stress only. You define the allowable:
 
 ```python
 from connecty import Weld, WeldParams, Load, LoadedWeld
@@ -375,9 +439,40 @@ else:
 
 ## 6. Examples
 
-### Example 1: Eccentric Bolt Group
+Connecty includes comprehensive examples demonstrating analysis and checks. Run them with:
 
-Compare elastic vs. ICR for an eccentric load:
+```bash
+# Run all examples (welds + bolts)
+python examples/run_all_examples.py
+
+# Run bolt examples only
+python examples/run_bolt_examples.py
+```
+
+**Example Organization:**
+
+```
+examples/
+├── bolt analysis/       # Force distribution (elastic vs ICR)
+├── bolt check/          # AISC 360-22 checks (bearing vs slip-critical)
+├── bolt plotting/       # Visualization
+├── weld analysis/       # Stress distribution
+├── weld plotting/       # Visualization
+└── common/              # Shared helpers
+```
+
+**Gallery Outputs:**
+
+```
+gallery/
+├── bolt analysis/       # .txt analysis results + .svg plots
+├── bolt check/          # .txt check results
+├── bolt plotting/       # .svg bolt group plots
+├── weld analysis/       # .txt stress results
+└── weld plotting/       # .svg stress distribution plots
+```
+
+### Example 1: Eccentric Bolt Group (Elastic vs. ICR)
 
 ```python
 from connecty import BoltGroup, BoltParameters, Force
@@ -402,9 +497,42 @@ savings = (1 - icr.max_force / elastic.max_force) * 100
 print(f"ICR saves: {savings:.0f}%")
 ```
 
-### Example 2: Fillet Weld with Moment
+See also: `examples/bolt analysis/elastic_vs_icr_analysis.py`
 
-Compare elastic vs. ICR for a fillet weld with eccentric load:
+### Example 2: Bolt Check (Bearing vs. Slip-Critical)
+
+```python
+from connecty import BoltGroup, BoltDesignParams, Load
+
+# 2×3 bolt group
+bolts = BoltGroup.from_pattern(rows=2, cols=3, spacing_y=80, spacing_z=70, diameter=20)
+force = Load(Fy=-100000, Fz=25000, location=(40, 120))
+
+# Design parameters
+design = BoltDesignParams(
+    grade="A325",
+    hole_type="standard",
+    threads_in_shear_plane=True,
+    plate_fu=450.0,
+    plate_thickness=14.0,
+    edge_distance_y=55.0,
+    edge_distance_z=60.0
+)
+
+# Bearing-type check
+bearing = bolts.check_aisc(force, design, method="elastic", connection_type="bearing")
+print(f"Bearing: {bearing.governing_utilization:.1%}")
+
+# Slip-critical check (Class B)
+design.slip_class = "B"
+design.n_s = 2
+slip = bolts.check_aisc(force, design, method="elastic", connection_type="slip-critical")
+print(f"Slip-critical: {slip.governing_utilization:.1%}")
+```
+
+See also: `examples/bolt check/bearing_vs_slip_check.py`
+
+### Example 3: Fillet Weld with Moment
 
 ```python
 from connecty import Weld, WeldParams, Load, LoadedWeld
@@ -431,29 +559,7 @@ elastic.plot(save_path="elastic.svg")
 icr.plot(save_path="icr.svg")
 ```
 
-### Example 3: Custom Design Workflow
-
-```python
-from connecty import BoltGroup, BoltParameters, Force
-
-# Try different bolt sizes
-sizes = [16, 20, 24]  # mm
-
-for size in sizes:
-    params = BoltParameters(diameter=size)
-    bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=100, spacing_z=75, diameter=size)
-    
-    force = Force(Fy=-200000, location=(100, 75))
-    result = bolts.analyze(force, method="icr")
-    
-    # Assume A325 capacity
-    F_nv = 372.0  # MPa
-    area = 3.14 * (size / 2) ** 2  # mm²
-    capacity_kN = (0.75 * F_nv * area) / 1000
-    
-    util = result.max_force / capacity_kN
-    print(f"M{size}: {util:.1%} utilization")
-```
+See also: `examples/weld analysis/` and `examples/weld plotting/`
 
 ---
 

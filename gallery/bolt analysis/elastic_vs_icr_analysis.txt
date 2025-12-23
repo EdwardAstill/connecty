@@ -1,71 +1,83 @@
 BOLT ANALYSIS SUMMARY (ELASTIC VS ICR)
 ============================================================
-Case: Rectangular � Elastic
+Case: Rectangular – Elastic
   Method: elastic
-  Load: Fy=120 kN @ z=140 mm
-  Max bolt force: 27.93 kN
-  Min bolt force: 2.04 kN
-  Mean bolt force: 17.78 kN
-  Critical bolt #3 at (y=0.0, z=120.0) -> R=27.93 kN
-  Per-bolt forces (kN):
-     1: Fy=-2.04, Fz=-13.18, R=13.33, angle=-171.2 deg
-     2: Fy=-13.33, Fz=-13.18, R=18.75, angle=-134.7 deg
-     3: Fy=-24.63, Fz=-13.18, R=27.93, angle=-118.1 deg
-     4: Fy=-2.04, Fz=0.00, R=2.04, angle=-90.0 deg
-     5: Fy=-13.33, Fz=0.00, R=13.33, angle=-90.0 deg
-     6: Fy=-24.63, Fz=0.00, R=24.63, angle=-90.0 deg
-     7: Fy=-2.04, Fz=13.18, R=13.33, angle=-8.8 deg
-     8: Fy=-13.33, Fz=13.18, R=18.75, angle=-45.3 deg
-     9: Fy=-24.63, Fz=13.18, R=27.93, angle=-61.9 deg
+  Load: Fy=120 kN, Mx=5 kN·m @ z=140 mm
+  Max bolt force: 36.50 kN
+  Min bolt force: 3.84 kN
+  Mean bolt force: 23.29 kN
+  Max shear stress: 116.2 MPa
+  Min shear stress: 12.2 MPa
+  Mean shear stress: 74.1 MPa
+  Critical bolt #3 at (y=0.0, z=120.0) -> R=36.50 kN, stress=116.2 MPa
+  Per-bolt forces and stresses:
+     1: Fy=3.84 kN, Fz=-20.04 kN, R=20.40 kN, stress=64.9 MPa, angle=169.1 deg
+     2: Fy=-13.33 kN, Fz=-20.04 kN, R=24.07 kN, stress=76.6 MPa, angle=-146.4 deg
+     3: Fy=-30.51 kN, Fz=-20.04 kN, R=36.50 kN, stress=116.2 MPa, angle=-123.3 deg
+     4: Fy=3.84 kN, Fz=0.00 kN, R=3.84 kN, stress=12.2 MPa, angle=90.0 deg
+     5: Fy=-13.33 kN, Fz=0.00 kN, R=13.33 kN, stress=42.4 MPa, angle=-90.0 deg
+     6: Fy=-30.51 kN, Fz=0.00 kN, R=30.51 kN, stress=97.1 MPa, angle=-90.0 deg
+     7: Fy=3.84 kN, Fz=20.04 kN, R=20.40 kN, stress=64.9 MPa, angle=10.9 deg
+     8: Fy=-13.33 kN, Fz=20.04 kN, R=24.07 kN, stress=76.6 MPa, angle=-33.6 deg
+     9: Fy=-30.51 kN, Fz=20.04 kN, R=36.50 kN, stress=116.2 MPa, angle=-56.7 deg
 
-Case: Rectangular � ICR
+Case: Rectangular – ICR
   Method: icr
-  Load: Fy=120 kN @ z=140 mm
-  Max bolt force: 30.81 kN
-  Min bolt force: 21.28 kN
-  Mean bolt force: 29.69 kN
-  Critical bolt #1 at (y=0.0, z=0.0) -> R=30.81 kN
-  Per-bolt forces (kN):
-     1: Fy=-26.04, Fz=16.47, R=30.81, angle=-57.7 deg
-     2: Fy=-18.05, Fz=24.94, R=30.79, angle=-35.9 deg
-     3: Fy=4.07, Fz=30.46, R=30.73, angle=7.6 deg
-     4: Fy=-30.80, Fz=-0.00, R=30.80, angle=-90.0 deg
-     5: Fy=-30.45, Fz=-0.00, R=30.45, angle=-90.0 deg
-     6: Fy=21.28, Fz=-0.00, R=21.28, angle=90.0 deg
-     7: Fy=-26.04, Fz=-16.47, R=30.81, angle=-122.3 deg
-     8: Fy=-18.05, Fz=-24.94, R=30.79, angle=-144.1 deg
-     9: Fy=4.07, Fz=-30.46, R=30.73, angle=172.4 deg
+  Load: Fy=120 kN, Mx=5 kN·m @ z=140 mm
+  Max bolt force: 37.60 kN
+  Min bolt force: 33.25 kN
+  Mean bolt force: 37.01 kN
+  Max shear stress: 119.7 MPa
+  Min shear stress: 105.9 MPa
+  Mean shear stress: 117.8 MPa
+  Critical bolt #1 at (y=0.0, z=0.0) -> R=37.60 kN, stress=119.7 MPa
+  Per-bolt forces and stresses:
+     1: Fy=-30.83 kN, Fz=21.51 kN, R=37.60 kN, stress=119.7 MPa, angle=-55.1 deg
+     2: Fy=-18.75 kN, Fz=32.56 kN, R=37.57 kN, stress=119.6 MPa, angle=-29.9 deg
+     3: Fy=10.16 kN, Fz=36.14 kN, R=37.54 kN, stress=119.5 MPa, angle=15.7 deg
+     4: Fy=-37.59 kN, Fz=-0.00 kN, R=37.59 kN, stress=119.7 MPa, angle=-90.0 deg
+     5: Fy=-36.83 kN, Fz=-0.00 kN, R=36.83 kN, stress=117.2 MPa, angle=-90.0 deg
+     6: Fy=33.25 kN, Fz=-0.00 kN, R=33.25 kN, stress=105.9 MPa, angle=90.0 deg
+     7: Fy=-30.83 kN, Fz=-21.51 kN, R=37.60 kN, stress=119.7 MPa, angle=-124.9 deg
+     8: Fy=-18.75 kN, Fz=-32.56 kN, R=37.57 kN, stress=119.6 MPa, angle=-150.1 deg
+     9: Fy=10.16 kN, Fz=-36.14 kN, R=37.54 kN, stress=119.5 MPa, angle=164.3 deg
 
-Case: Circular � Elastic
+Case: Circular – Elastic
   Method: elastic
-  Load: Fy=90 kN + Fz=45 kN @ z=80 mm
-  Max bolt force: 20.50 kN
-  Min bolt force: 5.47 kN
-  Mean bolt force: 13.96 kN
-  Critical bolt #2 at (y=77.8, z=77.8) -> R=20.50 kN
-  Per-bolt forces (kN):
-     1: Fy=-19.43, Fz=5.62, R=20.23, angle=-73.9 deg
-     2: Fy=-17.04, Fz=11.41, R=20.50, angle=-56.2 deg
-     3: Fy=-11.25, Fz=13.81, R=17.81, angle=-39.2 deg
-     4: Fy=-5.46, Fz=11.41, R=12.65, angle=-25.6 deg
-     5: Fy=-3.07, Fz=5.63, R=6.41, angle=-28.6 deg
-     6: Fy=-5.46, Fz=-0.16, R=5.47, angle=-91.7 deg
-     7: Fy=-11.25, Fz=-2.56, R=11.54, angle=-102.8 deg
-     8: Fy=-17.04, Fz=-0.16, R=17.04, angle=-90.5 deg
+  Load: Fy=90 kN, Fz=45 kN, Mx=3 kN·m @ z=80 mm
+  Max bolt force: 23.86 kN
+  Min bolt force: 3.99 kN
+  Mean bolt force: 15.51 kN
+  Max shear stress: 52.7 MPa
+  Min shear stress: 8.8 MPa
+  Mean shear stress: 34.3 MPa
+  Critical bolt #2 at (y=77.8, z=77.8) -> R=23.86 kN, stress=52.7 MPa
+  Per-bolt forces and stresses:
+     1: Fy=-22.84 kN, Fz=5.62 kN, R=23.52 kN, stress=52.0 MPa, angle=-76.2 deg
+     2: Fy=-19.45 kN, Fz=13.82 kN, R=23.86 kN, stress=52.7 MPa, angle=-54.6 deg
+     3: Fy=-11.25 kN, Fz=17.22 kN, R=20.57 kN, stress=45.5 MPa, angle=-33.2 deg
+     4: Fy=-3.05 kN, Fz=13.82 kN, R=14.15 kN, stress=31.3 MPa, angle=-12.5 deg
+     5: Fy=0.34 kN, Fz=5.63 kN, R=5.64 kN, stress=12.5 MPa, angle=3.5 deg
+     6: Fy=-3.05 kN, Fz=-2.57 kN, R=3.99 kN, stress=8.8 MPa, angle=-130.1 deg
+     7: Fy=-11.25 kN, Fz=-5.97 kN, R=12.73 kN, stress=28.1 MPa, angle=-117.9 deg
+     8: Fy=-19.45 kN, Fz=-2.57 kN, R=19.62 kN, stress=43.4 MPa, angle=-97.5 deg
 
-Case: Circular � ICR
+Case: Circular – ICR
   Method: icr
-  Load: Fy=90 kN + Fz=45 kN @ z=80 mm
-  Max bolt force: 16.45 kN
-  Min bolt force: 14.98 kN
-  Mean bolt force: 16.16 kN
-  Critical bolt #6 at (y=-77.8, z=-77.8) -> R=16.45 kN
-  Per-bolt forces (kN):
-     1: Fy=-2.10, Fz=15.54, R=15.68, angle=-7.7 deg
-     2: Fy=-13.57, Fz=-6.35, R=14.98, angle=-115.1 deg
-     3: Fy=-15.06, Fz=-6.51, R=16.40, angle=-113.4 deg
-     4: Fy=-16.37, Fz=-1.57, R=16.44, angle=-95.5 deg
-     5: Fy=-15.92, Fz=4.12, R=16.45, angle=-75.5 deg
-     6: Fy=-13.48, Fz=9.42, R=16.45, angle=-55.1 deg
-     7: Fy=-9.41, Fz=13.48, R=16.44, angle=-34.9 deg
-     8: Fy=-4.63, Fz=15.76, R=16.42, angle=-16.4 deg
+  Load: Fy=90 kN, Fz=45 kN, Mx=3 kN·m @ z=80 mm
+  Max bolt force: 19.00 kN
+  Min bolt force: 16.85 kN
+  Mean bolt force: 18.59 kN
+  Max shear stress: 42.0 MPa
+  Min shear stress: 37.3 MPa
+  Mean shear stress: 41.1 MPa
+  Critical bolt #6 at (y=-77.8, z=-77.8) -> R=19.00 kN, stress=42.0 MPa
+  Per-bolt forces and stresses:
+     1: Fy=2.90 kN, Fz=17.73 kN, R=17.96 kN, stress=39.7 MPa, angle=9.3 deg
+     2: Fy=-11.18 kN, Fz=-12.61 kN, R=16.85 kN, stress=37.3 MPa, angle=-138.4 deg
+     3: Fy=-16.38 kN, Fz=-9.53 kN, R=18.95 kN, stress=41.9 MPa, angle=-120.2 deg
+     4: Fy=-18.79 kN, Fz=-2.82 kN, R=19.00 kN, stress=42.0 MPa, angle=-98.5 deg
+     5: Fy=-18.47 kN, Fz=4.44 kN, R=19.00 kN, stress=42.0 MPa, angle=-76.5 deg
+     6: Fy=-15.44 kN, Fz=11.07 kN, R=19.00 kN, stress=42.0 MPa, angle=-54.4 deg
+     7: Fy=-10.15 kN, Fz=16.06 kN, R=19.00 kN, stress=42.0 MPa, angle=-32.3 deg
+     8: Fy=-3.47 kN, Fz=18.65 kN, R=18.97 kN, stress=41.9 MPa, angle=-10.5 deg
