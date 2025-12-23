@@ -75,13 +75,13 @@ Connecty is **unit-agnostic**: you choose your unit system and maintain consiste
 **Example: US Customary Units**
 
 ```python
-from connecty import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltParameters, Load
 
 # All dimensions in inches, all forces in kip
 params = BoltParameters(diameter=0.75)  # 3/4" bolt
-force = Force(Fy=-100.0, location=(4.0, 0.0))  # 100 kip at 4"
+load = Load(Fy=-100.0, location=(4.0, 0.0))  # 100 kip at 4"
 bolts = BoltGroup(positions=[(0, 0), (0, 3)], parameters=params)
-result = bolts.analyze(force)  # Forces in kip
+result = bolts.analyze(load)  # Forces in kip
 ```
 
 ### Geometry First
@@ -223,7 +223,7 @@ loaded.plot(
 ### Bolt Quick Start
 
 ```python
-from connecty import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltParameters, Load
 
 # Create bolt pattern
 params = BoltParameters(diameter=20)
@@ -232,17 +232,21 @@ bolts = BoltGroup.from_pattern(
 )
 
 # Apply load
-force = Force(Fy=-100000, location=(75, 150))
+load = Load(Fy=-100000, location=(75, 150))
 
 # Analyze
-result = bolts.analyze(force, method="elastic")
+result = bolts.analyze(load, method="elastic")
 
 # Access results
 print(f"Max bolt force: {result.max_force:.1f} kN")
-print(f"Mean force: {result.mean:.1f} kN")
+print(f"Mean force: {result.mean_force:.1f} kN")
 
-# Visualize
+# Visualize (default: in-plane shear forces with arrows)
 result.plot(save_path="bolts.svg")
+
+# Visualize out-of-plane axial forces (elastic method only)
+# Use diverging colormap to show tension (red) vs compression (blue)
+result.plot(mode="axial", cmap="RdBu_r", save_path="bolts_axial.svg")
 ```
 
 ### Creating Bolt Groups
@@ -475,21 +479,21 @@ gallery/
 ### Example 1: Eccentric Bolt Group (Elastic vs. ICR)
 
 ```python
-from connecty import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltParameters, Load
 
 # 4×2 bolt pattern
 params = BoltParameters(diameter=20)
 bolts = BoltGroup.from_pattern(rows=4, cols=2, spacing_y=100, spacing_z=75, diameter=20)
 
 # Eccentric load (100 kN at edge)
-force = Force(Fy=-100000, location=(150, 0))
+load = Load(Fy=-100000, location=(150, 0))
 
 # Elastic method
-elastic = bolts.analyze(force, method="elastic")
+elastic = bolts.analyze(load, method="elastic")
 print(f"Elastic: Max = {elastic.max_force:.1f} kN")
 
 # ICR method (more economical)
-icr = bolts.analyze(force, method="icr")
+icr = bolts.analyze(load, method="icr")
 print(f"ICR: Max = {icr.max_force:.1f} kN")
 
 # ICR typically 15-30% more economical

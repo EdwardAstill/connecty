@@ -115,19 +115,19 @@ load_3d = Load(
 The API is straightforward:
 
 ```python
-from connecty import BoltGroup, BoltParameters, Force
+from connecty import BoltGroup, BoltParameters, Load
 
 # Setup
 params = BoltParameters(diameter=20)
 bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
-force = Force(Fy=-100000, location=(75, 150))
+load = Load(Fy=-100000, location=(75, 150))
 
 # Elastic analysis
-result = bolts.analyze(force, method="elastic")
+result = bolts.analyze(load, method="elastic")
 print(f"Max bolt force: {result.max_force:.1f} kN")
 
 # ICR analysis (more accurate for eccentric loads)
-result_icr = bolts.analyze(force, method="icr")
+result_icr = bolts.analyze(load, method="icr")
 print(f"ICR Max force: {result_icr.max_force:.1f} kN")
 ```
 

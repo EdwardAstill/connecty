@@ -240,6 +240,15 @@ result.mean                # Average force per bolt
 result.max_stress          # Maximum shear stress on any bolt (MPa, ksi)
 result.min_stress          # Minimum shear stress on any bolt (MPa, ksi)
 result.mean_stress         # Average shear stress across bolts (MPa, ksi)
+
+result.max_axial_stress    # Maximum out-of-plane axial stress (MPa, ksi) [elastic only]
+result.min_axial_stress    # Minimum out-of-plane axial stress (MPa, ksi) [elastic only]
+result.mean_axial_stress   # Average axial stress (MPa, ksi) [elastic only]
+
+result.max_combined_stress # Maximum combined stress sqrt(tau^2 + |sigma|^2) (MPa, ksi) [elastic only]
+result.min_combined_stress # Minimum combined stress (MPa, ksi) [elastic only]
+result.mean_combined_stress # Average combined stress (MPa, ksi) [elastic only]
+
 result.critical_bolt       # BoltForce object at maximum force location
 result.critical_index      # Index of bolt with maximum force
 result.bolt_forces         # List of BoltForce objects (one per bolt)
@@ -303,24 +312,44 @@ Force and stress at a single bolt location.
 **Attributes:**
 
 ```python
+# Bolt position
 bf.y                       # y-coordinate of bolt
 bf.z                       # z-coordinate of bolt
-bf.Fy                      # Force component in y-direction [kN, kip, etc.]
-bf.Fz                      # Force component in z-direction
+
+# Forces (3D)
+bf.Fx                      # Axial force component (out-of-plane) [kN, kip, etc.]
+bf.Fy                      # Shear force component in y-direction (in-plane) [kN, kip, etc.]
+bf.Fz                      # Shear force component in z-direction (in-plane) [kN, kip, etc.]
+
+# Force magnitudes
+bf.shear                   # In-plane shear magnitude sqrt(Fy^2 + Fz^2) [kN, kip, etc.]
+bf.axial                   # Out-of-plane axial force (signed: + = tension) [kN, kip, etc.]
+bf.resultant               # Total resultant force magnitude sqrt(Fx^2 + Fy^2 + Fz^2)
+
+# Bolt properties
 bf.diameter                # Bolt diameter [mm, in]
-bf.resultant               # Resultant force magnitude (√(Fy² + Fz²))
-bf.angle                   # Force direction in degrees (atan2(Fz, Fy))
-bf.area                    # Cross-sectional area of bolt [mm², in²]
-bf.shear_stress            # Shear stress through bolt (MPa, ksi) - τ = V/A
+bf.area                    # Cross-sectional area of bolt [mm^2, in^2]
+bf.angle                   # In-plane force direction in degrees (atan2(Fz, Fy))
+
+# Stresses (calculated from forces if diameter is set)
+bf.shear_stress            # In-plane shear stress tau = sqrt(Fy^2 + Fz^2) / A (MPa, ksi)
 bf.shear_stress_y          # Shear stress from y-component only (MPa, ksi)
 bf.shear_stress_z          # Shear stress from z-component only (MPa, ksi)
+
+bf.axial_stress            # Out-of-plane axial stress sigma = Fx / A (MPa, ksi)
+                           # Positive = tension, Negative = compression
+
+bf.combined_stress         # Combined stress sqrt(tau^2 + |sigma|^2) (MPa, ksi)
 ```
 
 **Notes:**
-- Stress properties return 0.0 if diameter is not set
-- Shear stress is calculated as: τ = Force / Area
-- For kN and mm units: stress is in MPa (N/mm²)
+- Stress properties return 0.0 if diameter is not set in BoltParameters
+- Shear stress calculation (in-plane): tau = sqrt(Fy^2 + Fz^2) / A
+- Axial stress calculation (out-of-plane, signed): sigma = Fx / A (positive = tension, negative = compression)
+- Combined stress: sqrt(tau^2 + |sigma|^2)
+- For kN and mm units: stress is in MPa (N/mm^2)
 - For kip and inch units: stress is in ksi
+- Axial stress and combined stress properties are only available for elastic method results (ICR returns 0 for Fx)
 - **Shear stress is the same for both bearing-type and slip-critical connections**
   - Bearing-type: Shear stress is the primary resistance mechanism (AISC J3.6)
   - Slip-critical: Shear stress represents post-slip capacity; primary resistance is friction (AISC J3.8-J3.9)
@@ -812,7 +841,7 @@ Connecty is **unit-agnostic**. Choose any consistent system:
 ```python
 # All mm, N, MPa, N·mm
 bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
-force = Force(Fy=-100000, Fz=30000, location=(75, 150))
+load = Load(Fy=-100000, Fz=30000, location=(75, 150))
 # Results in kN, stresses in MPa
 ```
 
@@ -820,7 +849,7 @@ force = Force(Fy=-100000, Fz=30000, location=(75, 150))
 ```python
 # All inches, kip, ksi, kip·in
 bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=3, spacing_z=2.4, diameter=0.75)
-force = Force(Fy=-100, Fz=30, location=(3, 6))
+load = Load(Fy=-100, Fz=30, location=(3, 6))
 # Results in kip, stresses in ksi
 ```
 
