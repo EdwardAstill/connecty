@@ -61,31 +61,23 @@ from .weld import (
     Weld,
     WeldParams,
     WeldProperties,
-)
-
-from .welded_section import (
     WeldedSection,
     WeldGroup,
     WeldSegment,
-)
-
-from .load import Load
-
-from .loaded_weld import LoadedWeld
-
-from .weld_stress import (
+    LoadedWeld,
     StressComponents,
     PointStress,
     calculate_elastic_stress,
     calculate_icr_stress,
-)
-
-from .weld_plotter import (
     plot_stress_result,
     plot_stress_comparison,
     plot_weld_geometry,
     plot_stress_components,
+    plot_loaded_weld,
+    plot_loaded_weld_comparison,
 )
+
+from .common import Load
 
 from .bolt import (
     BoltGroup,
@@ -93,12 +85,11 @@ from .bolt import (
     BoltProperties,
     BoltForce,
     BoltResult,
-)
-
-from .bolt_plotter import (
     plot_bolt_result,
     plot_bolt_pattern,
 )
+
+from .bolt.checks.aisc import BoltDesignParams, BoltCheckResult
 
 __all__ = [
     # Main weld classes
@@ -120,12 +111,16 @@ __all__ = [
     "plot_stress_comparison",
     "plot_weld_geometry",
     "plot_stress_components",
+    "plot_loaded_weld",
+    "plot_loaded_weld_comparison",
     # Bolt classes
     "BoltGroup",
     "BoltParameters",
     "BoltProperties",
     "BoltForce",
     "BoltResult",
+    "BoltDesignParams",
+    "BoltCheckResult",
     # Bolt functions
     "plot_bolt_result",
     "plot_bolt_pattern",

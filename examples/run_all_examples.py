@@ -8,13 +8,16 @@ from pathlib import Path
 examples_dir = Path(__file__).parent
 
 examples = [
-    "standard_sections_analysis.py",
-    "weld_method_comparison.py",
-    "stress_components_analysis.py",
-    "bolt_group_analysis.py",
-    "good example.py",
-    "icr_rotation_eccentricity_trend.py",
-    "pjp_weld_analysis.py",
+    "weld analysis/standard_sections_analysis.py",
+    "weld plotting/weld_method_comparison.py",
+    "weld analysis/stress_components_analysis.py",
+    "weld analysis/good_example.py",
+    "weld plotting/icr_rotation_eccentricity_trend.py",
+    "weld analysis/pjp_weld_analysis.py",
+    "bolt analysis/bolt_group_analysis.py",
+    "bolt analysis/elastic_vs_icr_analysis.py",
+    "bolt check/bearing_vs_slip_check.py",
+    "bolt plotting/bolt_plotting_demo.py",
 ]
 
 print("=" * 60)

@@ -1,0 +1,71 @@
+BOLT ANALYSIS SUMMARY (ELASTIC VS ICR)
+============================================================
+Case: Rectangular – Elastic
+  Method: elastic
+  Load: Fy=120 kN @ z=140 mm
+  Max bolt force: 27.93 kN
+  Min bolt force: 2.04 kN
+  Mean bolt force: 17.78 kN
+  Critical bolt #3 at (y=0.0, z=120.0) -> R=27.93 kN
+  Per-bolt forces (kN):
+     1: Fy=-2.04, Fz=-13.18, R=13.33, angle=-171.2 deg
+     2: Fy=-13.33, Fz=-13.18, R=18.75, angle=-134.7 deg
+     3: Fy=-24.63, Fz=-13.18, R=27.93, angle=-118.1 deg
+     4: Fy=-2.04, Fz=0.00, R=2.04, angle=-90.0 deg
+     5: Fy=-13.33, Fz=0.00, R=13.33, angle=-90.0 deg
+     6: Fy=-24.63, Fz=0.00, R=24.63, angle=-90.0 deg
+     7: Fy=-2.04, Fz=13.18, R=13.33, angle=-8.8 deg
+     8: Fy=-13.33, Fz=13.18, R=18.75, angle=-45.3 deg
+     9: Fy=-24.63, Fz=13.18, R=27.93, angle=-61.9 deg
+
+Case: Rectangular – ICR
+  Method: icr
+  Load: Fy=120 kN @ z=140 mm
+  Max bolt force: 30.81 kN
+  Min bolt force: 21.28 kN
+  Mean bolt force: 29.69 kN
+  Critical bolt #1 at (y=0.0, z=0.0) -> R=30.81 kN
+  Per-bolt forces (kN):
+     1: Fy=-26.04, Fz=16.47, R=30.81, angle=-57.7 deg
+     2: Fy=-18.05, Fz=24.94, R=30.79, angle=-35.9 deg
+     3: Fy=4.07, Fz=30.46, R=30.73, angle=7.6 deg
+     4: Fy=-30.80, Fz=-0.00, R=30.80, angle=-90.0 deg
+     5: Fy=-30.45, Fz=-0.00, R=30.45, angle=-90.0 deg
+     6: Fy=21.28, Fz=-0.00, R=21.28, angle=90.0 deg
+     7: Fy=-26.04, Fz=-16.47, R=30.81, angle=-122.3 deg
+     8: Fy=-18.05, Fz=-24.94, R=30.79, angle=-144.1 deg
+     9: Fy=4.07, Fz=-30.46, R=30.73, angle=172.4 deg
+
+Case: Circular – Elastic
+  Method: elastic
+  Load: Fy=90 kN + Fz=45 kN @ z=80 mm
+  Max bolt force: 20.50 kN
+  Min bolt force: 5.47 kN
+  Mean bolt force: 13.96 kN
+  Critical bolt #2 at (y=77.8, z=77.8) -> R=20.50 kN
+  Per-bolt forces (kN):
+     1: Fy=-19.43, Fz=5.62, R=20.23, angle=-73.9 deg
+     2: Fy=-17.04, Fz=11.41, R=20.50, angle=-56.2 deg
+     3: Fy=-11.25, Fz=13.81, R=17.81, angle=-39.2 deg
+     4: Fy=-5.46, Fz=11.41, R=12.65, angle=-25.6 deg
+     5: Fy=-3.07, Fz=5.63, R=6.41, angle=-28.6 deg
+     6: Fy=-5.46, Fz=-0.16, R=5.47, angle=-91.7 deg
+     7: Fy=-11.25, Fz=-2.56, R=11.54, angle=-102.8 deg
+     8: Fy=-17.04, Fz=-0.16, R=17.04, angle=-90.5 deg
+
+Case: Circular – ICR
+  Method: icr
+  Load: Fy=90 kN + Fz=45 kN @ z=80 mm
+  Max bolt force: 16.45 kN
+  Min bolt force: 14.98 kN
+  Mean bolt force: 16.16 kN
+  Critical bolt #6 at (y=-77.8, z=-77.8) -> R=16.45 kN
+  Per-bolt forces (kN):
+     1: Fy=-2.10, Fz=15.54, R=15.68, angle=-7.7 deg
+     2: Fy=-13.57, Fz=-6.35, R=14.98, angle=-115.1 deg
+     3: Fy=-15.06, Fz=-6.51, R=16.40, angle=-113.4 deg
+     4: Fy=-16.37, Fz=-1.57, R=16.44, angle=-95.5 deg
+     5: Fy=-15.92, Fz=4.12, R=16.45, angle=-75.5 deg
+     6: Fy=-13.48, Fz=9.42, R=16.45, angle=-55.1 deg
+     7: Fy=-9.41, Fz=13.48, R=16.44, angle=-34.9 deg
+     8: Fy=-4.63, Fz=15.76, R=16.42, angle=-16.4 deg

@@ -1,0 +1,37 @@
+BOLT CHECK SUMMARY (BEARING VS SLIP-CRITICAL)
+============================================================
+Bearing connection (A325, standard holes)
+  Governing bolt index: 5
+  Governing limit state: shear
+  Governing utilization: 0.386
+  Per-bolt utilizations:
+    #1 @ (y=0.0, z=0.0)  V=6.15 kN, T=5.00 kN
+      shear=0.071, tension=0.034, bearing=0.027 -> shear
+    #2 @ (y=0.0, z=70.0)  V=18.64 kN, T=5.00 kN
+      shear=0.214, tension=0.034, bearing=0.082 -> shear
+    #3 @ (y=0.0, z=140.0)  V=31.70 kN, T=5.00 kN
+      shear=0.364, tension=0.037, bearing=0.140 -> shear
+    #4 @ (y=80.0, z=0.0)  V=12.78 kN, T=5.00 kN
+      shear=0.147, tension=0.034, bearing=0.056 -> shear
+    #5 @ (y=80.0, z=70.0)  V=21.75 kN, T=5.00 kN
+      shear=0.249, tension=0.034, bearing=0.096 -> shear
+    #6 @ (y=80.0, z=140.0)  V=33.62 kN, T=5.00 kN
+      shear=0.386, tension=0.037, bearing=0.148 -> shear
+
+Slip-critical (A325, Class B, short slots perpendicular to load)
+  Governing bolt index: 5
+  Governing limit state: shear
+  Governing utilization: 0.185
+  Per-bolt utilizations:
+    #1 @ (y=0.0, z=0.0)  V=13.05 kN, T=8.33 kN
+      shear=0.118, tension=0.057, bearing=0.058, slip=0.082 -> shear
+    #2 @ (y=0.0, z=70.0)  V=16.03 kN, T=8.33 kN
+      shear=0.145, tension=0.057, bearing=0.071, slip=0.101 -> shear
+    #3 @ (y=0.0, z=140.0)  V=19.09 kN, T=8.33 kN
+      shear=0.172, tension=0.057, bearing=0.084, slip=0.120 -> shear
+    #4 @ (y=80.0, z=0.0)  V=15.03 kN, T=8.33 kN
+      shear=0.136, tension=0.057, bearing=0.066, slip=0.094 -> shear
+    #5 @ (y=80.0, z=70.0)  V=17.68 kN, T=8.33 kN
+      shear=0.160, tension=0.057, bearing=0.078, slip=0.111 -> shear
+    #6 @ (y=80.0, z=140.0)  V=20.49 kN, T=8.33 kN
+      shear=0.185, tension=0.057, bearing=0.090, slip=0.129 -> shear
