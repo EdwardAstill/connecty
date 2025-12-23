@@ -10,18 +10,25 @@ The bolt analysis module calculates **force distribution** on bolt groups using 
 
 Connecty provides two methods for calculating force at each bolt location:
 
-**Elastic Method**
-- Conservative vector analysis
-- Superimposes direct shear ($P/n$) and torsional shear ($Tr/I_p$)
-- Assumes rigid connection behavior
-- Output: Force vector at each bolt
+**Elastic Method (3D)**
+- Conservative vector analysis for full 6DOF loading
+- **In-plane** (Fy, Fz, Mx): Direct shear + Torsion
+  - Direct shear: $P/n$ (uniform distribution)
+  - Torsional shear: $Tr/I_p$ (perpendicular to radius)
+- **Out-of-plane** (Fx, My, Mz): Direct axial + Bending
+  - Direct axial: $Fx/n$ (uniform distribution)
+  - Bending: Linear variation with distance from centroid
+- Vector superposition of all components
+- Output: 3D force vector (Fx, Fy, Fz) at each bolt
 
-**ICR Method**
+**ICR Method (2D)**
 - Iterative Instantaneous Center of Rotation method
+- **Handles in-plane loading only** (Fy, Fz, Mx)
+- **Ignores out-of-plane loads** (Fx, My, Mz)
 - Accounts for non-linear load-deformation behavior
 - Uses Crawford-Kulak load-deformation curves: $R = R_{ult}(1 - e^{-\mu \Delta})^\lambda$
 - More accurate force distribution for eccentrically loaded bolt groups
-- Output: Force vector at each bolt
+- Output: In-plane force vector (Fy, Fz) at each bolt
 
 ---
 
@@ -74,17 +81,30 @@ params = BoltParameters(
 
 That's it! Only diameter is needed. Material properties are outside the scope of force calculation.
 
-### 3. `Force` (Shared)
+### 3. `Load` (Shared)
 
-Uses the existing `Force` class for consistent load definition.
+Uses the existing `Load` class for consistent load definition.
 
 ```python
-from connecty import Force
+from connecty import Load
 
-force = Force(
+# 2D in-plane loading (supported by both elastic and ICR)
+load = Load(
     Fy=-100000,           # 100 kN downward (N)
     Fz=50000,             # 50 kN horizontal (N)
-    location=(100, 150)   # (y, z) application point
+    Mx=3000000,           # 3 kN·m torsion (N·mm)
+    location=(0, 0, 150)  # (x, y, z) application point
+)
+
+# Full 3D loading (elastic method only)
+load_3d = Load(
+    Fx=50000,             # 50 kN axial tension (N)
+    Fy=-100000,           # 100 kN downward (N)
+    Fz=60000,             # 60 kN horizontal (N)
+    Mx=5000000,           # 5 kN·m torsion (N·mm)
+    My=2500000,           # 2.5 kN·m bending about y (N·mm)
+    Mz=-2000000,          # 2 kN·m bending about z (N·mm)
+    location=(0, 0, 120)  # (x, y, z) application point
 )
 ```
 
@@ -111,18 +131,33 @@ result_icr = bolts.analyze(force, method="icr")
 print(f"ICR Max force: {result_icr.max_force:.1f} kN")
 ```
 
-### Elastic Method Details
+### Elastic Method Details (3D)
 
+**Geometric Properties:**
 1. **Centroid**: Calculated from bolt coordinates
    - $C_y = \frac{\sum y_i}{n}$, $C_z = \frac{\sum z_i}{n}$
 
-2. **Polar Moment**: $I_p = \sum (dy_i^2 + dz_i^2)$ about centroid
+2. **Moments of Inertia**: About centroid
+   - $I_y = \sum (z_i - C_z)^2$ (for My bending)
+   - $I_z = \sum (y_i - C_y)^2$ (for Mz bending)
+   - $I_p = I_y + I_z$ (polar moment for Mx torsion)
 
-3. **Direct Shear**: $R_{direct} = P / n$ (uniform distribution)
+**In-Plane Forces (y-z plane):**
+3. **Direct Shear**: $R_{direct,y} = F_y / n$, $R_{direct,z} = F_z / n$ (uniform)
 
-4. **Torsional Shear**: $R_{torsion} = \frac{M \cdot r}{I_p}$ (perpendicular to radius)
+4. **Torsional Shear**: $R_{torsion} = \frac{M_x \cdot r}{I_p}$ (perpendicular to radius)
+   - Direction perpendicular to $(\Delta y, \Delta z)$
+   - Magnitude proportional to distance from centroid
 
-5. **Superposition**: Vector sum of direct and torsional components
+**Out-of-Plane Forces (x-direction):**
+5. **Direct Axial**: $R_{direct,x} = F_x / n$ (uniform)
+
+6. **Bending Forces**: Linear variation with distance
+   - $R_{bend,x} = \frac{M_y \cdot \Delta z}{I_y} + \frac{M_z \cdot \Delta y}{I_z}$
+   - Creates tension/compression varying across pattern
+
+**Resultant:**
+7. **Vector Sum**: $R_{total} = \sqrt{R_x^2 + R_y^2 + R_z^2}$
 
 ### ICR Method Details
 
@@ -143,12 +178,29 @@ print(f"ICR Max force: {result_icr.max_force:.1f} kN")
 ```python
 result = bolts.analyze(force, method="elastic")
 
-# Properties
+# Force properties
 result.max_force       # Maximum resultant force on any bolt (kN)
 result.min_force       # Minimum resultant force on any bolt (kN)
 result.mean            # Average bolt force (kN)
+
+# Stress properties (if diameter set)
+result.max_stress      # Maximum in-plane shear stress (MPa)
+result.min_stress      # Minimum in-plane shear stress (MPa)
+result.mean_stress     # Average shear stress (MPa)
+
+result.max_axial_stress   # Maximum out-of-plane axial stress (MPa)
+result.min_axial_stress   # Minimum out-of-plane axial stress (MPa)
+result.mean_axial_stress  # Average axial stress (MPa)
+
+result.max_combined_stress   # Maximum combined stress (MPa)
+result.min_combined_stress   # Minimum combined stress (MPa)
+result.mean_combined_stress  # Average combined stress (MPa)
+
+# Critical bolt info
 result.critical_bolt   # BoltForce object at max location
 result.critical_index  # Index of most stressed bolt
+
+# All bolt data
 result.bolt_forces     # List of all BoltForce objects
 
 # ICR-specific
@@ -163,19 +215,38 @@ Each bolt's force is stored as a `BoltForce`:
 ```python
 for bf in result.bolt_forces:
     print(f"Bolt at ({bf.y}, {bf.z})")
+    
+    # In-plane forces
     print(f"  Fy = {bf.Fy:.2f} kN")
     print(f"  Fz = {bf.Fz:.2f} kN")
+    print(f"  Shear = {bf.shear:.2f} kN")
+    
+    # Out-of-plane force
+    print(f"  Fx = {bf.Fx:.2f} kN")
+    print(f"  Axial = {bf.axial:.2f} kN")
+    
+    # Total 3D force
     print(f"  Resultant = {bf.resultant:.2f} kN")
     print(f"  Angle = {bf.angle:.1f}°")
+    
+    # Stresses (if diameter set)
     print(f"  Shear stress = {bf.shear_stress:.1f} MPa")
+    print(f"  Axial stress = {bf.axial_stress:.1f} MPa")
+    print(f"  Combined stress = {bf.combined_stress:.1f} MPa")
 ```
 
-**Shear Stress Calculation:**
+**Stress Calculations:**
 
-The `shear_stress` property calculates τ = V / A where:
-- V = resultant force (kN)
-- A = bolt cross-sectional area (mm²)
-- τ = shear stress (MPa)
+- **Shear stress** (τ): In-plane shear stress
+  - τ = √(Fy² + Fz²) / A
+  - Where A = π(d/2)² is bolt cross-sectional area
+  
+- **Axial stress** (σ): Out-of-plane axial stress (signed)
+  - σ = Fx / A
+  - Positive values indicate tension, negative values indicate compression
+  
+- **Combined stress**: Total stress magnitude
+  - √(τ² + |σ|²)
 
 **Important:** The shear stress calculation is the same for both bearing-type and slip-critical connections:
 - **Bearing-type**: Shear stress is the primary resistance mechanism (checked against φFnv per AISC J3.6)
@@ -188,20 +259,36 @@ The `shear_stress` property calculates τ = V / A where:
 ```python
 # Plot analysis results
 result.plot(
+    mode="shear",        # "shear" or "axial" - type of force to visualize
     force=True,          # Show applied load location
-    bolt_forces=True,    # Show reaction vectors at each bolt
+    bolt_forces=True,    # Show reaction vectors at each bolt (arrows shown for shear mode only)
     colorbar=True,       # Show force magnitude colorbar
-    cmap="coolwarm",     # Matplotlib colormap
+    cmap="coolwarm",     # Matplotlib colormap (e.g., "RdBu_r" for axial)
     show=True,           # Display immediately
     save_path="bolt_analysis.svg"  # Save to file
 )
 ```
 
-Features:
+**Plotting Modes:**
+
+- **`mode="shear"`** (default): Visualizes in-plane shear forces
+  - Bolts colored by shear magnitude (always positive)
+  - Force arrows shown at each bolt
+  - Suitable for both elastic and ICR results
+  
+- **`mode="axial"`**: Visualizes out-of-plane axial forces
+  - Bolts colored by signed axial force (positive = tension, negative = compression)
+  - No force arrows shown
+  - Only available for elastic method (raises error for ICR)
+  - Recommended colormap: `"RdBu_r"` (red=tension, blue=compression)
+  - Colorbar label includes "[+tension/-compression]"
+
+Normalization: Colors scale to the actual data range (min→max); the palette is not forcibly centered at zero.
+
+**Features:**
 - Bolts shown as circles colored by force magnitude
-- Reaction forces shown as arrows at each bolt
 - Applied load location marked with red ×
-- ICR point shown (if ICR method used)
+- ICR point shown (if ICR method used and shear mode)
 - Title shows bolt count, size, and max force
 
 ### Pattern Visualization

@@ -276,6 +276,7 @@ Visualize bolt group and force distribution.
 
 ```python
 result.plot(
+    mode="shear",       # "shear" (default) or "axial"
     force=True,
     bolt_forces=True,
     colorbar=True,
@@ -285,10 +286,11 @@ result.plot(
 )
 ```
 
+- `mode` (str): Bolt plotting mode — `"shear"` colors by in-plane shear magnitude and shows arrows; `"axial"` colors by signed axial force (+ tension, − compression) and hides arrows. `"axial"` mode is only available for the elastic method.
 - `force` (bool): Show applied load location
-- `bolt_forces` (bool): Show reaction force vectors
+- `bolt_forces` (bool): Show reaction force vectors (arrows shown in `"shear"` mode only)
 - `colorbar` (bool): Show force magnitude colorbar
-- `cmap` (str): Matplotlib colormap
+- `cmap` (str): Matplotlib colormap (e.g., use `"RdBu_r"` for axial to show tension/compression)
 - `show` (bool): Display plot immediately
 - `save_path` (str): Path to save .svg file
 
@@ -659,12 +661,20 @@ result.plot(
 - `"plasma"` — Purple to yellow
 - See [matplotlib colormaps](https://matplotlib.org/stable/tutorials/colors/colormaps.html) for more
 
+### Bolt Plot Parameters
+
+Additional parameters and behavior specific to `BoltResult.plot`:
+
+- `mode` — `"shear"` (default) colors by in-plane shear magnitude and shows arrows; `"axial"` colors by signed axial force (+ tension, − compression) and hides arrows. `"axial"` mode is only available for elastic results (not ICR).
+- Colormap tip — For `mode="axial"`, a diverging colormap like `"RdBu_r"` is recommended (red=tension, blue=compression).
+- Normalization — Colors scale to the actual data range (min→max); the colormap is not forcibly centered at zero.
+
 **Bolt Plot Features:**
 
 - Bolts drawn as circles, colored by force magnitude
 - Applied load location marked with red ×
-- Force vectors shown as arrows at each bolt
-- ICR point shown (if ICR method used)
+- Force vectors shown as arrows at each bolt (shear mode only)
+- ICR point shown (for ICR results; axial mode is not available)
 - Title shows bolt count, size, max force
 
 **Weld Plot Features:**

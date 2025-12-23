@@ -267,6 +267,7 @@ class BoltForce:
     point: Point
     Fy: float  # Force in y-direction (kN)
     Fz: float  # Force in z-direction (kN)
+    Fx: float = 0.0  # Force in x-direction (kN) - axial/out-of-plane
     diameter: float = 0.0  # Bolt diameter (mm)
     
     @property
@@ -280,13 +281,23 @@ class BoltForce:
         return self.point[1]
     
     @property
-    def resultant(self) -> float:
-        """Resultant force magnitude (kN)."""
+    def shear(self) -> float:
+        """In-plane shear force magnitude (kN)."""
         return math.hypot(self.Fy, self.Fz)
     
     @property
+    def axial(self) -> float:
+        """Out-of-plane axial force (kN). Positive = tension, negative = compression."""
+        return self.Fx
+    
+    @property
+    def resultant(self) -> float:
+        """Total 3D force magnitude (kN)."""
+        return math.sqrt(self.Fy**2 + self.Fz**2 + self.Fx**2)
+    
+    @property
     def angle(self) -> float:
-        """Angle of resultant force (degrees from +z axis)."""
+        """Angle of in-plane shear force (degrees from +z axis)."""
         return math.degrees(math.atan2(self.Fy, self.Fz))
     
     @property
@@ -299,17 +310,17 @@ class BoltForce:
     @property
     def shear_stress(self) -> float:
         """
-        Shear stress through bolt cross-section (MPa).
+        In-plane shear stress through bolt cross-section (MPa).
         
         Calculated as: τ = V / A
-        where V is resultant force (kN) and A is bolt area (mm²)
+        where V is in-plane shear force (kN) and A is bolt area (mm²)
         
         Returns 0.0 if diameter is not set.
         """
         if self.area <= 0:
             return 0.0
         # Convert kN to N, divide by mm² to get MPa (N/mm²)
-        return (self.resultant * 1000.0) / self.area
+        return (self.shear * 1000.0) / self.area
     
     @property
     def shear_stress_y(self) -> float:
@@ -324,6 +335,34 @@ class BoltForce:
         if self.area <= 0:
             return 0.0
         return (abs(self.Fz) * 1000.0) / self.area
+    
+    @property
+    def axial_stress(self) -> float:
+        """
+        Out-of-plane axial stress (MPa). Positive = tension, negative = compression.
+        
+        Calculated as: σ = Fx / A
+        where Fx is axial force (kN) and A is bolt area (mm²)
+        
+        Returns 0.0 if diameter is not set.
+        """
+        if self.area <= 0:
+            return 0.0
+        return (self.Fx * 1000.0) / self.area
+    
+    @property
+    def combined_stress(self) -> float:
+        """
+        Combined stress magnitude (MPa).
+        
+        Simplified as: σ_combined = √(τ² + σ²)
+        where τ is in-plane shear stress and σ is axial stress magnitude.
+        
+        Returns 0.0 if diameter is not set.
+        """
+        if self.area <= 0:
+            return 0.0
+        return math.sqrt(self.shear_stress**2 + abs(self.axial_stress)**2)
 
 
 @dataclass
@@ -383,7 +422,7 @@ class BoltResult:
     @property
     def max_stress(self) -> float:
         """
-        Maximum shear stress on any bolt (MPa).
+        Maximum in-plane shear stress on any bolt (MPa).
         
         Returns 0.0 if bolt diameter is not set.
         """
@@ -395,7 +434,7 @@ class BoltResult:
     @property
     def min_stress(self) -> float:
         """
-        Minimum shear stress on any bolt (MPa).
+        Minimum in-plane shear stress on any bolt (MPa).
         
         Returns 0.0 if bolt diameter is not set.
         """
@@ -407,13 +446,88 @@ class BoltResult:
     @property
     def mean_stress(self) -> float:
         """
-        Average shear stress across bolts (MPa).
+        Average in-plane shear stress across bolts (MPa).
         
         Returns 0.0 if bolt diameter is not set.
         """
         if not self.bolt_forces:
             return 0.0
         stresses = [bf.shear_stress for bf in self.bolt_forces]
+        return float(np.mean(stresses)) if stresses else 0.0
+    
+    @property
+    def max_axial_stress(self) -> float:
+        """
+        Maximum out-of-plane axial stress on any bolt (MPa).
+        
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.axial_stress for bf in self.bolt_forces]
+        return float(np.max(stresses)) if stresses else 0.0
+    
+    @property
+    def min_axial_stress(self) -> float:
+        """
+        Minimum out-of-plane axial stress on any bolt (MPa).
+        
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.axial_stress for bf in self.bolt_forces]
+        return float(np.min(stresses)) if stresses else 0.0
+    
+    @property
+    def mean_axial_stress(self) -> float:
+        """
+        Average out-of-plane axial stress across bolts (MPa).
+        
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.axial_stress for bf in self.bolt_forces]
+        return float(np.mean(stresses)) if stresses else 0.0
+    
+    @property
+    def max_combined_stress(self) -> float:
+        """
+        Maximum combined stress on any bolt (MPa).
+        
+        Combined stress: √(τ² + σ²) where τ is shear and σ is axial.
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.combined_stress for bf in self.bolt_forces]
+        return float(np.max(stresses)) if stresses else 0.0
+    
+    @property
+    def min_combined_stress(self) -> float:
+        """
+        Minimum combined stress on any bolt (MPa).
+        
+        Combined stress: √(τ² + σ²) where τ is shear and σ is axial.
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.combined_stress for bf in self.bolt_forces]
+        return float(np.min(stresses)) if stresses else 0.0
+    
+    @property
+    def mean_combined_stress(self) -> float:
+        """
+        Average combined stress across bolts (MPa).
+        
+        Combined stress: √(τ² + σ²) where τ is shear and σ is axial.
+        Returns 0.0 if bolt diameter is not set.
+        """
+        if not self.bolt_forces:
+            return 0.0
+        stresses = [bf.combined_stress for bf in self.bolt_forces]
         return float(np.mean(stresses)) if stresses else 0.0
     
     @property
@@ -449,7 +563,8 @@ class BoltResult:
         cmap: str = "coolwarm",
         ax=None,
         show: bool = True,
-        save_path: str | None = None
+        save_path: str | None = None,
+        mode: str = "shear"
     ):
         """
         Plot bolt group with force distribution.
@@ -462,11 +577,14 @@ class BoltResult:
             ax: Matplotlib axes (creates new if None)
             show: Display the plot
             save_path: Path to save figure (.svg recommended)
+            mode: Visualization mode: "shear" (default) or "axial"
             
         Returns:
             Matplotlib axes
         """
         from .bolt_plotter import plot_bolt_result
+        if mode not in {"shear", "axial"}:
+            raise ValueError("mode must be 'shear' or 'axial'")
         return plot_bolt_result(
             self,
             force=force,
@@ -475,7 +593,8 @@ class BoltResult:
             cmap=cmap,
             ax=ax,
             show=show,
-            save_path=save_path
+            save_path=save_path,
+            mode=mode
         )
 
     def check_aisc(
@@ -494,33 +613,39 @@ def _calculate_elastic_bolt_force(
     force: Force
 ) -> BoltResult:
     """
-    Calculate bolt forces using the Elastic Method.
+    Calculate bolt forces using the Elastic Method (3D).
     
-    The elastic method:
-    1. Direct shear: R_p = P / n (uniform, all bolts share equally)
-    2. Moment shear: R_m = M × r / Σr² (perpendicular to radius, proportional to distance)
-    3. Vector sum for resultant
+    The elastic method handles:
+    1. In-plane shear (Fy, Fz): Direct + Torsion (Mx)
+       - Direct shear: R_p = P / n (uniform, all bolts share equally)
+       - Moment shear: R_m = M × r / Σr² (perpendicular to radius, proportional to distance)
+    2. Out-of-plane axial (Fx, My, Mz): Direct + Bending
+       - Direct axial: R_x = Fx / n (uniform)
+       - Bending: R_x = My × z / Iy + Mz × y / Iz (linear with distance)
     
     Args:
         bolt_group: BoltGroup object
         force: Applied Force
         
     Returns:
-        BoltResult with force at each bolt
+        BoltResult with 3D force at each bolt
     """
     props = bolt_group._calculate_properties()
     
     n = props.n
     Cy, Cz = props.Cy, props.Cz
-    Ip = props.Ip
+    Iy, Iz, Ip = props.Iy, props.Iz, props.Ip
     
-    # Get total moment about bolt group centroid (in-plane torsion)
-    Mx_total, _, _ = force.get_moments_about(0, Cy, Cz)
+    # Get total moments about bolt group centroid
+    Mx_total, My_total, Mz_total = force.get_moments_about(0, Cy, Cz)
     
     # Convert forces to kN (input is in N)
+    Fx_kN = force.Fx / 1000
     Fy_kN = force.Fy / 1000
     Fz_kN = force.Fz / 1000
     Mx_kNmm = Mx_total / 1000  # N·mm to kN·mm
+    My_kNmm = My_total / 1000
+    Mz_kNmm = Mz_total / 1000
     
     bolt_forces: List[BoltForce] = []
     
@@ -528,6 +653,8 @@ def _calculate_elastic_bolt_force(
         # Distance from centroid
         dy = y - Cy
         dz = z - Cz
+        
+        # === In-plane shear forces (y-z plane) ===
         
         # Direct shear (uniform): R = P / n
         R_direct_y = Fy_kN / n if n > 0 else 0.0
@@ -545,14 +672,32 @@ def _calculate_elastic_bolt_force(
             R_moment_y = -Mx_kNmm * dz / Ip
             R_moment_z = Mx_kNmm * dy / Ip
         
-        # Total force on bolt
+        # Total in-plane shear
         total_Fy = R_direct_y + R_moment_y
         total_Fz = R_direct_z + R_moment_z
+        
+        # === Out-of-plane axial force (x-direction) ===
+        
+        # Direct axial (uniform)
+        R_direct_x = Fx_kN / n if n > 0 else 0.0
+        
+        # Bending contribution (linear with distance from centroid)
+        # My bending: Fx ∝ z distance from centroid
+        # Mz bending: Fx ∝ y distance from centroid
+        R_bending_x = 0.0
+        if Iy > ZERO_TOLERANCE:
+            R_bending_x += My_kNmm * dz / Iy
+        if Iz > ZERO_TOLERANCE:
+            R_bending_x += Mz_kNmm * dy / Iz
+        
+        # Total out-of-plane axial
+        total_Fx = R_direct_x + R_bending_x
         
         bolt_forces.append(BoltForce(
             point=(y, z),
             Fy=total_Fy,
             Fz=total_Fz,
+            Fx=total_Fx,
             diameter=bolt_group.parameters.diameter
         ))
     

@@ -25,7 +25,8 @@ def plot_bolt_result(
     cmap: str = "coolwarm",
     ax: plt.Axes | None = None,
     show: bool = True,
-    save_path: str | None = None
+    save_path: str | None = None,
+    mode: str = "shear",
 ) -> plt.Axes:
     """
     Plot bolt group with force distribution.
@@ -33,16 +34,23 @@ def plot_bolt_result(
     Args:
         result: BoltResult from analysis
         force: Show applied load arrow
-        bolt_forces: Show reaction vectors at each bolt
+        bolt_forces: Show reaction vectors at each bolt (shear mode only)
         colorbar: Show force colorbar
         cmap: Matplotlib colormap name
         ax: Matplotlib axes (creates new if None)
         show: Display the plot
         save_path: Path to save figure (.svg recommended)
+        mode: Visualization mode: "shear" (default) or "axial"
         
     Returns:
         Matplotlib axes
     """
+    # Validate mode
+    if mode not in {"shear", "axial"}:
+        raise ValueError("mode must be 'shear' or 'axial'")
+    if mode == "axial" and result.method == "icr":
+        raise ValueError("Axial plotting is not supported for ICR results.")
+
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 8))
     else:
@@ -50,15 +58,28 @@ def plot_bolt_result(
     
     bolt_group = result.bolt_group
     
-    # Get force range for coloring
-    force_min = result.min_force
-    force_max = result.max_force
-    
+    # Choose value source based on mode
+    if mode == "shear":
+        values = [bf.shear for bf in result.bolt_forces]
+        color_label = "Bolt Shear (kN)"
+        title_metric = "Max Shear"
+        draw_arrows = True
+    else:
+        values = [bf.axial for bf in result.bolt_forces]
+        color_label = "Bolt Axial (kN) [+tension/-compression]"
+        title_metric = "Max |Axial|"
+        draw_arrows = False
+
+    # Get range for coloring
+    force_min = min(values) if values else 0.0
+    force_max = max(values) if values else 0.0
+
+    # Standard normalization for both modes
     if force_max - force_min > 1e-12:
         norm = mcolors.Normalize(vmin=force_min, vmax=force_max)
     else:
-        norm = mcolors.Normalize(vmin=0, vmax=max(force_max, 1))
-    
+        norm = mcolors.Normalize(vmin=0, vmax=max(force_max, 1.0))
+
     colormap = plt.get_cmap(cmap)
     
     # Bolt radius for visualization (proportional to actual diameter)
@@ -74,16 +95,17 @@ def plot_bolt_result(
         bolt_diameter * 4
     )
     
-    # Arrow scale: max force should be ~30% of extent
-    if force_max > 1e-12:
-        arrow_scale = 0.3 * extent / force_max
+    # Arrow scale: max selected metric should be ~30% of extent
+    if mode == "shear":
+        arrow_scale = 0.3 * extent / force_max if force_max > 1e-12 else 1.0
     else:
-        arrow_scale = 1.0
+        arrow_scale = 1.0  # Not used in axial mode
     
     # Plot each bolt
     for bf in result.bolt_forces:
-        # Bolt circle colored by force
-        color = colormap(norm(bf.resultant))
+        # Bolt circle colored by selected metric
+        value = bf.shear if mode == "shear" else bf.axial
+        color = colormap(norm(value))
         circle = Circle(
             (bf.z, bf.y),  # (z, y) for plotting
             radius=visual_radius,
@@ -94,8 +116,8 @@ def plot_bolt_result(
         )
         ax.add_patch(circle)
         
-        # Force vector arrow
-        if bolt_forces and bf.resultant > 1e-12:
+        # Force vector arrow (shear mode only)
+        if draw_arrows and bolt_forces and value > 1e-12:
             arrow_length_y = bf.Fy * arrow_scale
             arrow_length_z = bf.Fz * arrow_scale
             
@@ -116,7 +138,7 @@ def plot_bolt_result(
         sm.set_array([])
         
         cbar = fig.colorbar(sm, ax=ax, shrink=0.8, aspect=30)
-        cbar.set_label('Bolt Force (kN)', fontsize=10)
+        cbar.set_label(color_label, fontsize=10)
     
     # Plot applied force
     if force:
@@ -145,7 +167,7 @@ def plot_bolt_result(
     title = f"Bolt Group Analysis ({result.method.upper()} method)"
     title += f"\n{bolt_group.n} × M{bolt_group.parameters.diameter:.0f} bolts"
     if result.bolt_forces:
-        title += f" | Max Force: {result.max_force:.1f} kN"
+        title += f" | {title_metric}: {force_max:.1f} kN"
     ax.set_title(title, fontsize=12)
     
     plt.tight_layout()
