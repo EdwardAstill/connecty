@@ -13,7 +13,7 @@ from pathlib import Path
 
 from connecty import ConnectionResult
 
-from common.bolt_demo import demo_edge_distances_mm, make_demo_case
+from common.bolt_demo import make_demo_case
 
 
 def format_check(title: str, result) -> str:
@@ -47,8 +47,6 @@ def run() -> None:
     case_us = make_demo_case(grade="A325")
     case_au = make_demo_case(grade="8.8")
 
-    edge_y, edge_z, edge_clear = demo_edge_distances_mm(case_us)
-
     # Analyze demands with ELASTIC shear distribution (requested)
     result_aisc = ConnectionResult(
         connection=case_us.connection,
@@ -70,9 +68,6 @@ def run() -> None:
         hole_type="standard",
         slot_orientation="perpendicular",
         threads_in_shear_plane=True,
-        edge_distance_y=edge_y,
-        edge_distance_z=edge_z,
-        use_analysis_bolt_tension_if_present=True,
     )
 
     # === AS 4100 (Steel Designers Handbook) check ===
@@ -81,11 +76,9 @@ def run() -> None:
         connection_type="bearing",
         hole_type="standard",
         hole_type_factor=1.0,
-        edge_distance=edge_clear,
         nn_shear_planes=1,
         nx_shear_planes=0,
         prying_allowance=0.25,
-        use_analysis_bolt_tension_if_present=True,
     )
 
     # === Format Output ===

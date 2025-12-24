@@ -10,7 +10,7 @@ from pathlib import Path
 
 from connecty import ConnectionResult
 
-from common.bolt_demo import demo_edge_distances_mm, make_demo_case
+from common.bolt_demo import make_demo_case
 
 
 def format_check(title: str, result) -> str:
@@ -37,7 +37,6 @@ def run() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     case = make_demo_case(grade="A325")
-    edge_y, edge_z, _edge_clear = demo_edge_distances_mm(case)
 
     # Use the same load for both checks so only the connection type changes.
     load = case.load
@@ -58,9 +57,6 @@ def run() -> None:
         slip_class="A",
         n_s=1,
         fillers=0,
-        edge_distance_y=edge_y,
-        edge_distance_z=edge_z,
-        use_analysis_bolt_tension_if_present=True,
     )
 
     # Slip-critical check (Class B, slots perpendicular)
@@ -80,9 +76,6 @@ def run() -> None:
         n_s=2,
         fillers=0,
         n_b_tension=case.bolt_group.n,
-        edge_distance_y=edge_y,
-        edge_distance_z=edge_z,
-        use_analysis_bolt_tension_if_present=True,
     )
 
     lines = [

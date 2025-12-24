@@ -136,14 +136,10 @@ def check_bolt_group(
     nx_shear_planes: int = 0,
     prying_allowance: float = 0.25,
     reduction_factor_kr: float = 1.0,
-    edge_distance: float | None = None,
-    edge_distance_y: float | None = None,
-    edge_distance_z: float | None = None,
     tension_per_bolt: float | None = None,
     pretension_override: float | None = None,
     require_explicit_tension: bool = False,
     assume_uniform_tension_if_missing: bool = True,
-    use_analysis_bolt_tension_if_present: bool = True,
 ) -> BoltCheckResult:
     """Check bolt group per AISC 360-22 or AS 4100."""
     
@@ -161,23 +157,23 @@ def check_bolt_group(
     if standard == "aisc":
         return _check_aisc(
             result, grade, bolt_diameter, plate, connection_type, hole_type, slot_orientation,
-            threads_in_shear_plane, slip_class, n_s, fillers, n_b_tension, edge_distance_y,
-            edge_distance_z, tension_per_bolt, pretension_override, use_analysis_bolt_tension_if_present
+            threads_in_shear_plane, slip_class, n_s, fillers, n_b_tension,
+            tension_per_bolt, pretension_override
         )
     else:
         return _check_as4100(
             result, grade, bolt_diameter, plate, connection_type, hole_type, hole_type_factor,
             slip_coefficient, n_e, nn_shear_planes, nx_shear_planes, prying_allowance,
-            reduction_factor_kr, edge_distance, tension_per_bolt, pretension_override,
-            require_explicit_tension, assume_uniform_tension_if_missing, use_analysis_bolt_tension_if_present
+            reduction_factor_kr, tension_per_bolt, pretension_override,
+            require_explicit_tension, assume_uniform_tension_if_missing
         )
 
 
 # === AISC Implementation ===
 
 def _check_aisc(result, grade, bolt_diameter, plate, connection_type, hole_type, slot_orientation,
-                threads_in_shear_plane, slip_class, n_s, fillers, n_b_tension, edge_distance_y,
-                edge_distance_z, tension_per_bolt, pretension_override, use_analysis_bolt_tension_if_present):
+                threads_in_shear_plane, slip_class, n_s, fillers, n_b_tension,
+                tension_per_bolt, pretension_override):
     """AISC 360-22 check."""
     
     if connection_type not in ("bearing", "slip-critical"):
@@ -211,8 +207,8 @@ def _check_aisc(result, grade, bolt_diameter, plate, connection_type, hole_type,
     bolt_results = result.to_bolt_results()
     n_b = n_b_tension or len(bolt_results)
     
-    # Tension demand mode
-    has_per_bolt_tension = use_analysis_bolt_tension_if_present and bolt_results and hasattr(bolt_results[0], "Fx")
+    # Tension demand mode - always use per-bolt tensions when available
+    has_per_bolt_tension = bolt_results and hasattr(bolt_results[0], "Fx")
     if tension_per_bolt is not None:
         tension_mode = "override"
         tension_value = max(0.0, float(tension_per_bolt)) / 1000.0
@@ -237,13 +233,13 @@ def _check_aisc(result, grade, bolt_diameter, plate, connection_type, hole_type,
         Fnt_prime = max(0.0, min(Fnt, 1.3 * Fnt - (Fnt / (0.75 * Fnv)) * f_rv))
         tension_cap = 0.75 * Fnt_prime * area_b / 1000.0
         
-        # Bearing capacity
-        if edge_distance_y is None and edge_distance_z is None:
-            raise ValueError("Provide edge_distance_y or edge_distance_z for AISC bearing checks")
-        
-        clear_y = (edge_distance_y - hole_dia / 2.0) if edge_distance_y else None
-        clear_z = (edge_distance_z - hole_dia / 2.0) if edge_distance_z else None
-        lc = max(min(c for c in [clear_y, clear_z] if c is not None), 0.0)
+        # Bearing capacity - calculate edge distances from plate boundaries
+        bolt_y, bolt_z = bf.point
+        edge_clear_y_min = abs(bolt_y - plate.y_min) - hole_dia / 2.0
+        edge_clear_y_max = abs(plate.y_max - bolt_y) - hole_dia / 2.0
+        edge_clear_z_min = abs(bolt_z - plate.z_min) - hole_dia / 2.0
+        edge_clear_z_max = abs(plate.z_max - bolt_z) - hole_dia / 2.0
+        lc = min(edge_clear_y_min, edge_clear_y_max, edge_clear_z_min, edge_clear_z_max)
         
         bearing_nom = 2.4 * bolt_diameter * plate.thickness * plate.fu
         tear_nom = 1.2 * lc * plate.thickness * plate.fu
@@ -284,8 +280,8 @@ def _check_aisc(result, grade, bolt_diameter, plate, connection_type, hole_type,
 
 def _check_as4100(result, grade, bolt_diameter, plate, connection_type, hole_type, hole_type_factor,
                   slip_coefficient, n_e, nn_shear_planes, nx_shear_planes, prying_allowance,
-                  reduction_factor_kr, edge_distance, tension_per_bolt, pretension_override,
-                  require_explicit_tension, assume_uniform_tension_if_missing, use_analysis_bolt_tension_if_present):
+                  reduction_factor_kr, tension_per_bolt, pretension_override,
+                  require_explicit_tension, assume_uniform_tension_if_missing):
     """AS 4100 check."""
     
     if connection_type not in ("bearing", "friction"):
@@ -306,13 +302,8 @@ def _check_as4100(result, grade, bolt_diameter, plate, connection_type, hole_typ
     Ntf = As * fuf / 1000.0
     tension_capacity = 0.8 * Ntf
     
-    # Bearing
-    if edge_distance is None:
-        raise ValueError("Provide edge_distance for AS 4100 bearing checks")
-    
+    # Bearing capacity
     Vb = 3.2 * plate.thickness * bolt_diameter * plate.fu
-    Vp = edge_distance * plate.thickness * plate.fu
-    bearing_capacity = 0.9 * min(Vb, Vp) / 1000.0
     
     # Slip capacity
     slip_capacity = None
@@ -320,9 +311,9 @@ def _check_as4100(result, grade, bolt_diameter, plate, connection_type, hole_typ
         pretension = pretension_override or AS4100_PRETENSION_KN[size_key][grade]
         slip_capacity = 0.7 * slip_coefficient * n_e * pretension * hole_type_factor
     
-    # Tension demand mode
+    # Tension demand mode - always use per-bolt tensions when available
     bolt_results = result.to_bolt_results()
-    has_per_bolt_tension = use_analysis_bolt_tension_if_present and bolt_results and hasattr(bolt_results[0], "Fx")
+    has_per_bolt_tension = bolt_results and hasattr(bolt_results[0], "Fx")
     
     if tension_per_bolt is not None:
         tension_mode = "override"
@@ -342,6 +333,16 @@ def _check_as4100(result, grade, bolt_diameter, plate, connection_type, hole_typ
         Vu = math.hypot(bf.Fy, bf.Fz) / 1000.0
         Tu = max(0.0, float(getattr(bf, "Fx"))) / 1000.0 if tension_mode == "per_bolt" else tension_value
         Tu_prying = Tu * (1.0 + prying_allowance) if Tu > 0 else Tu
+        
+        # Bearing capacity - calculate clear edge distance for this bolt
+        bolt_y, bolt_z = bf.point
+        edge_clear_y_min = abs(bolt_y - plate.y_min)
+        edge_clear_y_max = abs(plate.y_max - bolt_y)
+        edge_clear_z_min = abs(bolt_z - plate.z_min)
+        edge_clear_z_max = abs(plate.z_max - bolt_z)
+        edge_clear = min(edge_clear_y_min, edge_clear_y_max, edge_clear_z_min, edge_clear_z_max)
+        Vp = edge_clear * plate.thickness * plate.fu
+        bearing_capacity = 0.9 * min(Vb, Vp) / 1000.0
         
         # Utilizations
         shear_util = Vu / shear_capacity if shear_capacity > 0 else math.inf

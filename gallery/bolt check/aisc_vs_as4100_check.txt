@@ -34,17 +34,17 @@ AS 4100 / SDHB (8.8)
   Governing utilization: 0.792
   Per-bolt checks:
     #1 @ (y=-75.0, z=-30.0)  V=40.89 kN, T=13.58 kN
-      shear_util=0.474, tension_util=0.108, bearing_util=0.210, interaction=0.236 -> shear
+      shear_util=0.474, tension_util=0.108, bearing_util=0.168, interaction=0.236 -> shear
     #2 @ (y=-75.0, z=30.0)  V=56.75 kN, T=16.48 kN
-      shear_util=0.658, tension_util=0.131, bearing_util=0.292, interaction=0.450 -> shear
+      shear_util=0.658, tension_util=0.131, bearing_util=0.234, interaction=0.450 -> shear
     #3 @ (y=0.0, z=-30.0)  V=7.53 kN, T=10.05 kN
-      shear_util=0.087, tension_util=0.080, bearing_util=0.039, interaction=0.014 -> shear
+      shear_util=0.087, tension_util=0.080, bearing_util=0.031, interaction=0.014 -> shear
     #4 @ (y=0.0, z=30.0)  V=40.06 kN, T=12.95 kN
-      shear_util=0.464, tension_util=0.103, bearing_util=0.206, interaction=0.226 -> shear
+      shear_util=0.464, tension_util=0.103, bearing_util=0.165, interaction=0.226 -> shear
     #5 @ (y=75.0, z=-30.0)  V=55.89 kN, T=6.52 kN
-      shear_util=0.648, tension_util=0.052, bearing_util=0.288, interaction=0.422 -> shear
+      shear_util=0.648, tension_util=0.052, bearing_util=0.230, interaction=0.422 -> shear
     #6 @ (y=75.0, z=30.0)  V=68.35 kN, T=9.42 kN
-      shear_util=0.792, tension_util=0.075, bearing_util=0.352, interaction=0.633 -> shear
+      shear_util=0.792, tension_util=0.075, bearing_util=0.281, interaction=0.633 -> shear
 
 ================================================================================
 

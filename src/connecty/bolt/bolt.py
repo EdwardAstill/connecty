@@ -934,16 +934,11 @@ class ConnectionResult:
         nx_shear_planes: int = 0,
         prying_allowance: float = 0.25,
         reduction_factor_kr: float = 1.0,
-        # Edge distances
-        edge_distance: float | None = None,
-        edge_distance_y: float | None = None,
-        edge_distance_z: float | None = None,
         # Other
         tension_per_bolt: float | None = None,
         pretension_override: float | None = None,
         require_explicit_tension: bool = False,
         assume_uniform_tension_if_missing: bool = True,
-        use_analysis_bolt_tension_if_present: bool = True,
     ) -> "BoltCheckResult":
         """Apply design checks (AISC 360-22 or AS 4100) to this analysis result.
         
@@ -984,12 +979,6 @@ class ConnectionResult:
             AS 4100 only: α factor for prying
         reduction_factor_kr : float
             AS 4100 only: reduction for long bolt lines
-        edge_distance : float, optional
-            AS 4100: clear distance to plate edge (mm)
-        edge_distance_y : float, optional
-            AISC: clear distance in y-direction (mm)
-        edge_distance_z : float, optional
-            AISC: clear distance in z-direction (mm)
         tension_per_bolt : float, optional
             Explicit tension per bolt (kN), overrides analysis
         pretension_override : float, optional
@@ -1007,24 +996,19 @@ class ConnectionResult:
         ...     standard="aisc",
         ...     connection_type="bearing",
         ...     hole_type="standard",
-        ...     threads_in_shear_plane=True,
-        ...     edge_distance_y=50.0,
-        ...     edge_distance_z=60.0
+        ...     threads_in_shear_plane=True
         ... )
         
         >>> # AS 4100 friction-type check
         >>> check = result.check(
         ...     standard="as4100",
         ...     connection_type="friction",
-        ...     hole_type="standard",
-        ...     edge_distance=50.0
+        ...     hole_type="standard"
         ... )
         
         >>> # Auto-detect standard from bolt grade
         >>> check = result.check(
-        ...     connection_type="bearing",
-        ...     edge_distance_y=50.0,
-        ...     edge_distance_z=60.0
+        ...     connection_type="bearing"
         ... )
         """
         from .checks import check_bolt_group
@@ -1047,13 +1031,9 @@ class ConnectionResult:
             nx_shear_planes=nx_shear_planes,
             prying_allowance=prying_allowance,
             reduction_factor_kr=reduction_factor_kr,
-            edge_distance=edge_distance,
-            edge_distance_y=edge_distance_y,
-            edge_distance_z=edge_distance_z,
             tension_per_bolt=tension_per_bolt,
             pretension_override=pretension_override,
             require_explicit_tension=require_explicit_tension,
             assume_uniform_tension_if_missing=assume_uniform_tension_if_missing,
-            use_analysis_bolt_tension_if_present=use_analysis_bolt_tension_if_present,
         )
 
