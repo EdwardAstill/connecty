@@ -107,9 +107,11 @@ from connecty import Plate
 
 # Define plate dimensions
 plate = Plate(
-    width=240.0,    # Plate width (mm)
-    depth=200.0,    # Plate depth (mm)
-    thickness=12.0  # Plate thickness (mm)
+    corner_a=(0, 0),      # First corner (y, z)
+    corner_b=(200, 240),  # Opposite corner (y, z)
+    thickness=12.0,       # Plate thickness (mm)
+    fu=400.0,             # Ultimate tensile strength (MPa)
+    fy=300.0              # Yield strength (MPa)
 )
 ```
 
@@ -162,7 +164,13 @@ from connecty import BoltGroup, Plate, BoltConnection, ConnectionLoad, Connectio
 bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
 
 # 2. Define plate geometry
-plate = Plate(width=240, depth=200, thickness=12)
+plate = Plate(
+    corner_a=(0, 0), 
+    corner_b=(200, 240), 
+    thickness=12, 
+    fu=400, 
+    fy=300
+)
 
 # 3. Create connection
 connection = BoltConnection(bolt_group=bolts, plate=plate, n_shear_planes=1)
@@ -251,9 +259,9 @@ result.max_combined_stress  # Maximum combined stress (MPa)
 result.min_combined_stress  # Minimum combined stress (MPa)
 
 # Critical bolt info
-result.bolt_results         # List of BoltResult objects (one per bolt)
-result.max_shear_bolt_index # Index of bolt with maximum shear
-result.max_axial_bolt_index # Index of bolt with maximum axial force
+result.forces               # List of BoltResult objects (one per bolt)
+result.critical_bolt_shear  # Index of bolt with maximum shear
+result.critical_bolt_axial  # Index of bolt with maximum axial force
 
 # Connection geometry
 result.connection           # BoltConnection object
@@ -272,16 +280,16 @@ result.icr_point            # (y, z) location of instantaneous center
 Each bolt's force and stress is stored as a `BoltResult`:
 
 ```python
-for br in result.bolt_results:
-    print(f"Bolt at ({br.position[0]}, {br.position[1]})")
+for br in result.forces:
+    print(f"Bolt at ({br.y}, {br.z})")
     
     # In-plane forces
-    print(f"  Shear force = {br.shear_force:.2f} N")
-    print(f"  Shear Fy = {br.shear_force_y:.2f} N")
-    print(f"  Shear Fz = {br.shear_force_z:.2f} N")
+    print(f"  Shear force = {br.shear:.2f} N")
+    print(f"  Shear Fy = {br.Fy:.2f} N")
+    print(f"  Shear Fz = {br.Fz:.2f} N")
     
     # Out-of-plane force
-    print(f"  Axial force = {br.axial_force:.2f} N")
+    print(f"  Axial force = {br.axial:.2f} N")
     
     # Stresses (calculated from forces and bolt area)
     print(f"  Shear stress = {br.shear_stress:.1f} MPa")
@@ -352,10 +360,10 @@ Normalization: Colors scale to the actual data range (min→max); the palette is
 ### Pattern Visualization
 
 ```python
-from connecty.bolt_plotter import plot_bolt_group
+from connecty.bolt.bolt_plotter import plot_bolt_pattern
 
 # Visualize bolt layout before analysis
-plot_bolt_group(bolts, save_path="pattern.svg")
+plot_bolt_pattern(bolts, save_path="pattern.svg")
 ```
 
 ---
@@ -371,6 +379,12 @@ Connecty provides **automatic design checks** for both AISC 360-22 (A325/A490) a
 - **Per-bolt tensions**: Always uses analysis-derived tensions when available (no flag needed)
 
 ### Quick Start
+
+    corner_a=(0, 0), 
+    corner_b=(200, 240), 
+    thickness=12, 
+    fu=400, 
+    fy=300
 
 ```python
 from connecty import BoltGroup, Plate, BoltConnection, ConnectionLoad, ConnectionResult
@@ -485,6 +499,12 @@ for detail in check.details:
 ```
 
 ### Examples
+
+    corner_a=(0, 0), 
+    corner_b=(200, 240), 
+    thickness=14, 
+    fu=400, 
+    fy=300
 
 **AISC A325 - Bearing-Type**
 ```python
