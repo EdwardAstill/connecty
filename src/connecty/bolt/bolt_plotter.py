@@ -27,6 +27,8 @@ def plot_bolt_result(
     show: bool = True,
     save_path: str | None = None,
     mode: str = "shear",
+    force_unit: str = "N",
+    length_unit: str = "mm",
 ) -> plt.Axes:
     """
     Plot bolt group with force distribution.
@@ -41,6 +43,8 @@ def plot_bolt_result(
         show: Display the plot
         save_path: Path to save figure (.svg recommended)
         mode: Visualization mode: "shear" (default) or "axial"
+        force_unit: Unit label for forces (e.g., 'N', 'kN', 'lbf')
+        length_unit: Unit label for lengths (e.g., 'mm', 'm', 'in')
         
     Returns:
         Matplotlib axes
@@ -61,12 +65,12 @@ def plot_bolt_result(
     # Choose value source based on mode
     if mode == "shear":
         values = [bf.shear for bf in result.bolt_forces]
-        color_label = "Bolt Shear (kN)"
+        color_label = f"Bolt Shear ({force_unit})"
         title_metric = "Max Shear"
         draw_arrows = True
     else:
         values = [bf.axial for bf in result.bolt_forces]
-        color_label = "Bolt Axial (kN) [+tension/-compression]"
+        color_label = f"Bolt Axial ({force_unit}) [+tension/-compression]"
         title_metric = "Max |Axial|"
         draw_arrows = False
 
@@ -146,7 +150,7 @@ def plot_bolt_result(
     
     # Plot applied force
     if force:
-        _plot_applied_force(ax, result.force, bolt_group, extent)
+        _plot_applied_force(ax, result.force, bolt_group, extent, force_unit, length_unit)
     
     # Plot ICR point if available
     if result.icr_point is not None:
@@ -156,8 +160,8 @@ def plot_bolt_result(
     
     # Formatting
     ax.set_aspect('equal')
-    ax.set_xlabel('z (mm)', fontsize=11)
-    ax.set_ylabel('y (mm)', fontsize=11)
+    ax.set_xlabel(f'z ({length_unit})', fontsize=11)
+    ax.set_ylabel(f'y ({length_unit})', fontsize=11)
     ax.grid(True, alpha=0.3, linestyle='--')
     
     # Adjust limits with margin
@@ -169,9 +173,9 @@ def plot_bolt_result(
     
     # Title with key info
     title = f"Bolt Group Analysis ({result.method.upper()} method)"
-    title += f"\n{bolt_group.n} × M{bolt_group.parameters.diameter:.0f} bolts"
+    title += f"\n{bolt_group.n} × {bolt_group.parameters.diameter:.1f}{length_unit} bolts"
     if result.bolt_forces:
-        title += f" | {title_metric}: {force_max:.1f} kN"
+        title += f" | {title_metric}: {force_max:.2f} {force_unit}"
     ax.set_title(title, fontsize=12)
     
     plt.tight_layout()
@@ -193,7 +197,9 @@ def _plot_applied_force(
     ax: plt.Axes,
     force,
     bolt_group,
-    extent: float
+    extent: float,
+    force_unit: str,
+    length_unit: str
 ) -> None:
     """Plot applied force and add legend."""
     x_loc, y_loc, z_loc = force.location
@@ -205,17 +211,17 @@ def _plot_applied_force(
     # Build legend text
     labels = []
     
-    # Forces (convert from N to kN)
-    if abs(force.Fy) > 1e-3:
-        labels.append(f"Fy = {force.Fy/1000:.1f} kN")
-    if abs(force.Fz) > 1e-3:
-        labels.append(f"Fz = {force.Fz/1000:.1f} kN")
+    # Forces (display in same units as input)
+    if abs(force.Fy) > 1e-6:
+        labels.append(f"Fy = {force.Fy:.2f} {force_unit}")
+    if abs(force.Fz) > 1e-6:
+        labels.append(f"Fz = {force.Fz:.2f} {force_unit}")
     
     # Moment (torsion)
     Cy, Cz = bolt_group.Cy, bolt_group.Cz
     Mx_total, _, _ = force.get_moments_about(Cy, Cz)
-    if abs(Mx_total) > 1e-3:
-        labels.append(f"Mx = {Mx_total/1e6:.2f} kN·m")
+    if abs(Mx_total) > 1e-6:
+        labels.append(f"Mx = {Mx_total:.2f} {force_unit}·{length_unit}")
     
     # Add a custom legend entry for the loads
     if labels:
@@ -229,7 +235,8 @@ def plot_bolt_pattern(
     bolt_group,
     ax: plt.Axes | None = None,
     show: bool = True,
-    save_path: str | None = None
+    save_path: str | None = None,
+    length_unit: str = "mm"
 ) -> plt.Axes:
     """
     Plot bolt group pattern without analysis results.
@@ -241,6 +248,7 @@ def plot_bolt_pattern(
         ax: Matplotlib axes (creates new if None)
         show: Display the plot
         save_path: Path to save figure
+        length_unit: Unit label for lengths (e.g., 'mm', 'm', 'in')
         
     Returns:
         Matplotlib axes
@@ -275,8 +283,8 @@ def plot_bolt_pattern(
     
     # Formatting
     ax.set_aspect('equal')
-    ax.set_xlabel('z (mm)', fontsize=11)
-    ax.set_ylabel('y (mm)', fontsize=11)
+    ax.set_xlabel(f'z ({length_unit})', fontsize=11)
+    ax.set_ylabel(f'y ({length_unit})', fontsize=11)
     ax.grid(True, alpha=0.3, linestyle='--')
     ax.legend(loc='upper right')
     
@@ -293,7 +301,7 @@ def plot_bolt_pattern(
     ax.set_ylim(min(y_coords) - margin, max(y_coords) + margin)
     
     # Title
-    title = f"Bolt Pattern: {bolt_group.n} × M{bolt_diameter:.0f} bolts"
+    title = f"Bolt Pattern: {bolt_group.n} × {bolt_diameter:.1f}{length_unit} bolts"
     ax.set_title(title, fontsize=12)
     
     plt.tight_layout()

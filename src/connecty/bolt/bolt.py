@@ -632,7 +632,9 @@ class BoltResult:
         ax=None,
         show: bool = True,
         save_path: str | None = None,
-        mode: str = "shear"
+        mode: str = "shear",
+        force_unit: str = "N",
+        length_unit: str = "mm"
     ):
         """
         Plot bolt group with force distribution.
@@ -646,6 +648,8 @@ class BoltResult:
             show: Display the plot
             save_path: Path to save figure (.svg recommended)
             mode: Visualization mode: "shear" (default) or "axial"
+            force_unit: Unit label for forces (e.g., 'N', 'kN', 'lbf')
+            length_unit: Unit label for lengths (e.g., 'mm', 'm', 'in')
             
         Returns:
             Matplotlib axes
@@ -662,7 +666,9 @@ class BoltResult:
             ax=ax,
             show=show,
             save_path=save_path,
-            mode=mode
+            mode=mode,
+            force_unit=force_unit,
+            length_unit=length_unit
         )
 
     def check_aisc(
