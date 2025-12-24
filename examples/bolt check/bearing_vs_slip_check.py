@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from connecty import BoltGroup, BoltDesignParams, Load
+from connecty import ConnectionResult
+
+from common.bolt_demo import demo_edge_distances_mm, make_demo_case
 
 
 def format_check(title: str, result) -> str:
@@ -34,56 +36,53 @@ def run() -> None:
     out_dir = project_root / "gallery" / "bolt check"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    bolts = BoltGroup.from_pattern(rows=2, cols=3, spacing_y=80, spacing_z=70, diameter=20)
+    case = make_demo_case(grade="A325")
+    edge_y, edge_z, _edge_clear = demo_edge_distances_mm(case)
 
-    # Factored loads
-    load_bearing = Load(Fy=-110000, Fz=25000, Fx=30000, location=(0, 40, 120))
-    load_slip = Load(Fy=-90000, Fz=45000, Fx=50000, location=(0, 30, 90))
-
-    common_geom = dict(
-        plate_fu=450.0,
-        plate_thickness=14.0,
-        edge_distance_y=55.0,
-        edge_distance_z=60.0,
-    )
+    # Use the same load for both checks so only the connection type changes.
+    load = case.load
 
     # Bearing-type check (threads in shear plane)
-    design_bearing = BoltDesignParams(
-        grade="A325",
+    result_bearing = ConnectionResult(
+        connection=case.connection,
+        load=load,
+        shear_method="elastic",
+        tension_method="accurate",
+    )
+    bearing_result = result_bearing.check(
+        standard="aisc",
+        connection_type="bearing",
         hole_type="standard",
         slot_orientation="perpendicular",
         threads_in_shear_plane=True,
         slip_class="A",
         n_s=1,
         fillers=0,
-        **common_geom,
-    )
-
-    bearing_result = bolts.check_aisc(
-        force=load_bearing,
-        design=design_bearing,
-        method="elastic",
-        connection_type="bearing",
+        edge_distance_y=edge_y,
+        edge_distance_z=edge_z,
+        use_analysis_bolt_tension_if_present=True,
     )
 
     # Slip-critical check (Class B, slots perpendicular)
-    design_slip = BoltDesignParams(
-        grade="A325",
+    result_slip = ConnectionResult(
+        connection=case.connection,
+        load=load,
+        shear_method="elastic",
+        tension_method="accurate",
+    )
+    slip_result = result_slip.check(
+        standard="aisc",
+        connection_type="slip-critical",
         hole_type="short_slotted",
         slot_orientation="perpendicular",
         threads_in_shear_plane=False,
         slip_class="B",
         n_s=2,
         fillers=0,
-        n_b_tension=bolts.n,
-        **common_geom,
-    )
-
-    slip_result = bolts.check_aisc(
-        force=load_slip,
-        design=design_slip,
-        method="elastic",
-        connection_type="slip-critical",
+        n_b_tension=case.bolt_group.n,
+        edge_distance_y=edge_y,
+        edge_distance_z=edge_z,
+        use_analysis_bolt_tension_if_present=True,
     )
 
     lines = [

@@ -8,27 +8,33 @@ The bolt analysis module calculates **force distribution** on bolt groups using 
 
 ## Analysis Methods
 
-Connecty provides two methods for calculating force at each bolt location:
+Connecty provides two methods for in-plane shear force distribution, plus a separate tension calculation:
 
-**Elastic Method (3D)**
-- Conservative vector analysis for full 6DOF loading
-- **In-plane** (Fy, Fz, Mx): Direct shear + Torsion
+**Elastic Method (2D In-Plane)**
+- Conservative vector analysis for in-plane loading only
+- **Handles** (Fy, Fz, Mx): Direct shear + Torsion
   - Direct shear: $P/n$ (uniform distribution)
   - Torsional shear: $Tr/I_p$ (perpendicular to radius)
-- **Out-of-plane** (Fx, My, Mz): Direct axial + Bending
-  - Direct axial: $Fx/n$ (uniform distribution)
-  - Bending: Linear variation with distance from centroid
-- Vector superposition of all components
-- Output: 3D force vector (Fx, Fy, Fz) at each bolt
+- Vector superposition of shear components
+- Output: In-plane shear forces (Fy, Fz) at each bolt
+- **Note:** Out-of-plane tension from (Fx, My, Mz) is calculated separately
 
-**ICR Method (2D)**
+**ICR Method (2D In-Plane)**
 - Iterative Instantaneous Center of Rotation method
 - **Handles in-plane loading only** (Fy, Fz, Mx)
-- **Ignores out-of-plane loads** (Fx, My, Mz)
 - Accounts for non-linear load-deformation behavior
 - Uses Crawford-Kulak load-deformation curves: $R = R_{ult}(1 - e^{-\mu \Delta})^\lambda$
 - More accurate force distribution for eccentrically loaded bolt groups
-- Output: In-plane force vector (Fy, Fz) at each bolt
+- Output: In-plane shear forces (Fy, Fz) at each bolt
+- **Note:** Out-of-plane tension from (Fx, My, Mz) is calculated separately
+
+**Tension Calculation (Out-of-Plane)**
+- Handles axial (Fx) and bending moments (My, Mz) to determine bolt tensions
+- Works with both elastic and ICR shear methods
+- Two approaches:
+  - `tension_method="conservative"`: Neutral axis at mid-depth of plate
+  - `tension_method="accurate"`: Neutral axis at d/6 from compression edge
+- Output: Axial force (Fx) at each bolt (tension positive, compression clamped to zero)
 
 ---
 
@@ -36,15 +42,15 @@ Connecty provides two methods for calculating force at each bolt location:
 
 ### 1. `BoltGroup`
 
-A collection of bolts defined by coordinates or a pattern.
+A collection of bolts defined by coordinates or a pattern. BoltGroup defines geometry only - no analysis methods.
 
 ```python
-from connecty import BoltGroup, BoltParameters
+from connecty import BoltGroup
 
 # Option A: Explicit coordinates
 bolts = BoltGroup(
     positions=[(0, 0), (0, 75), (0, 150)],
-    parameters=BoltParameters(diameter=20)
+    diameter=20
 )
 
 # Option B: Pattern generation (rectangular)
@@ -67,97 +73,144 @@ bolts = BoltGroup.from_circle(
 )
 ```
 
-### 2. `BoltParameters`
+### 2. `ConnectionLoad`
 
-Configuration for bolt geometry (for visualization and ICR calculations).
-
-```python
-from connecty import BoltParameters
-
-params = BoltParameters(
-    diameter=20  # Bolt diameter in mm
-)
-```
-
-That's it! Only diameter is needed. Material properties are outside the scope of force calculation.
-
-### 3. `Load` (Shared)
-
-Uses the existing `Load` class for consistent load definition.
+Represents applied forces and moments at a specific location on the connection.
 
 ```python
-from connecty import Load
+from connecty import ConnectionLoad
 
-# 2D in-plane loading (supported by both elastic and ICR)
-load = Load(
-    Fy=-100000,           # 100 kN downward (N)
-    Fz=50000,             # 50 kN horizontal (N)
-    Mx=3000000,           # 3 kN·m torsion (N·mm)
+# Define load with forces, moments, and location
+load = ConnectionLoad(
+    Fx=0.0,               # Axial force (N)
+    Fy=-100000,           # Vertical force (N)
+    Fz=50000,             # Horizontal force (N)
+    Mx=3000000,           # Torsion (N·mm)
+    My=0.0,               # Bending about y (N·mm)
+    Mz=0.0,               # Bending about z (N·mm)
     location=(0, 0, 150)  # (x, y, z) application point
 )
 
-# Full 3D loading (elastic method only)
-load_3d = Load(
-    Fx=50000,             # 50 kN axial tension (N)
-    Fy=-100000,           # 100 kN downward (N)
-    Fz=60000,             # 60 kN horizontal (N)
-    Mx=5000000,           # 5 kN·m torsion (N·mm)
-    My=2500000,           # 2.5 kN·m bending about y (N·mm)
-    Mz=-2000000,          # 2 kN·m bending about z (N·mm)
-    location=(0, 0, 120)  # (x, y, z) application point
+# Get equivalent load at another position
+eq_load = load.equivalent_load(position=(50, 100, 0))
+```
+
+**Method:**
+- `equivalent_load(position)`: Transfers forces and moments to a new position using moment transfer equations: M_new = M_old + r × F
+
+### 3. `Plate`
+
+Defines the plate geometry for tension calculations.
+
+```python
+from connecty import Plate
+
+# Define plate dimensions
+plate = Plate(
+    width=240.0,    # Plate width (mm)
+    depth=200.0,    # Plate depth (mm)
+    thickness=12.0  # Plate thickness (mm)
 )
+```
+
+### 4. `BoltConnection`
+
+Combines bolt group and plate geometry to define the complete connection. This is a frozen dataclass - no analysis methods.
+
+```python
+from connecty import BoltConnection
+
+# Define connection geometry
+connection = BoltConnection(
+    bolt_group=bolts,
+    plate=plate,
+    n_shear_planes=1  # Number of shear planes
+)
+```
+
+### 5. `ConnectionResult`
+
+Performs analysis automatically upon instantiation. This replaces the old `analyze()` method pattern.
+
+```python
+from connecty import ConnectionResult
+
+# Analysis happens in constructor
+result = ConnectionResult(
+    connection=connection,
+    load=load,
+    shear_method="elastic",      # "elastic" or "icr"
+    tension_method="conservative" # "conservative" or "accurate"
+)
+
+# Access results immediately
+print(f"Max shear: {result.max_shear_force:.1f} N")
+print(f"Max tension: {result.max_axial_force:.1f} N")
+print(f"Max stress: {result.max_combined_stress:.1f} MPa")
 ```
 
 ---
 
 ## Analysis Workflow
 
-The API is straightforward:
+The API is straightforward - create geometry, define load, get results:
 
 ```python
-from connecty import BoltGroup, BoltParameters, Load
+from connecty import BoltGroup, Plate, BoltConnection, ConnectionLoad, ConnectionResult
 
-# Setup
-params = BoltParameters(diameter=20)
+# 1. Define bolt group geometry
 bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
-load = Load(Fy=-100000, location=(75, 150))
 
-# Elastic analysis
-result = bolts.analyze(load, method="elastic")
-print(f"Max bolt force: {result.max_force:.1f} kN")
+# 2. Define plate geometry
+plate = Plate(width=240, depth=200, thickness=12)
+
+# 3. Create connection
+connection = BoltConnection(bolt_group=bolts, plate=plate, n_shear_planes=1)
+
+# 4. Define applied load
+load = ConnectionLoad(Fy=-100000, location=(75, 150, 100))
+
+# 5. Get results (analysis happens automatically)
+result = ConnectionResult(
+    connection=connection,
+    load=load,
+    shear_method="elastic",
+    tension_method="conservative"
+)
+
+print(f"Max shear force: {result.max_shear_force:.1f} N")
+print(f"Max axial force: {result.max_axial_force:.1f} N")
 
 # ICR analysis (more accurate for eccentric loads)
-result_icr = bolts.analyze(load, method="icr")
-print(f"ICR Max force: {result_icr.max_force:.1f} kN")
+result_icr = ConnectionResult(
+    connection=connection,
+    load=load,
+    shear_method="icr",
+    tension_method="accurate"
+)
+print(f"ICR Max shear: {result_icr.max_shear_force:.1f} N")
 ```
 
-### Elastic Method Details (3D)
+### Elastic Method Details (2D In-Plane)
 
 **Geometric Properties:**
 1. **Centroid**: Calculated from bolt coordinates
    - $C_y = \frac{\sum y_i}{n}$, $C_z = \frac{\sum z_i}{n}$
 
 2. **Moments of Inertia**: About centroid
-   - $I_y = \sum (z_i - C_z)^2$ (for My bending)
-   - $I_z = \sum (y_i - C_y)^2$ (for Mz bending)
-   - $I_p = I_y + I_z$ (polar moment for Mx torsion)
+   - $I_p = \sum((y_i - C_y)^2 + (z_i - C_z)^2)$ (polar moment for Mx torsion)
 
-**In-Plane Forces (y-z plane):**
+**In-Plane Shear Forces (y-z plane):**
 3. **Direct Shear**: $R_{direct,y} = F_y / n$, $R_{direct,z} = F_z / n$ (uniform)
 
 4. **Torsional Shear**: $R_{torsion} = \frac{M_x \cdot r}{I_p}$ (perpendicular to radius)
    - Direction perpendicular to $(\Delta y, \Delta z)$
    - Magnitude proportional to distance from centroid
 
-**Out-of-Plane Forces (x-direction):**
-5. **Direct Axial**: $R_{direct,x} = F_x / n$ (uniform)
+**Resultant In-Plane Force:**
+5. **Vector Sum**: $R_{inplane} = \sqrt{R_y^2 + R_z^2}$
 
-6. **Bending Forces**: Linear variation with distance
-   - $R_{bend,x} = \frac{M_y \cdot \Delta z}{I_y} + \frac{M_z \cdot \Delta y}{I_z}$
-   - Creates tension/compression varying across pattern
-
-**Resultant:**
-7. **Vector Sum**: $R_{total} = \sqrt{R_x^2 + R_y^2 + R_z^2}$
+**Note:** Out-of-plane axial forces are calculated separately using the tension calculation method.
 
 ### ICR Method Details
 
@@ -173,66 +226,68 @@ print(f"ICR Max force: {result_icr.max_force:.1f} kN")
 
 ## Result Access
 
-`BoltResult` provides force data at each bolt:
+`ConnectionResult` provides comprehensive force and stress data:
 
 ```python
-result = bolts.analyze(force, method="elastic")
+result = ConnectionResult(
+    connection=connection,
+    load=load,
+    shear_method="elastic",
+    tension_method="conservative"
+)
 
 # Force properties
-result.max_force       # Maximum resultant force on any bolt (kN)
-result.min_force       # Minimum resultant force on any bolt (kN)
-result.mean            # Average bolt force (kN)
+result.max_shear_force      # Maximum shear force on any bolt (N)
+result.min_shear_force      # Minimum shear force on any bolt (N)
+result.max_axial_force      # Maximum axial force on any bolt (N)
+result.min_axial_force      # Minimum axial force on any bolt (N)
 
-# Stress properties (if diameter set)
-result.max_stress      # Maximum in-plane shear stress (MPa)
-result.min_stress      # Minimum in-plane shear stress (MPa)
-result.mean_stress     # Average shear stress (MPa)
-
-result.max_axial_stress   # Maximum out-of-plane axial stress (MPa)
-result.min_axial_stress   # Minimum out-of-plane axial stress (MPa)
-result.mean_axial_stress  # Average axial stress (MPa)
-
-result.max_combined_stress   # Maximum combined stress (MPa)
-result.min_combined_stress   # Minimum combined stress (MPa)
-result.mean_combined_stress  # Average combined stress (MPa)
+# Stress properties
+result.max_shear_stress     # Maximum in-plane shear stress (MPa)
+result.min_shear_stress     # Minimum in-plane shear stress (MPa)
+result.max_axial_stress     # Maximum out-of-plane axial stress (MPa)
+result.min_axial_stress     # Minimum out-of-plane axial stress (MPa)
+result.max_combined_stress  # Maximum combined stress (MPa)
+result.min_combined_stress  # Minimum combined stress (MPa)
 
 # Critical bolt info
-result.critical_bolt   # BoltForce object at max location
-result.critical_index  # Index of most stressed bolt
+result.bolt_results         # List of BoltResult objects (one per bolt)
+result.max_shear_bolt_index # Index of bolt with maximum shear
+result.max_axial_bolt_index # Index of bolt with maximum axial force
 
-# All bolt data
-result.bolt_forces     # List of all BoltForce objects
+# Connection geometry
+result.connection           # BoltConnection object
+result.load                 # ConnectionLoad object
 
-# ICR-specific
-result.icr_point       # (y, z) location of instantaneous center
-result.method          # "elastic" or "icr"
+# Analysis methods used
+result.shear_method         # "elastic" or "icr"
+result.tension_method       # "conservative" or "accurate"
+
+# ICR-specific (if shear_method="icr")
+result.icr_point            # (y, z) location of instantaneous center
 ```
 
-### BoltForce Object
+### BoltResult Object
 
-Each bolt's force is stored as a `BoltForce`:
+Each bolt's force and stress is stored as a `BoltResult`:
 
 ```python
-for bf in result.bolt_forces:
-    print(f"Bolt at ({bf.y}, {bf.z})")
+for br in result.bolt_results:
+    print(f"Bolt at ({br.position[0]}, {br.position[1]})")
     
     # In-plane forces
-    print(f"  Fy = {bf.Fy:.2f} kN")
-    print(f"  Fz = {bf.Fz:.2f} kN")
-    print(f"  Shear = {bf.shear:.2f} kN")
+    print(f"  Shear force = {br.shear_force:.2f} N")
+    print(f"  Shear Fy = {br.shear_force_y:.2f} N")
+    print(f"  Shear Fz = {br.shear_force_z:.2f} N")
     
     # Out-of-plane force
-    print(f"  Fx = {bf.Fx:.2f} kN")
-    print(f"  Axial = {bf.axial:.2f} kN")
+    print(f"  Axial force = {br.axial_force:.2f} N")
     
-    # Total 3D force
-    print(f"  Resultant = {bf.resultant:.2f} kN")
-    print(f"  Angle = {bf.angle:.1f}°")
-    
-    # Stresses (if diameter set)
-    print(f"  Shear stress = {bf.shear_stress:.1f} MPa")
-    print(f"  Axial stress = {bf.axial_stress:.1f} MPa")
-    print(f"  Combined stress = {bf.combined_stress:.1f} MPa")
+    # Stresses (calculated from forces and bolt area)
+    print(f"  Shear stress = {br.shear_stress:.1f} MPa")
+    print(f"  Axial stress = {br.axial_stress:.1f} MPa")
+    print(f"  Combined stress = {br.combined_stress:.1f} MPa")
+    print(f"  Angle = {br.angle:.1f}°")
 ```
 
 **Stress Calculations:**
@@ -286,168 +341,219 @@ result.plot(
 Normalization: Colors scale to the actual data range (min→max); the palette is not forcibly centered at zero.
 
 **Features:**
-- Bolts shown as circles colored by force magnitude
+- Bolts shown as circles colored by force/stress magnitude
 - Applied load location marked with red ×
+- **Plate boundary** shown as gray rectangle
+- **Neutral axes** shown as dashed lines (blue for My bending, green for Mz bending)
+  - Position calculated based on tension_method ("conservative" at mid-depth, "accurate" at d/6 from compression edge)
 - ICR point shown (if ICR method used and shear mode)
 - Title shows bolt count, size, and max force
 
 ### Pattern Visualization
 
 ```python
-from connecty.bolt_plotter import plot_bolt_pattern
+from connecty.bolt_plotter import plot_bolt_group
 
 # Visualize bolt layout before analysis
-plot_bolt_pattern(bolts, save_path="pattern.svg")
+plot_bolt_group(bolts, save_path="pattern.svg")
 ```
 
 ---
 
-## Design Checks (AISC 360-22)
+## Design Checks (AISC 360-22 & AS 4100)
 
-Connecty provides **automatic AISC 360-22 checks** for A325 and A490 bolts, supporting both bearing-type and slip-critical connections. Checks include shear, tension, bearing/tear-out, and slip resistance limits with per-bolt utilization reporting.
+Connecty provides **automatic design checks** for both AISC 360-22 (A325/A490) and AS 4100 (metric 8.8/10.9) bolts. Separate modules (`aisc` and `as4100`) handle each standard with dedicated check functions. Supports bearing-type and slip-critical (friction-type) connections with per-bolt utilization reporting for all limit states.
 
 ### Quick Start
 
 ```python
-from connecty import BoltGroup, BoltDesignParams, Load
+from connecty import BoltGroup, Plate, BoltConnection, ConnectionLoad, ConnectionResult
+from connecty.bolt.checks import aisc, as4100
 
-# Create bolt group
+# Create geometry
 bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
-force = Load(Fy=-100000, Fz=30000, location=(75, 150))
+plate = Plate(width=240, depth=200, thickness=12)
+connection = BoltConnection(bolt_group=bolts, plate=plate, n_shear_planes=1)
+load = ConnectionLoad(Fy=-100000, Fz=30000, location=(75, 150, 100))
 
-# Define design parameters (A325, standard holes, bearing-type)
-design = BoltDesignParams(
-    grade="A325",
+# Run analysis
+result = ConnectionResult(
+    connection=connection,
+    load=load,
+    shear_method="elastic",
+    tension_method="conservative"
+)
+
+# Define design parameters for AISC 360-22
+design_aisc = aisc.BoltDesignParams(
     hole_type="standard",
     slot_orientation="perpendicular",
     threads_in_shear_plane=True,
-    slip_class="A",
-    n_s=1,
-    fillers=0,
-    plate_fu=450.0,      # MPa
-    plate_thickness=12.0, # mm
-    edge_distance_y=50.0, # mm
-    edge_distance_z=50.0  # mm
+    plate_fu=450.0,             # MPa
+    plate_thickness=12.0,       # mm
+    edge_distance_y=50.0,       # mm
+    edge_distance_z=50.0        # mm
 )
 
-# Run check
-check = bolts.check_aisc(
-    force=force,
-    design=design,
-    method="elastic",
-    connection_type="bearing"
+# Check using AISC 360-22
+check_aisc = aisc.check_bolt_group_aisc(
+    result,
+    design_aisc,
+    connection_type="bearing"  # "bearing" or "slip-critical"
 )
 
 # Access results
-print(f"Governing utilization: {check.governing_utilization:.2f}")
-print(f"Governing bolt: {check.governing_bolt_index}")
-print(f"Governing limit state: {check.governing_limit_state}")
+print(f"Governing utilization: {check_aisc.governing_utilization:.2f}")
+print(f"Governing bolt: {check_aisc.governing_bolt_index}")
+print(f"Governing limit state: {check_aisc.governing_limit_state}")
 
-if check.governing_utilization <= 1.0:
+if check_aisc.governing_utilization <= 1.0:
     print("PASS")
 else:
     print("FAIL")
 ```
 
-### BoltDesignParams
+### AISC 360-22 BoltDesignParams
 
-Defines all design-only inputs required for AISC checks. This dataclass captures material properties, geometry, and connection details not needed for analysis:
+Design parameters for AISC 360-22 checks (A325/A490 bolts):
 
 ```python
-from connecty import BoltDesignParams
+from connecty.bolt.checks import aisc
 
-design = BoltDesignParams(
-    # Grade and bolt geometry
-    grade="A325",              # "A325" or "A490"
-    hole_type="standard",      # "standard", "oversize", "short_slotted", "long_slotted"
+design = aisc.BoltDesignParams(
+    # Hole type and orientation
+    hole_type="standard",              # "standard", "oversize", "short_slotted", "long_slotted"
     slot_orientation="perpendicular",  # "perpendicular" or "parallel" (for slotted holes)
-    threads_in_shear_plane=True,  # Threads in or excluded from shear plane
+    threads_in_shear_plane=True,        # Threads in or excluded from shear plane
     
-    # Slip-critical parameters
-    slip_class="A",            # "A" (μ=0.30) or "B" (μ=0.50)
-    n_s=1,                      # Number of slip planes
-    fillers=0,                  # Count of fillers (affects h_f factor)
+    # Slip-critical parameters (for slip-critical checks)
+    slip_class="A",                    # "A" (μ=0.30) or "B" (μ=0.50)
+    n_s=1,                              # Number of slip planes (typically 1 or 2)
+    fillers=0,                          # Number of fillers (affects h_f factor)
     
     # Connected material properties
-    plate_fu=450.0,             # Ultimate tensile stress (MPa)
-    plate_thickness=12.0,       # Plate thickness (mm)
-    edge_distance_y=50.0,       # Edge distance in y-direction (mm)
-    edge_distance_z=50.0,       # Edge distance in z-direction (mm)
+    plate_fu=450.0,                     # Ultimate tensile stress (MPa)
+    plate_thickness=12.0,               # Plate thickness (mm)
+    edge_distance_y=50.0,               # Edge distance in y-direction (mm)
+    edge_distance_z=50.0,               # Edge distance in z-direction (mm)
     
     # Optional overrides
-    tension_per_bolt=None,      # kN override (if None, derives from Fx/n)
-    n_b_tension=None,           # Bolts carrying applied tension (for k_sc reduction)
-    pretension_override=None    # kN override (if None, uses AISC Table J3.1)
+    tension_per_bolt=None,              # kN override (derives from Fx/n if None)
+    n_b_tension=None,                   # Bolts carrying applied tension (for k_sc reduction)
+    pretension_override=None            # kN override (uses AISC Table J3.1 if None)
 )
 ```
 
-### BoltCheckResult
+### AS 4100 BoltDesignParams
 
-Returned by `check_aisc()` with complete utilization information:
+Design parameters for AS 4100 / Steel Designers Handbook checks (metric 8.8/10.9 bolts):
 
 ```python
-check = bolts.check_aisc(force, design, connection_type="bearing")
+from connecty.bolt.checks import as4100
 
-# Summary properties
-print(check.governing_utilization)    # Max util across all bolts/limit states
-print(check.governing_bolt_index)     # Index of critical bolt
-print(check.governing_limit_state)    # "shear", "tension", "bearing", or "slip"
-print(check.connection_type)          # "bearing" or "slip-critical"
-print(check.method)                   # "elastic" or "icr"
+design = as4100.BoltDesignParams(
+    # Hole type
+    hole_type="standard",              # "standard", "oversize", "slotted"
+    hole_type_factor=1.0,               # kh: 1.0 (standard), 0.85 (oversize), 0.70 (slotted)
+    
+    # Shear plane definition
+    nn_shear_planes=1,                  # Threaded shear planes
+    nx_shear_planes=0,                  # Unthreaded shear planes
+    
+    # Friction-type parameters (for friction-type checks)
+    slip_coefficient=0.35,              # Friction coefficient μ
+    n_e=1,                              # Number of shear planes (slip planes)
+    prying_allowance=0.25,              # α factor for prying allowance
+    
+    # Connected material properties
+    plate_fu=430.0,                     # Ultimate tensile stress (MPa)
+    plate_fy=250.0,                     # Yield strength (MPa)
+    plate_thickness=12.0,               # Plate thickness (mm)
+    edge_distance=45.0,                 # Clear distance to edge (mm)
+    
+    # Optional
+    tension_per_bolt=None,              # kN override (derives from Fx/n if None)
+    use_analysis_bolt_tension_if_present=True  # Use Fx from analysis if available
+)
+```
 
-# Per-bolt details for reporting
+### Check Functions
+
+**AISC 360-22:**
+```python
+from connecty.bolt.checks import aisc
+
+check = aisc.check_bolt_group_aisc(
+    result,                          # ConnectionResult from analysis
+    design,                          # aisc.BoltDesignParams
+    connection_type="bearing"        # "bearing" or "slip-critical"
+)
+```
+
+**AS 4100 / Steel Designers Handbook:**
+```python
+from connecty.bolt.checks import as4100
+
+check = as4100.check_bolt_group_sd_handbook(
+    result,                          # ConnectionResult from analysis
+    design,                          # as4100.BoltDesignParams
+    connection_type="bearing"        # "bearing" or "friction"
+)
+```
+
+### Check Result Object
+
+Both check functions return a result object with:
+
+```python
+check.governing_utilization     # Maximum utilization (0.0 to 1.0+)
+check.governing_bolt_index      # Index of critical bolt (0-indexed)
+check.governing_limit_state     # "shear", "tension", "bearing", or "slip"
+check.connection_type           # "bearing" or "slip-critical"/"friction"
+check.method                    # "elastic" or "icr"
+check.details                   # List of BoltCheckDetail (one per bolt)
+```
+
+**Per-bolt details:**
+```python
 for detail in check.details:
-    print(f"Bolt {detail.bolt_index}:")
-    print(f"  Shear demand: {detail.shear_demand:.2f} kN")
-    print(f"  Tension demand: {detail.tension_demand:.2f} kN")
-    print(f"  Shear util: {detail.shear_util:.3f}")
-    print(f"  Tension util: {detail.tension_util:.3f}")
-    print(f"  Bearing util: {detail.bearing_util:.3f}")
-    if detail.slip_util is not None:
-        print(f"  Slip util: {detail.slip_util:.3f}")
-    print(f"  Governing: {detail.governing_util:.3f} ({detail.governing_limit_state})")
-
-# Dictionary export (for tables/reports)
-info_dict = check.info  # Nested dict with all results
+    detail.bolt_index           # Bolt index (0-indexed)
+    detail.point                # (y, z) bolt position
+    detail.shear_demand         # In-plane shear force demand (kN)
+    detail.tension_demand       # Out-of-plane tension force demand (kN)
+    detail.shear_capacity       # Shear capacity (kN)
+    detail.tension_capacity     # Tension capacity (kN)
+    detail.bearing_capacity     # Bearing/tear-out capacity (kN)
+    detail.slip_capacity        # Slip resistance capacity (if applicable)
+    
+    detail.shear_util           # Shear utilization ratio
+    detail.tension_util         # Tension utilization ratio
+    detail.bearing_util         # Bearing utilization ratio
+    detail.slip_util            # Slip utilization (None for bearing-type)
+    detail.governing_util       # Maximum utilization for this bolt
+    detail.governing_limit_state # Limit state that governs for this bolt
 ```
-
-### Connection Types
-
-**Bearing-Type**
-```python
-check = bolts.check_aisc(force, design, connection_type="bearing")
-```
-Checks J3.6, J3.7, J3.10:
-- Shear rupture: $U_V = \frac{V_u}{\phi F_{nv} A_b}$
-- Tension rupture (with J3.7 interaction): $U_T = \frac{T_u}{\phi F'_{nt} A_b}$
-- Bearing/tear-out: $U_{bear} = \frac{V_u}{\phi R_n}$ where $R_n = \min(2.4dtF_u, 1.2l_ctF_u)$
-
-**Slip-Critical**
-```python
-check = bolts.check_aisc(force, design, connection_type="slip-critical")
-```
-Checks J3.8–J3.9 (plus all bearing-type):
-- Slip resistance: $U_{slip} = \frac{V_u}{\phi \mu D_u h_f T_b n_s k_{sc}}$
-
-Where:
-- $\phi = 1.00$ (standard holes, short slots ⊥ load), 0.85 (oversize, short slots ∥), 0.70 (long slots)
-- $\mu = 0.30$ (Class A) or 0.50 (Class B)
-- $D_u = 1.13$ (mean installed pretension multiplier)
-- $h_f = 1.0$ (≤1 filler) or 0.85 (≥2 fillers)
-- $T_b$ = pretension from AISC Table J3.1
-- $k_{sc} = \max(0, 1 - T_u / (D_u T_b n_b))$ (combined tension–shear reduction)
 
 ### Examples
 
-**Bearing-Type Check**
+**AISC A325 - Bearing-Type**
 ```python
-from connecty import BoltGroup, BoltDesignParams, Load
+from connecty import BoltGroup, Plate, BoltConnection, ConnectionLoad, ConnectionResult
+from connecty.bolt.checks import aisc
 
 bolts = BoltGroup.from_pattern(rows=2, cols=3, spacing_y=80, spacing_z=70, diameter=20)
-force = Load(Fy=-100000, Fz=25000, location=(40, 120))
+plate = Plate(width=240, depth=200, thickness=14)
+connection = BoltConnection(bolt_group=bolts, plate=plate, n_shear_planes=1)
+load = ConnectionLoad(Fy=-100000, Fz=25000, location=(40, 120, 100))
 
-design = BoltDesignParams(
-    grade="A325",
+result = ConnectionResult(
+    connection=connection,
+    load=load,
+    shear_method="elastic",
+    tension_method="conservative"
+)
+
+design = aisc.BoltDesignParams(
     hole_type="standard",
     threads_in_shear_plane=True,
     plate_fu=450.0,
@@ -456,14 +562,14 @@ design = BoltDesignParams(
     edge_distance_z=60.0
 )
 
-check = bolts.check_aisc(force, design, method="elastic", connection_type="bearing")
+check = aisc.check_bolt_group_aisc(result, design, connection_type="bearing")
 print(f"Utilization: {check.governing_utilization:.1%}")
+print(f"Limit state: {check.governing_limit_state}")
 ```
 
-**Slip-Critical Check (A325 Class B)**
+**AISC A325 - Slip-Critical**
 ```python
-design = BoltDesignParams(
-    grade="A325",
+design = aisc.BoltDesignParams(
     hole_type="short_slotted",
     slot_orientation="perpendicular",
     threads_in_shear_plane=False,
@@ -477,7 +583,41 @@ design = BoltDesignParams(
     n_b_tension=6  # All 6 bolts carry applied tension
 )
 
-check = bolts.check_aisc(force, design, method="elastic", connection_type="slip-critical")
+check = aisc.check_bolt_group_aisc(result, design, connection_type="slip-critical")
+print(f"Utilization: {check.governing_utilization:.1%}")
+```
+
+**AS 4100 Grade 8.8 - Bearing-Type**
+```python
+from connecty.bolt.checks import as4100
+
+design = as4100.BoltDesignParams(
+    hole_type="standard",
+    nn_shear_planes=1,              # Threaded shear planes
+    nx_shear_planes=0,              # Unthreaded shear planes
+    plate_fu=430.0,
+    plate_fy=250.0,
+    plate_thickness=14.0,
+    edge_distance=50.0
+)
+
+check = as4100.check_bolt_group_sd_handbook(result, design, connection_type="bearing")
+print(f"Utilization: {check.governing_utilization:.1%}")
+```
+
+**AS 4100 Grade 10.9 - Friction-Type**
+```python
+design = as4100.BoltDesignParams(
+    hole_type="standard",
+    slip_coefficient=0.35,          # Friction coefficient μ
+    n_e=1,                          # Number of shear planes
+    plate_fu=430.0,
+    plate_fy=250.0,
+    plate_thickness=14.0,
+    edge_distance=50.0
+)
+
+check = as4100.check_bolt_group_sd_handbook(result, design, connection_type="friction")
 print(f"Utilization: {check.governing_utilization:.1%}")
 ```
 

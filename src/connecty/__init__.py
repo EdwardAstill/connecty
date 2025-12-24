@@ -77,19 +77,22 @@ from .weld import (
     plot_loaded_weld_comparison,
 )
 
-from .common import Load
+from .common import Load, Force
 
 from .bolt import (
     BoltGroup,
     BoltParameters,
     BoltProperties,
-    BoltForce,
     BoltResult,
+    ConnectionResult,
     plot_bolt_result,
     plot_bolt_pattern,
+    BoltConnection,
+    ConnectionLoad,
+    Plate,
 )
 
-from .bolt.checks.aisc import BoltDesignParams, BoltCheckResult
+from .bolt.checks import BoltCheckResult
 
 __all__ = [
     # Main weld classes
@@ -100,6 +103,7 @@ __all__ = [
     "WeldGroup",
     "WeldSegment",
     "Load",
+    "Force",
     "LoadedWeld",
     # Weld stress results
     "StressComponents",
@@ -117,13 +121,18 @@ __all__ = [
     "BoltGroup",
     "BoltParameters",
     "BoltProperties",
-    "BoltForce",
     "BoltResult",
-    "BoltDesignParams",
+    "ConnectionResult",
+    "BoltConnection",
+    "ConnectionLoad",
+    "Plate",
     "BoltCheckResult",
     # Bolt functions
     "plot_bolt_result",
     "plot_bolt_pattern",
 ]
+
+# Backward-friendly aliases used by existing scripts/tests.
+WeldParameters = WeldParams
 
 __version__ = "0.3.0"

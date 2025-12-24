@@ -238,17 +238,316 @@ For each bolt (or bolt group), the following values are reported in tabular form
 
 After completing all checks, the bolt with the **highest governing utilisation** is identified and flagged for design review or adjustment.
 
+
+# Steel Designers Handbook 7th Edition
+
+Below is a **Steel Designers Handbook–style section** that mirrors the structure, tone, and intent of your AISC section, but is aligned with **AS 4100 / Steel Designers Handbook (7th Ed.)** practice for **checks and reporting**.
+It is written as a *design-method subsection* you can drop straight into your document.
+
 ---
 
-If you want, I can generate a reusable calculation template (spreadsheet or Python script) that automatically evaluates these utilisations for any bolt set.
+Below is a **clean, corrected, and tightened rewrite** of your section.
+I’ve kept your structure and intent, but:
 
+* Fixed notation and formatting (AS 4100–style)
+* Removed ambiguity about demands vs capacities
+* Clarified serviceability vs strength intent
+* Ensured utilisation definitions are consistent and unambiguous
+* Made the language read like a **code commentary / handbook extract**, not API notes
 
+This version is something you could reasonably include in a calculation methodology, design basis, or software documentation.
 
+---
 
+# AS 4100 — Steel Designers Handbook (7th Edition)
 
+## Bolt Strength Checks and Reporting
 
+This section defines the **verification and reporting procedure** for bolts and bolt groups in accordance with **AS 4100**, as interpreted and applied in the *Steel Designers Handbook (7th Edition)*.
 
+The procedure applies to **high-strength structural bolts** in standard building connections and is valid for both **single bolts** and **bolt groups** subject to **in-plane** and/or **out-of-plane** actions.
 
+---
+
+## 1. Scope and Assumptions
+
+The following assumptions are consistent with AS 4100 and the Steel Designers Handbook:
+
+* Bolts are **high-strength structural bolts** (e.g. Property Class 8.8 or 10.9, or equivalent).
+* Bolts are installed and tightened in accordance with the nominated **bolting category**:
+
+  * Bearing-type (/S)
+  * Tensioned bearing (/TB)
+  * Friction-type (/TF)
+* Connected plate elements are assumed **rigid at bolt locations** for the purpose of force distribution.
+* Bolt group actions may be determined using **elastic superposition** or **instantaneous centre of rotation (ICR)** analysis.
+* **Strength verification is performed on the most heavily loaded bolt(s)** in the group.
+* **Prying action is not included** in the basic force analysis and must be accounted for separately where applicable.
+
+---
+
+## 2. Bolt-Level Design Actions
+
+From bolt-group analysis (elastic or ICR), determine for each bolt ( i ):
+
+* Design shear force:
+  [
+  V_i^*
+  ]
+* Design tensile force:
+  [
+  N_{ti}^*
+  ]
+
+For bolt groups:
+
+* The **critical bolt** is defined as the bolt with the **maximum governing utilisation**.
+* In many practical cases, this corresponds to the bolt **farthest from the centre of rotation** or neutral axis.
+
+---
+
+## 3. Strength Limit State Checks (AS 4100)
+
+### 3.1 Bolt Shear Capacity
+
+The **nominal bolt shear capacity** depends on whether the shear plane passes through threaded or unthreaded regions:
+
+[
+V_f
+===
+
+0.62,k_r f_{uf}
+\left(
+n_n A_c + n_x A_o
+\right)
+]
+
+where:
+
+* ( f_{uf} ) = minimum tensile strength of bolt material
+* ( A_c ) = core (thread-root) area
+* ( A_o ) = shank area
+* ( n_n, n_x ) = number of shear planes through threaded and unthreaded regions
+* ( k_r ) = reduction factor for long bolt lines
+
+**Design requirement:**
+[
+V_i^* \le \phi V_f
+\qquad \text{with } \phi = 0.8
+]
+
+---
+
+### 3.2 Bolt Tension Capacity
+
+The **nominal tensile capacity** of a bolt is:
+
+[
+N_{tf} = A_s f_{uf}
+]
+
+where ( A_s ) is the tensile stress area of the bolt.
+
+**Design requirement:**
+[
+N_{ti}^* \le \phi N_{tf}
+\qquad \text{with } \phi = 0.8
+]
+
+---
+
+### 3.3 Combined Shear and Tension Interaction
+
+Bolts subject to **simultaneous shear and tension** must satisfy the AS 4100 interaction requirement:
+
+[
+\left(
+\frac{V_i^*}{\phi V_f}
+\right)^2
++
+\left(
+\frac{N_{ti}^*}{\phi N_{tf}}
+\right)^2
+\le 1.0
+]
+
+This interaction governs the design of bolts in:
+
+* Out-of-plane loaded bolt groups
+* Eccentrically loaded connections
+* Beam–column end-plate connections
+
+---
+
+### 3.4 Bearing and Tear-Out of Connected Material
+
+Bolt design must also consider the **capacity of the connected plies**, which frequently governs.
+
+#### (a) Bearing (Ply Crushing)
+
+[
+V_b = 3.2, t_p d_f f_{up}
+]
+
+#### (b) Tear-Out
+
+[
+V_p = a_e t_p f_{up}
+]
+
+where:
+
+* ( t_p ) = plate thickness
+* ( d_f ) = bolt diameter
+* ( a_e ) = edge distance in the direction of load
+* ( f_{up} ) = tensile strength of plate material
+
+**Design requirements:**
+[
+V_i^* \le \phi V_b
+\quad \text{and} \quad
+V_i^* \le \phi V_p
+\qquad \text{with } \phi = 0.9
+]
+
+The **governing ply capacity** is the lesser of bearing or tear-out.
+
+---
+
+## 4. Serviceability Limit State
+
+### (Friction-Type /TF Bolts Only)
+
+For friction-type connections where slip must be prevented, the **nominal slip resistance** is:
+
+[
+V_{sf} = \mu n_e N_{ti} k_h
+]
+
+where:
+
+* ( \mu ) = friction coefficient
+* ( n_e ) = number of shear planes
+* ( N_{ti} ) = installed bolt pretension
+* ( k_h ) = hole-type factor
+
+**Design requirement:**
+[
+V_i^* \le \phi V_{sf}
+\qquad \phi = 0.7
+]
+
+Even for friction-type connections, **all strength limit state checks in Section 3 must also be satisfied**.
+
+---
+
+## 5. Prying Action Allowance
+
+AS 4100 does not explicitly model prying action.
+The Steel Designers Handbook recommends allowing for increased bolt tension where prying is likely.
+
+A practical allowance is:
+
+[
+N_{ti,\text{design}}
+====================
+
+(1+\alpha),N_{ti}^*
+\qquad
+\alpha = 0.20\text{–}0.33
+]
+
+Prying action may be minimised by:
+
+* Increasing bolt spacing (≥ 90 mm)
+* Increasing end-plate thickness (≥ (1.25d))
+* Providing end-plate stiffeners
+
+---
+
+## 6. Utilisation Calculations
+
+For each bolt ( i ), the following utilisation ratios are evaluated.
+
+### 6.1 Individual Utilisations
+
+* **Shear utilisation**
+  [
+  U_{V,i} = \frac{V_i^*}{\phi V_f}
+  ]
+
+* **Tension utilisation**
+  [
+  U_{T,i} = \frac{N_{ti}^*}{\phi N_{tf}}
+  ]
+
+* **Bearing / tear-out utilisation**
+  [
+  U_{\text{bear},i}
+  =================
+
+  \frac{V_i^*}{\phi \min(V_b, V_p)}
+  ]
+
+* **Shear–tension interaction utilisation**
+  [
+  U_{\text{int},i}
+  ================
+
+  \left(
+  \frac{V_i^*}{\phi V_f}
+  \right)^2
+  +
+  \left(
+  \frac{N_{ti}^*}{\phi N_{tf}}
+  \right)^2
+  ]
+
+---
+
+### 6.2 Governing Utilisation
+
+[
+U_{\text{governing},i}
+======================
+
+\max
+\left(
+U_{V,i},
+U_{T,i},
+U_{\text{bear},i},
+U_{\text{int},i}
+\right)
+]
+
+---
+
+## 7. Reporting Format
+
+Results are reported **per bolt**, with the governing bolt clearly identified.
+
+| Bolt ID | (V_i^*) | (N_{ti}^*) | (U_V) | (U_T) | (U_{\text{bear}}) | (U_{\text{int}}) | Governing Utilisation |
+| ------- | ------- | ---------- | ----- | ----- | ----------------- | ---------------- | --------------------- |
+
+---
+
+## 8. Identification of Critical Bolt
+
+The bolt with the **maximum governing utilisation** is designated the **critical bolt** and controls:
+
+* Bolt size and grade
+* Number of bolts
+* Plate thickness and detailing
+
+This approach is consistent with Steel Designers Handbook guidance that **verification of the most heavily loaded bolt is sufficient to confirm the adequacy of the bolt group**.
+
+---
+
+If you want next, I can:
+
+* Strip this down into a **formal “Design Basis” appendix**
+* Align clause references **line-by-line to AS 4100**
+* Or translate this directly into **software-ready pseudocode** that matches your `connecty` API exactly
 
 
 

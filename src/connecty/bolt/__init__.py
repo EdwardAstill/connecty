@@ -8,8 +8,8 @@ from .bolt import (
     BoltGroup,
     BoltParameters,
     BoltProperties,
-    BoltForce,
     BoltResult,
+    ConnectionResult,
 )
 
 from .bolt_plotter import (
@@ -17,12 +17,19 @@ from .bolt_plotter import (
     plot_bolt_pattern,
 )
 
+from .connection import BoltConnection
+from .load import ConnectionLoad
+from .plate import Plate
+
 __all__ = [
     "BoltGroup",
     "BoltParameters",
     "BoltProperties",
-    "BoltForce",
     "BoltResult",
+    "ConnectionResult",
+    "BoltConnection",
+    "ConnectionLoad",
+    "Plate",
     "plot_bolt_result",
     "plot_bolt_pattern",
 ]

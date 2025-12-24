@@ -11,8 +11,7 @@ src_dir = examples_dir.parent / "src"
 
 bolt_examples = [
     "bolt analysis/bolt_group_analysis.py",
-    "bolt analysis/elastic_vs_icr_analysis.py",
-    "bolt check/bearing_vs_slip_check.py",
+    "bolt check/aisc_vs_as4100_check.py",
     "bolt plotting/bolt_plotting_demo.py",
 ]
 
@@ -26,9 +25,9 @@ def main() -> None:
     env["PYTHONPATH"] = f"{examples_dir};{src_dir}"
 
     for example in bolt_examples:
-        print(f"\n{'─' * 60}")
+        print(f"\n{'-' * 60}")
         print(f"Running: {example}")
-        print("─" * 60)
+        print("-" * 60)
 
         result = subprocess.run([
             sys.executable,
@@ -36,9 +35,9 @@ def main() -> None:
         ], env=env, capture_output=False)
 
         if result.returncode != 0:
-            print(f"❌ {example} failed!")
+            print(f"[FAILED] {example}")
         else:
-            print(f"✓ {example} completed")
+            print(f"[OK] {example} completed")
 
     print("\n" + "=" * 60)
     print("BOLT EXAMPLES COMPLETE")

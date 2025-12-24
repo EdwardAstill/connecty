@@ -38,6 +38,56 @@ Per-bolt utilization breakdown and governing limit state identification
 
 ---
 
+## Quick Start - Bolt Connection
+
+```python
+from connecty import (
+    BoltGroup, Plate, BoltConnection,
+    ConnectionLoad, ConnectionResult
+)
+
+# 1. Define bolt group geometry
+bolts = BoltGroup.from_pattern(
+    rows=3, cols=2,
+    spacing_y=75, spacing_z=60,
+    diameter=20
+)
+
+# 2. Define plate geometry
+plate = Plate(width=240, depth=200, thickness=12)
+
+# 3. Create connection
+connection = BoltConnection(
+    bolt_group=bolts,
+    plate=plate,
+    n_shear_planes=1
+)
+
+# 4. Define applied load
+load = ConnectionLoad(
+    Fy=-100000,  # 100 kN downward
+    location=(75, 150, 100)
+)
+
+# 5. Analyze (analysis happens automatically)
+result = ConnectionResult(
+    connection=connection,
+    load=load,
+    shear_method="elastic",
+    tension_method="conservative"
+)
+
+# 6. View results
+print(f"Max shear: {result.max_shear_force:.1f} N")
+print(f"Max tension: {result.max_axial_force:.1f} N")
+print(f"Max stress: {result.max_combined_stress:.1f} MPa")
+
+# 7. Visualize
+result.plot(save_path="analysis.svg")
+```
+
+---
+
 ## Quick Links
 
 - **[Bolt Analysis & Checks](bolt/)**: Force distribution and AISC checks

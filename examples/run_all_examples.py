@@ -15,8 +15,7 @@ examples = [
     "weld plotting/icr_rotation_eccentricity_trend.py",
     "weld analysis/pjp_weld_analysis.py",
     "bolt analysis/bolt_group_analysis.py",
-    "bolt analysis/elastic_vs_icr_analysis.py",
-    "bolt check/bearing_vs_slip_check.py",
+    "bolt check/aisc_vs_as4100_check.py",
     "bolt plotting/bolt_plotting_demo.py",
 ]
 

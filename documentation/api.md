@@ -22,9 +22,11 @@ Complete API documentation for the Connecty structural connection analysis and d
 from connecty import (
     # Bolt analysis
     BoltGroup,
-    BoltParameters,
+    Plate,
+    BoltConnection,
+    ConnectionLoad,
+    ConnectionResult,
     BoltResult,
-    BoltForce,
     
     # Bolt design checks (AISC 360-22)
     BoltDesignParams,
@@ -36,9 +38,6 @@ from connecty import (
     WeldParams,
     LoadedWeld,
     WeldStress,
-    
-    # Shared
-    Load,
 )
 ```
 
@@ -46,83 +45,64 @@ from connecty import (
 
 ## Shared Classes
 
-### `Load`
+### `ConnectionLoad`
 
-Represents a concentrated force and moment applied at a point.
+Represents a concentrated force and moment applied at a point for bolt connection analysis.
 
 ```python
-class Load:
-    Fx: float          # Axial force (out-of-plane, tension positive) [kN, kip, etc.]
-    Fy: float          # Shear force in y-direction (vertical) [kN, kip, etc.]
-    Fz: float          # Shear force in z-direction (horizontal) [kN, kip, etc.]
-    Mx: float          # Torsional moment about x-axis [kN·mm, kip·in, etc.]
-    My: float          # Bending moment about y-axis [kN·mm, kip·in, etc.]
-    Mz: float          # Bending moment about z-axis [kN·mm, kip·in, etc.]
+class ConnectionLoad:
+    Fx: float          # Axial force (out-of-plane, tension positive) [N]
+    Fy: float          # Shear force in y-direction (vertical) [N]
+    Fz: float          # Shear force in z-direction (horizontal) [N]
+    Mx: float          # Torsional moment about x-axis [N·mm]
+    My: float          # Bending moment about y-axis [N·mm]
+    Mz: float          # Bending moment about z-axis [N·mm]
     location: tuple    # (x, y, z) application point
 ```
 
 **Constructor:**
 ```python
 # With forces only (moments calculated from eccentricity)
-load = Load(Fy=-100.0, Fz=50.0, location=(0, 100, 150))
+load = ConnectionLoad(Fy=-100000.0, Fz=50000.0, location=(0, 100, 150))
 
 # With forces and moments
-load = Load(
+load = ConnectionLoad(
     Fx=0.0,
-    Fy=-100.0,
-    Fz=50.0,
-    Mx=5000.0,    # Applied torsion
+    Fy=-100000.0,
+    Fz=50000.0,
+    Mx=5000000.0,    # Applied torsion
     My=0.0,
     Mz=0.0,
     location=(0, 100, 150)
 )
-
-# Alternative constructor with descriptive names
-load = Load.from_components(
-    axial=0.0,
-    shear_y=-100.0,
-    shear_z=50.0,
-    torsion=5000.0,
-    moment_y=0.0,
-    moment_z=0.0,
-    at=(0, 100, 150)
-)
 ```
 
-**Attributes:**
-- `Fx`, `Fy`, `Fz`: Force components (positive per right-hand rule)
-- `Mx`, `My`, `Mz`: Moment components (default 0.0)
-- `location`: (x, y, z) coordinates where force is applied
-- **Note**: For bolt analysis, moments are typically generated from force eccentricity rather than applied directly
-
-**Methods:**
+**Method:**
 ```python
-force.at(x, y, z)                    # Get equivalent force/moments at a point
-force.get_moments_about(x, y, z)     # Get total moments about a point
-force.shear_magnitude                # √(Fy² + Fz²)
-force.total_force_magnitude          # √(Fx² + Fy² + Fz²)
+eq_load = load.equivalent_load(position=(50, 100, 0))  # Transfer loads to new position
 ```
+
+The `equivalent_load()` method transfers forces and moments to a different position using moment transfer equations: M_new = M_old + r × F
 
 ---
 
 ## Bolt Analysis
 
-### `BoltParameters`
+### `Plate`
 
-Defines bolt geometry for force calculations and visualization.
+Defines plate geometry for tension calculations.
 
 ```python
-class BoltParameters:
-    diameter: float    # Bolt diameter [mm, in, etc.]
+class Plate:
+    width: float       # Plate width [mm]
+    depth: float       # Plate depth [mm]
+    thickness: float   # Plate thickness [mm]
 ```
 
 **Constructor:**
 ```python
-params = BoltParameters(diameter=20)  # M20 bolt
+plate = Plate(width=240.0, depth=200.0, thickness=12.0)
 ```
-
-**Attributes:**
-- `diameter`: Bolt diameter (used for ICR load-deformation curves and visualization)
 
 ---
 
@@ -136,7 +116,7 @@ A collection of bolts with analysis methods.
 # Option A: Explicit coordinates
 bolts = BoltGroup(
     positions=[(0, 0), (0, 75), (0, 150)],
-    parameters=BoltParameters(diameter=20)
+    diameter=20
 )
 
 # Option B: Rectangular pattern
