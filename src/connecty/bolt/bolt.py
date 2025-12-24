@@ -380,47 +380,82 @@ class BoltResult:
     # ICR-specific results
     icr_point: Point | None = None
     
-    # Cached values
-    _forces: np.ndarray | None = field(default=None, repr=False)
-    
-    def _get_forces(self) -> np.ndarray:
-        """Get array of resultant forces."""
-        if self._forces is None:
-            self._forces = np.array([bf.resultant for bf in self.bolt_forces])
-        return self._forces
-    
-    # === Properties (beamy-style) ===
+    # === Properties ===
     
     @property
-    def max_force(self) -> float:
-        """Maximum resultant force on any bolt (kN)."""
-        forces = self._get_forces()
-        return float(np.max(forces)) if len(forces) > 0 else 0.0
+    def max_shear_force(self) -> float:
+        """Maximum in-plane shear force on any bolt (kN)."""
+        if not self.bolt_forces:
+            return 0.0
+        shears = [bf.shear for bf in self.bolt_forces]
+        return float(np.max(shears))
     
     @property
-    def max(self) -> float:
-        """Alias for max_force."""
-        return self.max_force
+    def min_shear_force(self) -> float:
+        """Minimum in-plane shear force on any bolt (kN)."""
+        if not self.bolt_forces:
+            return 0.0
+        shears = [bf.shear for bf in self.bolt_forces]
+        return float(np.min(shears))
     
     @property
-    def min_force(self) -> float:
-        """Minimum resultant force on any bolt (kN)."""
-        forces = self._get_forces()
-        return float(np.min(forces)) if len(forces) > 0 else 0.0
+    def mean_shear_force(self) -> float:
+        """Average in-plane shear force across bolts (kN)."""
+        if not self.bolt_forces:
+            return 0.0
+        shears = [bf.shear for bf in self.bolt_forces]
+        return float(np.mean(shears))
     
     @property
-    def min(self) -> float:
-        """Alias for min_force."""
-        return self.min_force
+    def max_axial_force(self) -> float:
+        """Maximum out-of-plane axial force on any bolt (kN). Returns absolute value."""
+        if not self.bolt_forces:
+            return 0.0
+        axials = [abs(bf.axial) for bf in self.bolt_forces]
+        return float(np.max(axials))
     
     @property
-    def mean(self) -> float:
-        """Average bolt force (kN)."""
-        forces = self._get_forces()
-        return float(np.mean(forces)) if len(forces) > 0 else 0.0
+    def min_axial_force(self) -> float:
+        """Minimum out-of-plane axial force on any bolt (kN). Returns absolute value."""
+        if not self.bolt_forces:
+            return 0.0
+        axials = [abs(bf.axial) for bf in self.bolt_forces]
+        return float(np.min(axials))
     
     @property
-    def max_stress(self) -> float:
+    def mean_axial_force(self) -> float:
+        """Average out-of-plane axial force across bolts (kN). Returns absolute value."""
+        if not self.bolt_forces:
+            return 0.0
+        axials = [abs(bf.axial) for bf in self.bolt_forces]
+        return float(np.mean(axials))
+    
+    @property
+    def max_resultant_force(self) -> float:
+        """Maximum 3D resultant force on any bolt (kN)."""
+        if not self.bolt_forces:
+            return 0.0
+        resultants = [bf.resultant for bf in self.bolt_forces]
+        return float(np.max(resultants))
+    
+    @property
+    def min_resultant_force(self) -> float:
+        """Minimum 3D resultant force on any bolt (kN)."""
+        if not self.bolt_forces:
+            return 0.0
+        resultants = [bf.resultant for bf in self.bolt_forces]
+        return float(np.min(resultants))
+    
+    @property
+    def mean_resultant_force(self) -> float:
+        """Average 3D resultant force across bolts (kN)."""
+        if not self.bolt_forces:
+            return 0.0
+        resultants = [bf.resultant for bf in self.bolt_forces]
+        return float(np.mean(resultants))
+    
+    @property
+    def max_shear_stress(self) -> float:
         """
         Maximum in-plane shear stress on any bolt (MPa).
         
@@ -429,10 +464,10 @@ class BoltResult:
         if not self.bolt_forces:
             return 0.0
         stresses = [bf.shear_stress for bf in self.bolt_forces]
-        return float(np.max(stresses)) if stresses else 0.0
+        return float(np.max(stresses))
     
     @property
-    def min_stress(self) -> float:
+    def min_shear_stress(self) -> float:
         """
         Minimum in-plane shear stress on any bolt (MPa).
         
@@ -441,10 +476,10 @@ class BoltResult:
         if not self.bolt_forces:
             return 0.0
         stresses = [bf.shear_stress for bf in self.bolt_forces]
-        return float(np.min(stresses)) if stresses else 0.0
+        return float(np.min(stresses))
     
     @property
-    def mean_stress(self) -> float:
+    def mean_shear_stress(self) -> float:
         """
         Average in-plane shear stress across bolts (MPa).
         
@@ -453,43 +488,43 @@ class BoltResult:
         if not self.bolt_forces:
             return 0.0
         stresses = [bf.shear_stress for bf in self.bolt_forces]
-        return float(np.mean(stresses)) if stresses else 0.0
+        return float(np.mean(stresses))
     
     @property
     def max_axial_stress(self) -> float:
         """
-        Maximum out-of-plane axial stress on any bolt (MPa).
+        Maximum out-of-plane axial stress magnitude on any bolt (MPa).
         
         Returns 0.0 if bolt diameter is not set.
         """
         if not self.bolt_forces:
             return 0.0
-        stresses = [bf.axial_stress for bf in self.bolt_forces]
-        return float(np.max(stresses)) if stresses else 0.0
+        stresses = [abs(bf.axial_stress) for bf in self.bolt_forces]
+        return float(np.max(stresses))
     
     @property
     def min_axial_stress(self) -> float:
         """
-        Minimum out-of-plane axial stress on any bolt (MPa).
+        Minimum out-of-plane axial stress magnitude on any bolt (MPa).
         
         Returns 0.0 if bolt diameter is not set.
         """
         if not self.bolt_forces:
             return 0.0
-        stresses = [bf.axial_stress for bf in self.bolt_forces]
-        return float(np.min(stresses)) if stresses else 0.0
+        stresses = [abs(bf.axial_stress) for bf in self.bolt_forces]
+        return float(np.min(stresses))
     
     @property
     def mean_axial_stress(self) -> float:
         """
-        Average out-of-plane axial stress across bolts (MPa).
+        Average out-of-plane axial stress magnitude across bolts (MPa).
         
         Returns 0.0 if bolt diameter is not set.
         """
         if not self.bolt_forces:
             return 0.0
-        stresses = [bf.axial_stress for bf in self.bolt_forces]
-        return float(np.mean(stresses)) if stresses else 0.0
+        stresses = [abs(bf.axial_stress) for bf in self.bolt_forces]
+        return float(np.mean(stresses))
     
     @property
     def max_combined_stress(self) -> float:
@@ -502,7 +537,7 @@ class BoltResult:
         if not self.bolt_forces:
             return 0.0
         stresses = [bf.combined_stress for bf in self.bolt_forces]
-        return float(np.max(stresses)) if stresses else 0.0
+        return float(np.max(stresses))
     
     @property
     def min_combined_stress(self) -> float:
@@ -515,7 +550,7 @@ class BoltResult:
         if not self.bolt_forces:
             return 0.0
         stresses = [bf.combined_stress for bf in self.bolt_forces]
-        return float(np.min(stresses)) if stresses else 0.0
+        return float(np.min(stresses))
     
     @property
     def mean_combined_stress(self) -> float:
@@ -528,27 +563,28 @@ class BoltResult:
         if not self.bolt_forces:
             return 0.0
         stresses = [bf.combined_stress for bf in self.bolt_forces]
-        return float(np.mean(stresses)) if stresses else 0.0
+        return float(np.mean(stresses))
     
     @property
-    def critical_bolt(self) -> BoltForce | None:
-        """BoltForce at maximum force location."""
+    def critical_bolt_shear(self) -> BoltForce | None:
+        """BoltForce with maximum shear force."""
+        if not self.bolt_forces:
+            return None
+        return max(self.bolt_forces, key=lambda bf: bf.shear)
+    
+    @property
+    def critical_bolt_axial(self) -> BoltForce | None:
+        """BoltForce with maximum axial force magnitude."""
+        if not self.bolt_forces:
+            return None
+        return max(self.bolt_forces, key=lambda bf: abs(bf.axial))
+    
+    @property
+    def critical_bolt_resultant(self) -> BoltForce | None:
+        """BoltForce with maximum resultant force."""
         if not self.bolt_forces:
             return None
         return max(self.bolt_forces, key=lambda bf: bf.resultant)
-    
-    @property
-    def critical_index(self) -> int | None:
-        """Index of the most stressed bolt."""
-        if not self.bolt_forces:
-            return None
-        max_force = 0.0
-        max_idx = 0
-        for i, bf in enumerate(self.bolt_forces):
-            if bf.resultant > max_force:
-                max_force = bf.resultant
-                max_idx = i
-        return max_idx
     
     @property
     def forces(self) -> List[BoltForce]:
