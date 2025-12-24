@@ -339,16 +339,18 @@ class BoltForce:
     @property
     def axial_stress(self) -> float:
         """
-        Out-of-plane axial stress (MPa). Positive = tension, negative = compression.
+        Out-of-plane tensile stress (MPa). Only reports tension; compression returns 0.0.
         
-        Calculated as: σ = Fx / A
+        Bolts are assumed not to resist compression (borne by connected parts).
+        Calculated as: σ = max(0, Fx / A)
         where Fx is axial force (kN) and A is bolt area (mm²)
         
-        Returns 0.0 if diameter is not set.
+        Returns 0.0 if diameter is not set or bolt is in compression.
         """
         if self.area <= 0:
             return 0.0
-        return (self.Fx * 1000.0) / self.area
+        stress = (self.Fx * 1000.0) / self.area
+        return max(0.0, stress)
     
     @property
     def combined_stress(self) -> float:
@@ -408,26 +410,26 @@ class BoltResult:
     
     @property
     def max_axial_force(self) -> float:
-        """Maximum out-of-plane axial force on any bolt (kN). Returns absolute value."""
+        """Maximum out-of-plane axial force on any bolt (kN). Positive = tension, negative = compression."""
         if not self.bolt_forces:
             return 0.0
-        axials = [abs(bf.axial) for bf in self.bolt_forces]
+        axials = [bf.axial for bf in self.bolt_forces]
         return float(np.max(axials))
     
     @property
     def min_axial_force(self) -> float:
-        """Minimum out-of-plane axial force on any bolt (kN). Returns absolute value."""
+        """Minimum out-of-plane axial force on any bolt (kN). Positive = tension, negative = compression."""
         if not self.bolt_forces:
             return 0.0
-        axials = [abs(bf.axial) for bf in self.bolt_forces]
+        axials = [bf.axial for bf in self.bolt_forces]
         return float(np.min(axials))
     
     @property
     def mean_axial_force(self) -> float:
-        """Average out-of-plane axial force across bolts (kN). Returns absolute value."""
+        """Average out-of-plane axial force across bolts (kN). Positive = tension, negative = compression."""
         if not self.bolt_forces:
             return 0.0
-        axials = [abs(bf.axial) for bf in self.bolt_forces]
+        axials = [bf.axial for bf in self.bolt_forces]
         return float(np.mean(axials))
     
     @property
@@ -493,37 +495,38 @@ class BoltResult:
     @property
     def max_axial_stress(self) -> float:
         """
-        Maximum out-of-plane axial stress magnitude on any bolt (MPa).
+        Maximum tensile axial stress on any bolt (MPa).
         
-        Returns 0.0 if bolt diameter is not set.
+        Compressive forces are assumed to be borne by connected parts, not the bolts.
+        Returns 0.0 if no bolts are in tension or if bolt diameter is not set.
         """
         if not self.bolt_forces:
             return 0.0
-        stresses = [abs(bf.axial_stress) for bf in self.bolt_forces]
+        stresses = [bf.axial_stress for bf in self.bolt_forces]
         return float(np.max(stresses))
     
     @property
     def min_axial_stress(self) -> float:
         """
-        Minimum out-of-plane axial stress magnitude on any bolt (MPa).
+        Minimum out-of-plane axial stress on any bolt (MPa). Positive = tension, negative = compression.
         
         Returns 0.0 if bolt diameter is not set.
         """
         if not self.bolt_forces:
             return 0.0
-        stresses = [abs(bf.axial_stress) for bf in self.bolt_forces]
+        stresses = [bf.axial_stress for bf in self.bolt_forces]
         return float(np.min(stresses))
     
     @property
     def mean_axial_stress(self) -> float:
         """
-        Average out-of-plane axial stress magnitude across bolts (MPa).
+        Average out-of-plane axial stress across bolts (MPa). Positive = tension, negative = compression.
         
         Returns 0.0 if bolt diameter is not set.
         """
         if not self.bolt_forces:
             return 0.0
-        stresses = [abs(bf.axial_stress) for bf in self.bolt_forces]
+        stresses = [bf.axial_stress for bf in self.bolt_forces]
         return float(np.mean(stresses))
     
     @property
@@ -574,7 +577,7 @@ class BoltResult:
     
     @property
     def critical_bolt_axial(self) -> BoltForce | None:
-        """BoltForce with maximum axial force magnitude."""
+        """BoltForce with maximum absolute axial force (largest tension or compression)."""
         if not self.bolt_forces:
             return None
         return max(self.bolt_forces, key=lambda bf: abs(bf.axial))
@@ -585,6 +588,13 @@ class BoltResult:
         if not self.bolt_forces:
             return None
         return max(self.bolt_forces, key=lambda bf: bf.resultant)
+    
+    @property
+    def critical_bolt_combined(self) -> BoltForce | None:
+        """BoltForce with maximum combined stress (most critical for design)."""
+        if not self.bolt_forces:
+            return None
+        return max(self.bolt_forces, key=lambda bf: bf.combined_stress)
     
     @property
     def forces(self) -> List[BoltForce]:
