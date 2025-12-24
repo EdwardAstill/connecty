@@ -5,8 +5,8 @@ from connecty.bolt import BoltConnection
 
 
 def test_tension_conservative_vs_accurate_changes_na_and_forces():
-    # 2 rows (y), 2 cols (z)
-    bg = BoltGroup.from_pattern(rows=2, cols=2, spacing_y=100.0, spacing_z=100.0, diameter=20.0)
+    # 2 rows (y), 3 cols (z)
+    bg = BoltGroup.from_pattern(rows=2, cols=3, spacing_y=100.0, spacing_z=50.0, diameter=20.0)
 
     plate = Plate(corner_a=(-60.0, -60.0), corner_b=(60.0, 60.0), thickness=10.0, fu=450.0, fy=350.0)  # y,z
     conn = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=1)

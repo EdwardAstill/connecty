@@ -362,13 +362,18 @@ plot_bolt_group(bolts, save_path="pattern.svg")
 
 ## Design Checks (AISC 360-22 & AS 4100)
 
-Connecty provides **automatic design checks** for both AISC 360-22 (A325/A490) and AS 4100 (metric 8.8/10.9) bolts. Separate modules (`aisc` and `as4100`) handle each standard with dedicated check functions. Supports bearing-type and slip-critical (friction-type) connections with per-bolt utilization reporting for all limit states.
+Connecty provides **automatic design checks** for both AISC 360-22 (A325/A490) and AS 4100 (metric 8.8/10.9) bolts via a unified `.check()` method on `ConnectionResult`. Supports bearing-type and slip-critical (friction-type) connections with per-bolt utilization reporting for all limit states.
+
+**Key features:**
+- **Simplified API**: Single method on `ConnectionResult` object
+- **Auto-calculated edge distances**: Derived automatically from plate boundaries and bolt positions—no manual input required
+- **Auto-detected standard**: If standard not specified, automatically detects from bolt grade (A325/A490 → AISC, 8.8/10.9 → AS 4100)
+- **Per-bolt tensions**: Always uses analysis-derived tensions when available (no flag needed)
 
 ### Quick Start
 
 ```python
 from connecty import BoltGroup, Plate, BoltConnection, ConnectionLoad, ConnectionResult
-from connecty.bolt.checks import aisc, as4100
 
 # Create geometry
 bolts = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20)
@@ -381,125 +386,70 @@ result = ConnectionResult(
     connection=connection,
     load=load,
     shear_method="elastic",
-    tension_method="conservative"
+    tension_method="accurate"  # Use accurate tension method for per-bolt tensions
 )
 
-# Define design parameters for AISC 360-22
-design_aisc = aisc.BoltDesignParams(
+# Apply AISC 360-22 check (auto-detects from A325 grade)
+check = result.check(
+    standard="aisc",
+    connection_type="bearing",
     hole_type="standard",
-    slot_orientation="perpendicular",
-    threads_in_shear_plane=True,
-    plate_fu=450.0,             # MPa
-    plate_thickness=12.0,       # mm
-    edge_distance_y=50.0,       # mm
-    edge_distance_z=50.0        # mm
-)
-
-# Check using AISC 360-22
-check_aisc = aisc.check_bolt_group_aisc(
-    result,
-    design_aisc,
-    connection_type="bearing"  # "bearing" or "slip-critical"
+    threads_in_shear_plane=True
 )
 
 # Access results
-print(f"Governing utilization: {check_aisc.governing_utilization:.2f}")
-print(f"Governing bolt: {check_aisc.governing_bolt_index}")
-print(f"Governing limit state: {check_aisc.governing_limit_state}")
+print(f"Governing utilization: {check.governing_utilization:.2f}")
+print(f"Governing bolt: {check.governing_bolt_index}")
+print(f"Governing limit state: {check.governing_limit_state}")
 
-if check_aisc.governing_utilization <= 1.0:
+if check.governing_utilization <= 1.0:
     print("PASS")
 else:
     print("FAIL")
 ```
 
-### AISC 360-22 BoltDesignParams
+### ConnectionResult.check() Method
 
-Design parameters for AISC 360-22 checks (A325/A490 bolts):
+Call `.check()` on any `ConnectionResult` to apply design checks:
 
 ```python
-from connecty.bolt.checks import aisc
-
-design = aisc.BoltDesignParams(
-    # Hole type and orientation
-    hole_type="standard",              # "standard", "oversize", "short_slotted", "long_slotted"
-    slot_orientation="perpendicular",  # "perpendicular" or "parallel" (for slotted holes)
-    threads_in_shear_plane=True,        # Threads in or excluded from shear plane
+check_result = result.check(
+    # Standard and connection type
+    standard=None,                      # "aisc" or "as4100" (auto-detected if None)
+    connection_type="bearing",          # "bearing", "slip-critical" (AISC), or "friction" (AS 4100)
     
-    # Slip-critical parameters (for slip-critical checks)
-    slip_class="A",                    # "A" (μ=0.30) or "B" (μ=0.50)
+    # Hole and geometry parameters
+    hole_type="standard",               # AISC: "standard", "oversize", "short_slotted", "long_slotted"
+                                        # AS 4100: "standard", "oversize", "slotted"
+    slot_orientation="perpendicular",   # AISC only: "perpendicular" or "parallel"
+    
+    # AISC-specific parameters
+    threads_in_shear_plane=True,        # Threads in or excluded from shear plane
+    slip_class="A",                     # "A" (μ=0.30) or "B" (μ=0.50)
     n_s=1,                              # Number of slip planes (typically 1 or 2)
     fillers=0,                          # Number of fillers (affects h_f factor)
-    
-    # Connected material properties
-    plate_fu=450.0,                     # Ultimate tensile stress (MPa)
-    plate_thickness=12.0,               # Plate thickness (mm)
-    edge_distance_y=50.0,               # Edge distance in y-direction (mm)
-    edge_distance_z=50.0,               # Edge distance in z-direction (mm)
-    
-    # Optional overrides
-    tension_per_bolt=None,              # kN override (derives from Fx/n if None)
     n_b_tension=None,                   # Bolts carrying applied tension (for k_sc reduction)
-    pretension_override=None            # kN override (uses AISC Table J3.1 if None)
-)
-```
-
-### AS 4100 BoltDesignParams
-
-Design parameters for AS 4100 / Steel Designers Handbook checks (metric 8.8/10.9 bolts):
-
-```python
-from connecty.bolt.checks import as4100
-
-design = as4100.BoltDesignParams(
-    # Hole type
-    hole_type="standard",              # "standard", "oversize", "slotted"
-    hole_type_factor=1.0,               # kh: 1.0 (standard), 0.85 (oversize), 0.70 (slotted)
     
-    # Shear plane definition
+    # AS 4100-specific parameters
+    hole_type_factor=1.0,               # kh: 1.0 (standard), 0.85 (oversize), 0.70 (slotted)
+    slip_coefficient=0.35,              # Friction coefficient μ
+    n_e=1,                              # Number of faying surfaces
     nn_shear_planes=1,                  # Threaded shear planes
     nx_shear_planes=0,                  # Unthreaded shear planes
-    
-    # Friction-type parameters (for friction-type checks)
-    slip_coefficient=0.35,              # Friction coefficient μ
-    n_e=1,                              # Number of shear planes (slip planes)
     prying_allowance=0.25,              # α factor for prying allowance
+    reduction_factor_kr=1.0,            # Reduction for long bolt lines
     
-    # Connected material properties
-    plate_fu=430.0,                     # Ultimate tensile stress (MPa)
-    plate_fy=250.0,                     # Yield strength (MPa)
-    plate_thickness=12.0,               # Plate thickness (mm)
-    edge_distance=45.0,                 # Clear distance to edge (mm)
-    
-    # Optional
-    tension_per_bolt=None,              # kN override (derives from Fx/n if None)
-    use_analysis_bolt_tension_if_present=True  # Use Fx from analysis if available
+    # Optional overrides
+    tension_per_bolt=None,              # kN override (uses analysis if available, else Fx/n)
+    pretension_override=None,           # kN override (uses code table if None)
+    require_explicit_tension=False,     # Raise error if no tension provided
+    assume_uniform_tension_if_missing=True  # Assume uniform tension if analysis unavailable
 )
 ```
 
-### Check Functions
-
-**AISC 360-22:**
-```python
-from connecty.bolt.checks import aisc
-
-check = aisc.check_bolt_group_aisc(
-    result,                          # ConnectionResult from analysis
-    design,                          # aisc.BoltDesignParams
-    connection_type="bearing"        # "bearing" or "slip-critical"
-)
-```
-
-**AS 4100 / Steel Designers Handbook:**
-```python
-from connecty.bolt.checks import as4100
-
-check = as4100.check_bolt_group_sd_handbook(
-    result,                          # ConnectionResult from analysis
-    design,                          # as4100.BoltDesignParams
-    connection_type="bearing"        # "bearing" or "friction"
-)
-```
+**Edge distances are calculated automatically:**
+- **AISC** (`edge_distance_y`, `edge_distance_z`): Calculated from bolt position to nearest plate edge in each direction
+- **AS 4100** (`edge_distance`): Calculated as minimum clear distance from bolt to any plate edge
 
 ### Check Result Object
 
@@ -539,7 +489,6 @@ for detail in check.details:
 **AISC A325 - Bearing-Type**
 ```python
 from connecty import BoltGroup, Plate, BoltConnection, ConnectionLoad, ConnectionResult
-from connecty.bolt.checks import aisc
 
 bolts = BoltGroup.from_pattern(rows=2, cols=3, spacing_y=80, spacing_z=70, diameter=20)
 plate = Plate(width=240, depth=200, thickness=14)
@@ -550,75 +499,73 @@ result = ConnectionResult(
     connection=connection,
     load=load,
     shear_method="elastic",
-    tension_method="conservative"
+    tension_method="accurate"  # Use accurate for per-bolt tensions
 )
 
-design = aisc.BoltDesignParams(
+# Edge distances calculated automatically from plate boundaries
+check = result.check(
+    standard="aisc",
+    connection_type="bearing",
     hole_type="standard",
-    threads_in_shear_plane=True,
-    plate_fu=450.0,
-    plate_thickness=14.0,
-    edge_distance_y=55.0,
-    edge_distance_z=60.0
+    threads_in_shear_plane=True
 )
 
-check = aisc.check_bolt_group_aisc(result, design, connection_type="bearing")
 print(f"Utilization: {check.governing_utilization:.1%}")
 print(f"Limit state: {check.governing_limit_state}")
 ```
 
 **AISC A325 - Slip-Critical**
 ```python
-design = aisc.BoltDesignParams(
+check = result.check(
+    standard="aisc",
+    connection_type="slip-critical",
     hole_type="short_slotted",
     slot_orientation="perpendicular",
     threads_in_shear_plane=False,
     slip_class="B",
     n_s=2,
     fillers=0,
-    plate_fu=450.0,
-    plate_thickness=14.0,
-    edge_distance_y=55.0,
-    edge_distance_z=60.0,
     n_b_tension=6  # All 6 bolts carry applied tension
 )
 
-check = aisc.check_bolt_group_aisc(result, design, connection_type="slip-critical")
 print(f"Utilization: {check.governing_utilization:.1%}")
 ```
 
 **AS 4100 Grade 8.8 - Bearing-Type**
 ```python
-from connecty.bolt.checks import as4100
-
-design = as4100.BoltDesignParams(
+# Edge distance auto-calculated from plate boundaries
+check = result.check(
+    standard="as4100",
+    connection_type="bearing",
     hole_type="standard",
-    nn_shear_planes=1,              # Threaded shear planes
-    nx_shear_planes=0,              # Unthreaded shear planes
-    plate_fu=430.0,
-    plate_fy=250.0,
-    plate_thickness=14.0,
-    edge_distance=50.0
+    nn_shear_planes=1,
+    nx_shear_planes=0
 )
 
-check = as4100.check_bolt_group_sd_handbook(result, design, connection_type="bearing")
 print(f"Utilization: {check.governing_utilization:.1%}")
 ```
 
 **AS 4100 Grade 10.9 - Friction-Type**
 ```python
-design = as4100.BoltDesignParams(
+check = result.check(
+    standard="as4100",
+    connection_type="friction",
     hole_type="standard",
-    slip_coefficient=0.35,          # Friction coefficient μ
-    n_e=1,                          # Number of shear planes
-    plate_fu=430.0,
-    plate_fy=250.0,
-    plate_thickness=14.0,
-    edge_distance=50.0
+    slip_coefficient=0.35,
+    n_e=1
 )
 
-check = as4100.check_bolt_group_sd_handbook(result, design, connection_type="friction")
 print(f"Utilization: {check.governing_utilization:.1%}")
+```
+
+**Auto-detect Standard from Bolt Grade**
+```python
+# If bolt_group.grade is "A325" or "A490", uses AISC
+# If bolt_group.grade is "8.8" or "10.9", uses AS 4100
+check = result.check(
+    connection_type="bearing",
+    hole_type="standard"
+)
 ```
 
 ### AISC Reference Data

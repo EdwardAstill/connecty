@@ -116,12 +116,16 @@ def plot_bolt_result(
         value = bf.shear if mode == "shear" else bf.axial
         color = colormap(norm(value))
         
-        # Draw connection line from bolt to nearest plate edge
-        _draw_connection_line(ax, bf, plate, color)
-        
-        # Bolt point marker (small, to show exact location)
-        ax.plot(bf.z, bf.y, 'o', color=color, markersize=8, 
-               markeredgecolor='black', markeredgewidth=1.5, zorder=3)
+        # Bolt circle with actual diameter
+        circle = Circle(
+            (bf.z, bf.y),
+            radius=visual_radius,
+            facecolor=color,
+            edgecolor='black',
+            linewidth=1.5,
+            zorder=3
+        )
+        ax.add_patch(circle)
         
         # Add bolt index label
         ax.text(bf.z, bf.y - visual_radius * 1.2, str(i + 1), 
@@ -157,7 +161,8 @@ def plot_bolt_result(
         _plot_applied_force(ax, result.load, bolt_group, extent, force_unit, length_unit)
     
     # Plot neutral axis lines (if tension analysis was performed)
-    _plot_neutral_axes(ax, result, bolt_group)
+    if mode == "axial":
+        _plot_neutral_axes(ax, result, bolt_group)
     
     # Plot ICR point if available
     if result.icr_point is not None:

@@ -24,7 +24,7 @@ def get_ibeam_weld():
 
 
 def get_channel_weld():
-    section = u(h=200, b=75, t=10, r=8)
+    section = u(h=200, b=75, tw=10, tf=10, r=8)
     params = WeldParams(type="fillet", leg=6.0)
     return Weld.from_section(section=section, parameters=params)
 
