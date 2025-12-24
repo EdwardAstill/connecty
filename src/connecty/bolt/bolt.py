@@ -569,32 +569,36 @@ class BoltResult:
         return float(np.mean(stresses))
     
     @property
-    def critical_bolt_shear(self) -> BoltForce | None:
-        """BoltForce with maximum shear force."""
+    def critical_bolt_shear(self) -> int | None:
+        """Index of bolt with maximum shear force."""
         if not self.bolt_forces:
             return None
-        return max(self.bolt_forces, key=lambda bf: bf.shear)
+        max_bolt = max(self.bolt_forces, key=lambda bf: bf.shear)
+        return self.bolt_forces.index(max_bolt)
     
     @property
-    def critical_bolt_axial(self) -> BoltForce | None:
-        """BoltForce with maximum absolute axial force (largest tension or compression)."""
+    def critical_bolt_axial(self) -> int | None:
+        """Index of bolt with maximum absolute axial force (largest tension or compression)."""
         if not self.bolt_forces:
             return None
-        return max(self.bolt_forces, key=lambda bf: abs(bf.axial))
+        max_bolt = max(self.bolt_forces, key=lambda bf: abs(bf.axial))
+        return self.bolt_forces.index(max_bolt)
     
     @property
-    def critical_bolt_resultant(self) -> BoltForce | None:
-        """BoltForce with maximum resultant force."""
+    def critical_bolt_resultant(self) -> int | None:
+        """Index of bolt with maximum resultant force."""
         if not self.bolt_forces:
             return None
-        return max(self.bolt_forces, key=lambda bf: bf.resultant)
+        max_bolt = max(self.bolt_forces, key=lambda bf: bf.resultant)
+        return self.bolt_forces.index(max_bolt)
     
     @property
-    def critical_bolt_combined(self) -> BoltForce | None:
-        """BoltForce with maximum combined stress (most critical for design)."""
+    def critical_bolt_combined(self) -> int | None:
+        """Index of bolt with maximum combined stress (most critical for design)."""
         if not self.bolt_forces:
             return None
-        return max(self.bolt_forces, key=lambda bf: bf.combined_stress)
+        max_bolt = max(self.bolt_forces, key=lambda bf: bf.combined_stress)
+        return self.bolt_forces.index(max_bolt)
     
     @property
     def forces(self) -> List[BoltForce]:

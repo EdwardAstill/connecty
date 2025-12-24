@@ -102,7 +102,7 @@ def plot_bolt_result(
         arrow_scale = 1.0  # Not used in axial mode
     
     # Plot each bolt
-    for bf in result.bolt_forces:
+    for i, bf in enumerate(result.bolt_forces):
         # Bolt circle colored by selected metric
         value = bf.shear if mode == "shear" else bf.axial
         color = colormap(norm(value))
@@ -115,6 +115,10 @@ def plot_bolt_result(
             zorder=3
         )
         ax.add_patch(circle)
+        
+        # Add bolt index label
+        ax.text(bf.z, bf.y, str(i), ha='center', va='center',
+               fontsize=8, fontweight='bold', color='white', zorder=4)
         
         # Force vector arrow (shear mode only)
         if draw_arrows and bolt_forces and value > 1e-12:
