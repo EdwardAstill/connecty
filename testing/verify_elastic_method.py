@@ -6,7 +6,7 @@ import math
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from connecty import WeldedSection, WeldParameters, Force, WeldGroup, WeldSegment
+from connecty import Load, WeldParams, WeldedSection
 from sectiony.geometry import Line
 from sectiony import Section, Geometry, Contour
 
@@ -62,7 +62,7 @@ def test_elastic_method_verification():
     section = Section(name="Dummy", geometry=geometry)
     
     welded = WeldedSection(section=section)
-    weld_params = WeldParameters(weld_type="butt", throat_thickness=10.0)
+    weld_params = WeldParams(type="fillet", throat_thickness=10.0)
     
     # Weld the single line
     welded.add_weld(0, weld_params)
@@ -75,7 +75,7 @@ def test_elastic_method_verification():
     
     # 2. Apply Load
     # Force at z=100, y=0. Fy = -10000
-    force = Force(Fy=-10000, location=(0, 0, 100))
+    force = Load(Fy=-10000, location=(0, 0, 100))
     
     # 3. Calculate
     result = welded.calculate_weld_stress(force, discretization=21) # Ensure point at top

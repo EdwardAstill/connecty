@@ -1,7 +1,6 @@
 import pytest
 
-from connecty import BoltGroup, Force, Plate
-from connecty.bolt import BoltConnection
+from connecty import BoltConnection, BoltGroup, Load, Plate
 
 
 def test_tension_conservative_vs_accurate_changes_na_and_forces():
@@ -12,7 +11,7 @@ def test_tension_conservative_vs_accurate_changes_na_and_forces():
     conn = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=1)
 
     # Apply pure My (causes gradient across z)
-    f = Force(My=1.0e6, location=(0.0, 0.0, 0.0))
+    f = Load(My=1.0e6, location=(0.0, 0.0, 0.0))
 
     r_cons = conn.analyze(f, shear_method="elastic", tension_method="conservative")
     r_acc = conn.analyze(f, shear_method="elastic", tension_method="accurate")
@@ -33,9 +32,9 @@ def test_tension_sums_my_and_mz_contributions():
     plate = Plate(corner_a=(-60.0, -60.0), corner_b=(60.0, 60.0), thickness=10.0, fu=450.0, fy=350.0)
     conn = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=1)
 
-    f_my = Force(My=1.0e6, location=(0.0, 0.0, 0.0))
-    f_mz = Force(Mz=1.0e6, location=(0.0, 0.0, 0.0))
-    f_both = Force(My=1.0e6, Mz=1.0e6, location=(0.0, 0.0, 0.0))
+    f_my = Load(My=1.0e6, location=(0.0, 0.0, 0.0))
+    f_mz = Load(Mz=1.0e6, location=(0.0, 0.0, 0.0))
+    f_both = Load(My=1.0e6, Mz=1.0e6, location=(0.0, 0.0, 0.0))
 
     r_my = conn.analyze(f_my, shear_method="elastic", tension_method="conservative")
     r_mz = conn.analyze(f_mz, shear_method="elastic", tension_method="conservative")
@@ -54,7 +53,7 @@ def test_shear_planes_reduce_shear_stress():
     bg = BoltGroup.from_pattern(rows=1, cols=1, spacing_y=100.0, spacing_z=100.0, diameter=20.0)
     plate = Plate(corner_a=(-10.0, -10.0), corner_b=(10.0, 10.0), thickness=10.0, fu=450.0, fy=350.0)
 
-    f = Force(Fy=10000.0, location=(0.0, 0.0, 0.0))
+    f = Load(Fy=10000.0, location=(0.0, 0.0, 0.0))
 
     conn_1 = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=1)
     conn_2 = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=2)

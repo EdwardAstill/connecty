@@ -31,29 +31,32 @@ Example usage (Welds):
         print(f"OK: {loaded.max/allowable_stress:.1%}")
 
 Example usage (Bolts):
-    from connecty import BoltGroup, BoltParameters, Load
+    from connecty import BoltGroup, Plate, BoltConnection, Load
     
-    # Create bolt group from pattern
-    params = BoltParameters(diameter=20)
+    # 1. Create bolt group from pattern
     bolts = BoltGroup.from_pattern(
         rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20
     )
     
-    # Define load
-    load = Load(Fy=-100e3, location=(150, 0))
+    # 2. Define plate and connection
+    plate = Plate(corner_a=(-100.0, -150.0), corner_b=(100.0, 150.0), thickness=12.0, fu=450.0, fy=350.0)
+    connection = BoltConnection(bolt_group=bolts, plate=plate)
     
-    # Analyze (elastic or icr method)
-    result = bolts.analyze(load, method="elastic")
+    # 3. Define load
+    load = Load(Fy=-100e3, location=(75, 150, 100))
     
-    # Access results
-    print(f"Max force: {result.max_force:.1f} kN")
+    # 4. Analyze
+    result = connection.analyze(load, shear_method="elastic", tension_method="conservative")
     
-    # Design check (you define capacity)
-    bolt_capacity = 87.8  # kN (A325 M20)
-    if result.max_force <= bolt_capacity:
-        print(f"OK: {result.max_force/bolt_capacity:.1%}")
+    # 5. Access results
+    print(f"Max shear force: {result.max_shear_force:.1f} N")
     
-    # Plot
+    # 6. Design check (AISC 360-22)
+    check = result.check(connection_type="bearing", threads_in_shear_plane=True)
+    if check.governing_utilization <= 1.0:
+        print(f"OK: {check.governing_utilization:.1%}")
+    
+    # 7. Plot
     result.plot(force=True, bolt_forces=True)
 """
 
@@ -77,22 +80,21 @@ from .weld import (
     plot_loaded_weld_comparison,
 )
 
-from .common import Load, Force
+from .common import Load
 
 from .bolt import (
     BoltGroup,
     BoltParameters,
     BoltProperties,
     BoltResult,
-    ConnectionResult,
+    LoadedBoltConnection,
     plot_bolt_result,
     plot_bolt_pattern,
     BoltConnection,
-    ConnectionLoad,
     Plate,
 )
 
-from .bolt.checks import BoltCheckResult
+from .bolt.checks import BoltCheckDetail, BoltCheckResult
 
 __all__ = [
     # Main weld classes
@@ -103,7 +105,6 @@ __all__ = [
     "WeldGroup",
     "WeldSegment",
     "Load",
-    "Force",
     "LoadedWeld",
     # Weld stress results
     "StressComponents",
@@ -122,17 +123,14 @@ __all__ = [
     "BoltParameters",
     "BoltProperties",
     "BoltResult",
-    "ConnectionResult",
+    "LoadedBoltConnection",
     "BoltConnection",
-    "ConnectionLoad",
     "Plate",
     "BoltCheckResult",
+    "BoltCheckDetail",
     # Bolt functions
     "plot_bolt_result",
     "plot_bolt_pattern",
 ]
-
-# Backward-friendly aliases used by existing scripts/tests.
-WeldParameters = WeldParams
 
 __version__ = "0.3.0"

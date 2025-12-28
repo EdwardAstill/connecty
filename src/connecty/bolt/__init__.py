@@ -9,26 +9,23 @@ from .bolt import (
     BoltParameters,
     BoltProperties,
     BoltResult,
-    ConnectionResult,
+    LoadedBoltConnection,
 )
 
-from .bolt_plotter import (
+from .plotting import (
     plot_bolt_result,
     plot_bolt_pattern,
 )
 
-from .connection import BoltConnection
-from .load import ConnectionLoad
-from .plate import Plate
+from .geometry import BoltConnection, Plate
 
 __all__ = [
     "BoltGroup",
     "BoltParameters",
     "BoltProperties",
     "BoltResult",
-    "ConnectionResult",
+    "LoadedBoltConnection",
     "BoltConnection",
-    "ConnectionLoad",
     "Plate",
     "plot_bolt_result",
     "plot_bolt_pattern",

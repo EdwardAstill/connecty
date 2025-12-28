@@ -12,13 +12,13 @@ from typing import Tuple, Dict, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from sectiony.library import rhs, chs, i
-from connecty import WeldedSection, WeldParameters, Force
+from connecty import Load, WeldParams, WeldedSection
 import math
 
 
 def test_stress_continuity(
     welded_section: WeldedSection,
-    force: Force,
+    force: Load,
     discretization: int = 200,
     max_relative_change: float = 0.02,  # 2% max change between consecutive points
     max_absolute_change: Optional[float] = None,  # Will be set based on max stress
@@ -228,10 +228,10 @@ def test_multiple_scenarios():
     print("\n[Test 1] RHS 100x200x10 - Vertical Load at Centroid")
     section1 = rhs(b=100, h=200, t=10, r=15)
     welded1 = WeldedSection(section=section1)
-    weld_params1 = WeldParameters(type="fillet", throat_thickness=4.2, leg_size=6.0)
+    weld_params1 = WeldParams(type="fillet", throat_thickness=4.2, leg_size=6.0)
     welded1.weld_all_segments(weld_params1)
     
-    force1 = Force(Fy=-100000, location=(0, 0, 0))
+    force1 = Load(Fy=-100000, location=(0, 0, 0))
     passed1, results1 = test_stress_continuity(welded1, force1, discretization=200)
     all_passed = all_passed and passed1
     
@@ -239,10 +239,10 @@ def test_multiple_scenarios():
     print("\n[Test 2] RHS 100x200x10 - Eccentric Vertical Load")
     section2 = rhs(b=100, h=200, t=10, r=15)
     welded2 = WeldedSection(section=section2)
-    weld_params2 = WeldParameters(type="fillet", throat_thickness=4.2, leg_size=6.0)
+    weld_params2 = WeldParams(type="fillet", throat_thickness=4.2, leg_size=6.0)
     welded2.weld_all_segments(weld_params2)
     
-    force2 = Force(Fy=-100000, location=(0, 50, 0))  # Eccentric
+    force2 = Load(Fy=-100000, location=(0, 50, 0))  # Eccentric
     passed2, results2 = test_stress_continuity(welded2, force2, discretization=200)
     all_passed = all_passed and passed2
     
@@ -250,10 +250,10 @@ def test_multiple_scenarios():
     print("\n[Test 3] RHS 100x200x10 - Combined Shear and Torsion")
     section3 = rhs(b=100, h=200, t=10, r=15)
     welded3 = WeldedSection(section=section3)
-    weld_params3 = WeldParameters(type="fillet", throat_thickness=4.2, leg_size=6.0)
+    weld_params3 = WeldParams(type="fillet", throat_thickness=4.2, leg_size=6.0)
     welded3.weld_all_segments(weld_params3)
     
-    force3 = Force(Fy=-80000, Fz=20000, Mx=2000000, location=(0, 0, 0))
+    force3 = Load(Fy=-80000, Fz=20000, Mx=2000000, location=(0, 0, 0))
     passed3, results3 = test_stress_continuity(welded3, force3, discretization=200)
     all_passed = all_passed and passed3
     
@@ -261,10 +261,10 @@ def test_multiple_scenarios():
     print("\n[Test 4] CHS 200x10 - Vertical Load with Torsion")
     section4 = chs(d=200, t=10)
     welded4 = WeldedSection(section=section4)
-    weld_params4 = WeldParameters(type="cjp", throat_thickness=10.0)
+    weld_params4 = WeldParams(type="cjp", throat_thickness=10.0)
     welded4.weld_all_segments(weld_params4)
     
-    force4 = Force(Fy=-50000, Mx=3e6, location=(0, 0, 0))
+    force4 = Load(Fy=-50000, Mx=3e6, location=(0, 0, 0))
     passed4, results4 = test_stress_continuity(welded4, force4, discretization=200)
     all_passed = all_passed and passed4
     
@@ -272,12 +272,12 @@ def test_multiple_scenarios():
     print("\n[Test 5] I-Beam 400x200x20x10 - Bending Moment")
     section5 = i(d=400, b=200, tf=20, tw=10, r=15)
     welded5 = WeldedSection(section=section5)
-    weld_params5 = WeldParameters(type="fillet", throat_thickness=6.0)
+    weld_params5 = WeldParams(type="fillet", throat_thickness=6.0)
     welded5.add_welds([0, 1, 2, 3], weld_params5)  # Top flange
     welded5.add_welds([8, 9, 10, 11], weld_params5)  # Bottom flange
     welded5.calculate_properties()
     
-    force5 = Force(My=5e6, location=(0, 0, 0))
+    force5 = Load(My=5e6, location=(0, 0, 0))
     passed5, results5 = test_stress_continuity(welded5, force5, discretization=200, max_relative_change=0.05)
     all_passed = all_passed and passed5
     

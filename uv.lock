@@ -32,7 +32,7 @@ requires-dist = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pytest", specifier = ">=9.0.1" },
-    { name = "sectiony", editable = "../sectiony" },
+    { name = "sectiony", git = "https://github.com/EdwardAstill/sectiony" },
 ]
 
 [package.metadata.requires-dev]
@@ -427,16 +427,10 @@ wheels = [
 [[package]]
 name = "sectiony"
 version = "0.1.0"
-source = { editable = "../sectiony" }
+source = { git = "https://github.com/EdwardAstill/sectiony#ec49b6adf89cd762679ab198cbfdda23ab72d770" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "matplotlib", specifier = ">=3.10.7" },
-    { name = "numpy", specifier = ">=2.3.5" },
 ]
 
 [[package]]

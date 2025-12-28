@@ -1,5 +1,5 @@
 """
-Weld class and WeldParameters for weld stress analysis.
+Weld class and WeldParams for weld stress analysis.
 
 Supports fillet, PJP, CJP, and plug/slot welds per AISC 360.
 """
@@ -300,6 +300,4 @@ class Weld:
 # Import Load here to avoid circular import at module level
 from ..common.load import Load
 
-# Legacy aliases for backward compatibility
-Force = Load
-WeldParameters = WeldParams
+# Legacy aliases removed (breaking changes allowed)

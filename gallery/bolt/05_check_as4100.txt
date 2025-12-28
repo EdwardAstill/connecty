@@ -1,0 +1,210 @@
+AS 4100 CHECK (bearing)
+================================================================================
+connection_type=bearing, method=elastic
+governing_bolt_index=5
+governing_limit_state=shear
+governing_utilization=0.4428
+
+Meta:
+  Ac: 217.5
+  Ao: 314.2
+  As: 245.0
+  Ntf_kN: 196.0
+  Vb_N: 345600.00000000006
+  Vf_kN: 107.88
+  bolt_diameter: 20.0
+  connection_type: bearing
+  fuf: 800.0
+  grade: 8.8
+  hole_type: standard
+  hole_type_factor: 1.0
+  n_e: 1
+  nn_shear_planes: 1
+  nx_shear_planes: 0
+  plate_fu: 450.0
+  plate_thickness: 12.0
+  pretension_kN: None
+  prying_allowance: 0.25
+  reduction_factor_kr: 1.0
+  shear_capacity_kN: 86.304
+  slip_capacity_kN: None
+  slip_coefficient: 0.35
+  standard: as4100
+  tension_capacity_kN: 156.8
+  tension_mode: per_bolt
+
+Per-bolt:
+  bolt #1 @ (y=-75.00, z=-30.00)
+    Demand: V=16.893 kN, T=13.270 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=243.000 kN
+    Util: shear=0.1957, tension=0.1058, bearing=0.0695 -> shear (0.1957)
+    Trace:
+      Vn (Shear)   = phi * 0.62 * fuf * kr * (nn*Ac + nx*Ao)
+                   = 0.8 * 0.62 * 800 * 1.0 * (1*217.5 + 0*314.2)
+                   = 0.8 * 0.62 * 800 * 1.0 * 217.5 / 1000
+                   = 86.304 kN
+      Tn (Tension) = phi * As * fuf
+                   = 0.8 * 245.0 * 800 / 1000
+                   = 156.800 kN
+      Bn (Bearing) = phi * min(Vb, Vp)
+                   Vb = 3.2 * tp * df * fup = 3.2 * 12.0 * 20.0 * 450 / 1000 = 345.600 kN
+                   Vp = ae * tp * fup       = 50.0 * 12.0 * 450 / 1000 = 270.000 kN
+                   = 0.9 * 270.000 = 243.000 kN
+    Calc (Raw):
+      Tu_kN: 13.26976597090449
+      Tu_prying_kN: 16.587207463630612
+      Vb_N: 345600.00000000006
+      Vp_N: 270000.0
+      Vu_kN: 16.893188351969243
+      bearing_capacity_kN: 243.0
+      edge_clear: 50.0
+      prying_allowance: 0.25
+      shear_capacity_kN: 86.304
+      tension_capacity_kN: 156.8
+      term_t: 0.0111906274176744
+      term_v: 0.038314344428767334
+  bolt #2 @ (y=-75.00, z=30.00)
+    Demand: V=29.864 kN, T=22.560 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=243.000 kN
+    Util: shear=0.3460, tension=0.1798, bearing=0.1229 -> shear (0.3460)
+    Trace:
+      Vn (Shear)   = phi * 0.62 * fuf * kr * (nn*Ac + nx*Ao)
+                   = 0.8 * 0.62 * 800 * 1.0 * (1*217.5 + 0*314.2)
+                   = 0.8 * 0.62 * 800 * 1.0 * 217.5 / 1000
+                   = 86.304 kN
+      Tn (Tension) = phi * As * fuf
+                   = 0.8 * 245.0 * 800 / 1000
+                   = 156.800 kN
+      Bn (Bearing) = phi * min(Vb, Vp)
+                   Vb = 3.2 * tp * df * fup = 3.2 * 12.0 * 20.0 * 450 / 1000 = 345.600 kN
+                   Vp = ae * tp * fup       = 50.0 * 12.0 * 450 / 1000 = 270.000 kN
+                   = 0.9 * 270.000 = 243.000 kN
+    Calc (Raw):
+      Tu_kN: 22.56008855154965
+      Tu_prying_kN: 28.200110689437064
+      Vb_N: 345600.00000000006
+      Vp_N: 270000.0
+      Vu_kN: 29.863546768566106
+      bearing_capacity_kN: 243.0
+      edge_clear: 50.0
+      prying_allowance: 0.25
+      shear_capacity_kN: 86.304
+      tension_capacity_kN: 156.8
+      term_t: 0.03234517530523181
+      term_v: 0.11973494582561546
+  bolt #3 @ (y=0.00, z=-30.00)
+    Demand: V=14.508 kN, T=11.064 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=243.000 kN
+    Util: shear=0.1681, tension=0.0882, bearing=0.0597 -> shear (0.1681)
+    Trace:
+      Vn (Shear)   = phi * 0.62 * fuf * kr * (nn*Ac + nx*Ao)
+                   = 0.8 * 0.62 * 800 * 1.0 * (1*217.5 + 0*314.2)
+                   = 0.8 * 0.62 * 800 * 1.0 * 217.5 / 1000
+                   = 86.304 kN
+      Tn (Tension) = phi * As * fuf
+                   = 0.8 * 245.0 * 800 / 1000
+                   = 156.800 kN
+      Bn (Bearing) = phi * min(Vb, Vp)
+                   Vb = 3.2 * tp * df * fup = 3.2 * 12.0 * 20.0 * 450 / 1000 = 345.600 kN
+                   Vp = ae * tp * fup       = 50.0 * 12.0 * 450 / 1000 = 270.000 kN
+                   = 0.9 * 270.000 = 243.000 kN
+    Calc (Raw):
+      Tu_kN: 11.063883617963315
+      Tu_prying_kN: 13.829854522454143
+      Vb_N: 345600.00000000006
+      Vp_N: 270000.0
+      Vu_kN: 14.508286411902045
+      bearing_capacity_kN: 243.0
+      edge_clear: 50.0
+      prying_allowance: 0.25
+      shear_capacity_kN: 86.304
+      tension_capacity_kN: 156.8
+      term_t: 0.007779346338124303
+      term_v: 0.028259885082886387
+  bolt #4 @ (y=0.00, z=30.00)
+    Demand: V=28.582 kN, T=20.354 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=243.000 kN
+    Util: shear=0.3312, tension=0.1623, bearing=0.1176 -> shear (0.3312)
+    Trace:
+      Vn (Shear)   = phi * 0.62 * fuf * kr * (nn*Ac + nx*Ao)
+                   = 0.8 * 0.62 * 800 * 1.0 * (1*217.5 + 0*314.2)
+                   = 0.8 * 0.62 * 800 * 1.0 * 217.5 / 1000
+                   = 86.304 kN
+      Tn (Tension) = phi * As * fuf
+                   = 0.8 * 245.0 * 800 / 1000
+                   = 156.800 kN
+      Bn (Bearing) = phi * min(Vb, Vp)
+                   Vb = 3.2 * tp * df * fup = 3.2 * 12.0 * 20.0 * 450 / 1000 = 345.600 kN
+                   Vp = ae * tp * fup       = 50.0 * 12.0 * 450 / 1000 = 270.000 kN
+                   = 0.9 * 270.000 = 243.000 kN
+    Calc (Raw):
+      Tu_kN: 20.354206198608477
+      Tu_prying_kN: 25.442757748260597
+      Vb_N: 345600.00000000006
+      Vp_N: 270000.0
+      Vu_kN: 28.582197037894186
+      bearing_capacity_kN: 243.0
+      edge_clear: 50.0
+      prying_allowance: 0.25
+      shear_capacity_kN: 86.304
+      tension_capacity_kN: 156.8
+      term_t: 0.026329114245882027
+      term_v: 0.10968048647973447
+  bolt #5 @ (y=75.00, z=-30.00)
+    Demand: V=29.222 kN, T=8.858 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=243.000 kN
+    Util: shear=0.3386, tension=0.0706, bearing=0.1203 -> shear (0.3386)
+    Trace:
+      Vn (Shear)   = phi * 0.62 * fuf * kr * (nn*Ac + nx*Ao)
+                   = 0.8 * 0.62 * 800 * 1.0 * (1*217.5 + 0*314.2)
+                   = 0.8 * 0.62 * 800 * 1.0 * 217.5 / 1000
+                   = 86.304 kN
+      Tn (Tension) = phi * As * fuf
+                   = 0.8 * 245.0 * 800 / 1000
+                   = 156.800 kN
+      Bn (Bearing) = phi * min(Vb, Vp)
+                   Vb = 3.2 * tp * df * fup = 3.2 * 12.0 * 20.0 * 450 / 1000 = 345.600 kN
+                   Vp = ae * tp * fup       = 50.0 * 12.0 * 450 / 1000 = 270.000 kN
+                   = 0.9 * 270.000 = 243.000 kN
+    Calc (Raw):
+      Tu_kN: 8.858001265022137
+      Tu_prying_kN: 11.072501581277672
+      Vb_N: 345600.00000000006
+      Vp_N: 270000.0
+      Vu_kN: 29.222049890312
+      bearing_capacity_kN: 243.0
+      edge_clear: 50.0
+      prying_allowance: 0.25
+      shear_capacity_kN: 86.304
+      tension_capacity_kN: 156.8
+      term_t: 0.004986540897160222
+      term_v: 0.11464615823831245
+  bolt #6 @ (y=75.00, z=30.00)
+    Demand: V=38.215 kN, T=18.148 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=243.000 kN
+    Util: shear=0.4428, tension=0.1447, bearing=0.1573 -> shear (0.4428)
+    Trace:
+      Vn (Shear)   = phi * 0.62 * fuf * kr * (nn*Ac + nx*Ao)
+                   = 0.8 * 0.62 * 800 * 1.0 * (1*217.5 + 0*314.2)
+                   = 0.8 * 0.62 * 800 * 1.0 * 217.5 / 1000
+                   = 86.304 kN
+      Tn (Tension) = phi * As * fuf
+                   = 0.8 * 245.0 * 800 / 1000
+                   = 156.800 kN
+      Bn (Bearing) = phi * min(Vb, Vp)
+                   Vb = 3.2 * tp * df * fup = 3.2 * 12.0 * 20.0 * 450 / 1000 = 345.600 kN
+                   Vp = ae * tp * fup       = 50.0 * 12.0 * 450 / 1000 = 270.000 kN
+                   = 0.9 * 270.000 = 243.000 kN
+    Calc (Raw):
+      Tu_kN: 18.1483238456673
+      Tu_prying_kN: 22.685404807084126
+      Vb_N: 345600.00000000006
+      Vp_N: 270000.0
+      Vu_kN: 38.21491610215976
+      bearing_capacity_kN: 243.0
+      edge_clear: 50.0
+      prying_allowance: 0.25
+      shear_capacity_kN: 86.304
+      tension_capacity_kN: 156.8
+      term_t: 0.020931528825118256
+      term_v: 0.19606675963516057

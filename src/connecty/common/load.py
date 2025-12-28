@@ -127,6 +127,24 @@ class Load:
         """
         _, _, _, Mx, My, Mz = self.at(x=x, y=y, z=z)
         return (Mx, My, Mz)
+
+    def equivalent_at(self, location: Point) -> "Load":
+        """Return an equivalent Load at a new application point.
+
+        Forces stay the same; moments are transferred to the new point via:
+        M_new = M_old + r x F, where r is the offset from the new point to the
+        original load application point.
+        """
+        Fx, Fy, Fz, Mx, My, Mz = self.at(x=location[0], y=location[1], z=location[2])
+        return Load(
+            Fx=float(Fx),
+            Fy=float(Fy),
+            Fz=float(Fz),
+            Mx=float(Mx),
+            My=float(My),
+            Mz=float(Mz),
+            location=tuple(location),
+        )
     
     @classmethod
     def from_components(
