@@ -91,6 +91,9 @@ def check_as4100(
     tension_capacity = 0.8 * Ntf
 
     Vb = 3.2 * plate.thickness * bolt_diameter * plate.fu
+    
+    # Standard hole diameter for AS 4100 (typically bolt_diameter + 2mm)
+    hole_dia = bolt_diameter + 2.0
 
     slip_capacity: float | None = None
     pretension: float | None = None
@@ -121,6 +124,7 @@ def check_as4100(
         "standard": "as4100",
         "grade": grade,
         "bolt_diameter": float(bolt_diameter),
+        "hole_dia": float(hole_dia),
         "fuf": float(fuf),
         "As": float(As),
         "Ac": float(Ac),
@@ -157,14 +161,23 @@ def check_as4100(
 
         Tu_prying = Tu * (1.0 + prying_allowance) if Tu > 0.0 else Tu
 
+        # AS 4100 Clause 9.3.2.4: a_e is clear distance from hole edge to plate edge
+        # Standard hole diameter is typically bolt_diameter + 2mm
+        hole_dia = bolt_diameter + 2.0
+        
         bolt_y, bolt_z = bf.point
         edge_clear_y_min = abs(bolt_y - plate.y_min)
         edge_clear_y_max = abs(plate.y_max - bolt_y)
         edge_clear_z_min = abs(bolt_z - plate.z_min)
         edge_clear_z_max = abs(plate.z_max - bolt_z)
-        edge_clear = min(edge_clear_y_min, edge_clear_y_max, edge_clear_z_min, edge_clear_z_max)
+        
+        # Minimum distance from bolt center to plate edge
+        edge_clear_center = min(edge_clear_y_min, edge_clear_y_max, edge_clear_z_min, edge_clear_z_max)
+        
+        # a_e: clear distance from hole edge to plate edge (per AS 4100:2020 Cl. 9.3.2.4)
+        a_e = edge_clear_center - hole_dia / 2.0
 
-        Vp = edge_clear * plate.thickness * plate.fu
+        Vp = a_e * plate.thickness * plate.fu
         bearing_capacity = 0.9 * min(Vb, Vp) / 1000.0
 
         shear_util = Vu / shear_capacity if shear_capacity > 0.0 else math.inf
@@ -196,7 +209,9 @@ def check_as4100(
             "Tu_prying_kN": float(Tu_prying),
             "prying_allowance": float(prying_allowance),
             "Vb_N": float(Vb),
-            "edge_clear": float(edge_clear),
+            "hole_dia": float(hole_dia),
+            "edge_clear_center": float(edge_clear_center),
+            "a_e": float(a_e),
             "Vp_N": float(Vp),
             "bearing_capacity_kN": float(bearing_capacity),
             "shear_capacity_kN": float(shear_capacity),

@@ -111,6 +111,13 @@ $$
 l_c = \min\left(|y-y_\text{edge}| - d_h/2,\ |z-z_\text{edge}| - d_h/2\right)
 $$
 
+**Note on edge distance definition**
+
+AISC 360-22 defines the clear distance $l_c$ in the **direction of the applied force**.  
+For simplicity and conservatism, `connecty` instead uses the **minimum clear distance from the hole edge to any plate edge**, regardless of force direction.
+
+This approach may result in lower reported bearing or tear-out capacities compared to hand calculations that consider force direction explicitly.
+
 ### 4) Slip resistance (slip-critical joints) — J3.8 / J3.9
 
 When `connection_type="slip-critical"`, `connecty` evaluates slip in addition to the bearing-type limit states:
@@ -158,8 +165,16 @@ The governing utilisation is the maximum across applicable limit states.
 - Per-bolt demands come from bolt-group analysis:
   - $V^* = \sqrt{F_y^2 + F_z^2}$
   - $N_t^* = \max(F_x, 0)$
-- Optional prying allowance: `connecty` uses
-  - $N_{t,\text{design}}^* = (1+\alpha)\,N_t^*$ for $N_t^*>0$, where $\alpha$ = `prying_allowance` (default 0.25)
+- Optional prying allowance (approximate):
+  - `connecty` applies:
+    $$
+    N_{t,\text{design}}^* = (1+\alpha)\,N_t^*
+    $$
+    for $N_t^*>0$, where $\alpha$ = `prying_allowance` (default 0.25).
+
+  - This is a **simplified, handbook-based approximation** (e.g. Steel Designers Handbook) and does **not** represent a full prying force calculation per AS 4100 Clause 9.1.2.2.
+
+  - Users may override or disable this factor where a more detailed prying analysis is required.
 
 ## Strength checks implemented
 
@@ -216,8 +231,16 @@ $$
 0.9\,\min(V_b, V_p)
 $$
 
-where `connecty` conservatively takes:
-- $a_e$ = minimum distance from bolt **center** to any plate edge (`edge_clear`)
+where:
+
+- $a_e$ = **minimum clear distance from the edge of the bolt hole to the adjacent plate edge**, in accordance with AS 4100:2020 Clause 9.3.2.4
+- $a_e$ is computed as:
+
+$$
+a_e = \min(\text{edge\_clear}) - \frac{d_h}{2}
+$$
+
+This definition aligns with the Standard and avoids unconservative overestimation of tear-out capacity.
 
 ### 5) Friction (slip resistance)
 
@@ -233,3 +256,20 @@ where:
 - $T_b$ is bolt pretension from internal tables (or `pretension_override`)
 - $k_h$ is `hole_type_factor`
 
+# Code Deviations and Conservative Assumptions
+
+The following intentional deviations and simplifications are applied in `connecty` for robustness, clarity, and software practicality:
+
+## General
+- All checks are performed on a **per-bolt basis**, which may be conservative where codes permit force redistribution.
+- Bolt compression is ignored in tension rupture checks.
+
+## AISC 360-22
+- Bearing and tear-out edge distance $l_c$ is taken as the **minimum clear distance to any plate edge**, rather than the force-direction-specific distance defined in the Standard.
+- Slip resistance is evaluated per bolt using resultant shear demand.
+
+## AS 4100
+- Prying forces are approximated using a fixed multiplier rather than an explicit flexibility-based calculation.
+- Tear-out edge distance $a_e$ is taken from the **edge of the hole**, consistent with Clause 9.3.2.4.
+
+These choices are conservative unless otherwise noted and are documented to ensure transparent interpretation of reported utilisations.
