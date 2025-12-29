@@ -24,4 +24,4 @@ Base metal (conservative, for fusion-face check):
 
 Applied load (forces + moments at a location):
   Fx=0.00 N, Fy=-120000.00 N, Fz=45000.00 N, Mx=0.00 N·mm, My=0.00 N·mm, Mz=0.00 N·mm, location=(0.0, 0.0, 0.0)
-  theta_deg (for k_ds) = None (directional effects ignored)
+  theta_deg (for k_ds) = None (auto-computed at governing location)

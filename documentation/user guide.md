@@ -404,7 +404,65 @@ For detailed parameter documentation, see [../bolt/bolt.md](../bolt/bolt.md).
 
 ### Weld Design Check
 
-Connecty outputs stress only. You define the allowable:
+Connecty provides automatic AISC 360-22 checks for fillet welds (with geometry-based inputs):
+
+```python
+from connecty import WeldConnection, WeldBaseMetal, WeldParams, Load
+
+# Setup weld connection with base metal properties
+base_metal = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+params = WeldParams(type="fillet", leg=6.0)
+connection = WeldConnection.from_dxf(
+    "path/to/weld.dxf",
+    parameters=params,
+    base_metal=base_metal,
+    is_double_fillet=False
+)
+
+# Analyze
+load = Load(Fy=-120000, Fz=45000, location=(0, 0, 0))
+result = connection.analyze(load, method="icr")
+
+# Automatic AISC 360-22 check
+check = result.check(standard="aisc")
+
+# Results
+print(f"Utilization: {check.governing_utilization:.2f}")
+print(f"Limit state: {check.governing_limit_state}")
+
+if check.governing_utilization <= 1.0:
+    print("PASS")
+else:
+    print("FAIL")
+```
+
+**Directional strength increase (automatic by default):**
+
+By default, Connecty automatically computes theta at the **governing location** (the point of maximum utilization) to claim the AISC k_ds directional strength benefit:
+
+```python
+# Default behavior: automatic theta computation
+check = result.check(standard="aisc")
+print(f"Auto theta: {check.details[0].theta_deg:.1f}°")
+print(f"k_ds: {check.details[0].k_ds:.4f}")
+
+# Conservative mode: force k_ds=1.0
+check = result.check(standard="aisc", conservative_k_ds=True)
+print(f"k_ds: {check.details[0].k_ds:.4f}")  # Will be 1.0
+```
+
+The automatic computation scans all points along the weld to find the one with the highest stress-to-capacity ratio ($\sigma / k_{ds}$), ensuring the true governing condition is identified even if it doesn't occur at the point of maximum absolute stress.
+
+**Key Features:**
+- AISC J2.2 (fillet weld metal strength with k_ds directional factor)
+- AISC J4 (base metal fusion face shear: yielding + rupture)
+- Detailing limits (max fillet size per thickness)
+- Per-limit-state utilization
+- Automatic theta computation at governing location
+
+**Manual stress-based check:**
+
+For custom checks or other weld types, you can use the stress output directly:
 
 ```python
 from connecty import Weld, WeldParams, Load, LoadedWeld

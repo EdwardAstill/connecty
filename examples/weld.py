@@ -85,7 +85,7 @@ def _format_setup(case: WeldCase, dxf_path: Path) -> str:
     if case.theta_deg is not None:
         lines.append(f"  theta_deg (for k_ds) = {case.theta_deg:.1f}°")
     else:
-        lines.append("  theta_deg (for k_ds) = None (directional effects ignored)")
+        lines.append("  theta_deg (for k_ds) = None (auto-computed at governing location)")
     return "\n".join(lines)
 
 
@@ -172,7 +172,7 @@ def _format_full_check(title: str, case: WeldCase, elastic_result, icr_result, c
     if case.theta_deg is not None:
         lines.append(f"theta_deg={case.theta_deg:.1f}° (k_ds enabled)")
     else:
-        lines.append("theta_deg=None (k_ds disabled)")
+        lines.append("theta_deg=None (auto-computed at governing location)")
     lines.append("")
 
     lines.append("3. LOAD INFORMATION")
@@ -293,7 +293,7 @@ def run() -> None:
     # --- Checks (AISC) ---
     check_aisc = result_icr.check(
         standard="aisc",
-        theta_deg=case.theta_deg,
+        conservative_k_ds=False,  # Enable auto-angle computation (default)
     )
     _write_text(out_dir / "05_check_aisc.txt", _format_check("AISC 360-22 CHECK (fillet)", result_icr, check_aisc))
 

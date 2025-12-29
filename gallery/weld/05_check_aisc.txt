@@ -13,10 +13,10 @@ Capacity Equations (AISC 360-22, fillet welds):
 Weld group:
   type=fillet, w=6.000 mm, t_e=4.242 mm, L_weld=487.014 mm
   stress_demand=85.441 MPa
-  F_EXX=450.0 MPa, k_ds=1.000, theta_deg=None
+  F_EXX=450.0 MPa, k_ds=1.034, theta_deg=9.518210507926147
 
 Utilizations:
-  weld_metal: 0.4219
+  weld_metal: 0.4082
   base_metal_fusion_face: 0.1790
   detailing_max_fillet: 0.7500 (w_max=8.0)
 

@@ -7,6 +7,77 @@ import math
 from .models import WeldCheckDetail, WeldCheckResult, get_governing
 
 
+def _auto_compute_governing_theta(result) -> float | None:
+    """
+    Compute theta corresponding to the governing (maximum utilization) point.
+    
+    This function scans all discretized points and finds the one that maximizes
+    the ratio (stress / k_ds), which corresponds to the highest utilization.
+    
+    Args:
+        result: LoadedWeldConnection result object
+        
+    Returns:
+        Angle in degrees that corresponds to the governing limit state, or None.
+    """
+    # Check if result has analysis attribute (real LoadedWeldConnection vs test dummy)
+    if not hasattr(result, 'analysis'):
+        return None
+    
+    analysis = result.analysis
+    if not analysis.point_stresses:
+        return None
+    
+    # Get tangents at discretized points
+    weld = result.connection.weld
+    points_ds = weld._discretize(result.discretization)
+    
+    # Ensure lists are aligned (sanity check)
+    if len(analysis.point_stresses) != len(points_ds):
+        # Fallback: if lengths mismatch, we cannot reliably map stresses to tangents.
+        # Return None -> k_ds=1.0 (conservative)
+        return None
+        
+    best_util_proxy = -1.0
+    governing_theta = None
+    
+    for ps, (pt_ds, _, (tan_y, tan_z), _) in zip(analysis.point_stresses, points_ds):
+        stress = ps.stress
+        if stress < 1e-6:
+            continue
+            
+        # Local in-plane resultant direction
+        fy = float(ps.components.total_y)
+        fz = float(ps.components.total_z)
+        mag = math.hypot(fy, fz)
+        
+        if mag < 1e-12:
+            # Pure axial/moment with no shear? unlikely for general case but possible.
+            # If no shear direction, assume worst case for k_ds benefit (min benefit).
+            theta = 0.0
+            k_ds = 1.0
+        else:
+            dir_y = fy / mag
+            dir_z = fz / mag
+            
+            # Angle between force and tangent
+            # Tangent is unit vector (tan_y, tan_z)
+            cos_theta = abs(dir_y * float(tan_y) + dir_z * float(tan_z))
+            cos_theta = min(max(cos_theta, 0.0), 1.0)
+            theta = math.degrees(math.acos(cos_theta))
+            k_ds = _aisc_kds(theta)
+            
+        # Utilization proxy = stress / k_ds
+        # (Capacity R_n proportional to k_ds)
+        util_proxy = stress / k_ds
+        
+        if util_proxy > best_util_proxy:
+            best_util_proxy = util_proxy
+            governing_theta = theta
+            
+    return governing_theta
+
+
 def _aisc_kds(theta_deg: float) -> float:
     theta = abs(float(theta_deg))
     sin_val = abs(math.sin(math.radians(theta)))
@@ -30,14 +101,20 @@ def _aisc_max_fillet_size_metric(t: float) -> float:
 def check_aisc(
     *,
     result,
-    theta_deg: float | None,
     F_EXX: float,
     enforce_max_fillet_size: bool,
+    conservative_k_ds: bool = False,
 ) -> WeldCheckResult:
     """
     Check a weld analysis result per AISC 360-22 (fillet welds, LRFD).
 
     This check is intentionally conservative and aligns with documentation/standards/weld.md.
+    
+    Args:
+        result: LoadedWeldConnection result
+        F_EXX: Electrode strength (MPa)
+        enforce_max_fillet_size: Check maximum fillet size detailing limit
+        conservative_k_ds: If True, force k_ds=1.0 (ignores directional benefit)
     """
     connection = result.connection
     weld = connection.weld
@@ -59,17 +136,20 @@ def check_aisc(
     stress_demand = float(result.max_stress)  # MPa (N/mm^2) if using mm+N
     Ru_equiv = stress_demand * A_we  # N
 
-    # k_ds (optional, global)
-    if connection.is_rect_hss_end_connection:
+    # k_ds: automatic by default, can be disabled
+    if connection.is_rect_hss_end_connection or conservative_k_ds:
+        # HSS end connection restriction OR user requests conservative approach
         k_ds = 1.0
         theta_used = None
     else:
-        if theta_deg is None:
+        # Automatically compute theta at governing (max utilization) location
+        theta_computed = _auto_compute_governing_theta(result)
+        if theta_computed is None:
             k_ds = 1.0
             theta_used = None
         else:
-            k_ds = _aisc_kds(theta_deg)
-            theta_used = float(theta_deg)
+            k_ds = _aisc_kds(theta_computed)
+            theta_used = float(theta_computed)
 
     # Weld metal capacity (AISC J2.2, LRFD)
     phi_w = 0.75

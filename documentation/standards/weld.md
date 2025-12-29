@@ -216,6 +216,21 @@ $$
 * $\theta$ = angle between applied force and weld axis
 * If directional effects are ignored, `connecty` uses $k_{ds} = 1.0$
 
+**Automatic theta computation (default behavior)**
+
+By default, `connecty` automatically computes $\theta$ at the **governing location** (the point of maximum utilization, i.e., highest stress-to-capacity ratio).
+
+The algorithm:
+1. Scans all discretized points along the weld.
+2. For each point $i$, calculates local stress $\sigma_i$ and angle $\theta_i$ between local force direction and tangent.
+3. Calculates local directional factor $k_{ds,i} = 1.0 + 0.5 \sin^{1.5}\theta_i$.
+4. Identifies the point that maximizes the ratio $\sigma_i / k_{ds,i}$.
+5. Uses the $\theta$ from that governing point for the weld group check.
+
+This ensures safety even if a point with slightly lower stress has a much less favorable load angle (lower $k_{ds}$), which could result in a higher utilization.
+
+To disable this and use conservative $k_{ds} = 1.0$, set `conservative_k_ds=True` in the check.
+
 **Rectangular HSS (end connection) restriction**
 
 * If the weld is **to the end of a rectangular HSS** (cap plate / end plate type), then **force**:

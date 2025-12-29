@@ -15,7 +15,7 @@ Centroid: (y=4.828, z=-77.702) mm
 Base metal: t=10.000 mm, Fy=350.0 MPa, Fu=450.0 MPa
 is_double_fillet=False
 is_rect_hss_end_connection=False
-theta_deg=None (k_ds disabled)
+theta_deg=None (auto-computed at governing location)
 
 3. LOAD INFORMATION
 --------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ Governing limit state: detailing_max_fillet
 Governing utilization: 0.7500
 
 Per-limit-state utilization:
-  weld_metal: 0.4219
+  weld_metal: 0.4082
   base_metal_fusion_face: 0.1790
   detailing_max_fillet: 0.7500
 

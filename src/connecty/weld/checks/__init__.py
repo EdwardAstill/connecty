@@ -10,9 +10,9 @@ def check_weld_group(
     result,
     *,
     standard: str = "aisc",
-    theta_deg: float | None = None,
     F_EXX: float | None = None,
     enforce_max_fillet_size: bool = True,
+    conservative_k_ds: bool = False,
 ) -> WeldCheckResult:
     """
     Check a weld group result per AISC 360-22.
@@ -20,6 +20,9 @@ def check_weld_group(
     Notes:
     - Easy mode supports fillet welds with conservative defaults.
     - Other weld types require advanced inputs and are not auto-checked here.
+    - By default, automatically computes theta at the governing location (max utilization)
+      to claim the AISC k_ds directional strength benefit safely.
+    - Set conservative_k_ds=True to force k_ds=1.0 (ignores directional benefit).
     """
     standard_norm = standard.lower()
     if standard_norm != "aisc":
@@ -33,9 +36,9 @@ def check_weld_group(
 
     return check_aisc(
         result=result,
-        theta_deg=theta_deg,
         F_EXX=F_EXX_value,
         enforce_max_fillet_size=bool(enforce_max_fillet_size),
+        conservative_k_ds=bool(conservative_k_ds),
     )
 
 
