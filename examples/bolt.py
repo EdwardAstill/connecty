@@ -6,6 +6,8 @@ Outputs (created under `gallery/bolt/`):
 - 03_analysis.txt
 - 04_check_aisc.txt
 - 05_check_as4100.txt
+- 06_full_check_aisc.txt (comprehensive report)
+- 07_full_check_as4100.txt (comprehensive report)
 - bolt_plot_shear.svg
 - bolt_plot_axial.svg
 """
@@ -30,6 +32,15 @@ class BoltCase:
     load: Load
 
 
+_PLATE_WIDTH_Y = 250.0
+_PLATE_HEIGHT_Z = 160.0
+_PLATE_CENTER = (0.0, 0.0)
+
+# Small offset so the bolt group is not perfectly centered on the plate
+_BOLT_OFFSET_Y = 10.0
+_BOLT_OFFSET_Z = -5.0
+
+
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -50,6 +61,12 @@ def _format_setup(case: BoltCase) -> str:
     plate = case.connection.plate
     load = case.load
 
+    plate_center_y, plate_center_z = plate.center
+    bolt_centroid_y = bg.Cy
+    bolt_centroid_z = bg.Cz
+    offset_y = bolt_centroid_y - plate_center_y
+    offset_z = bolt_centroid_z - plate_center_z
+
     lines: list[str] = []
     lines.append("BOLT EXAMPLE - SETUP")
     lines.append("=" * 80)
@@ -58,12 +75,17 @@ def _format_setup(case: BoltCase) -> str:
     lines.append("Units: choose any consistent system (this example uses mm, N, N*mm)")
     lines.append("")
     lines.append(f"Bolt group: n={bg.n}, d={bg.diameter:.2f}, grade={bg.grade}")
+    lines.append(
+        f"Bolt group centroid: (y={bolt_centroid_y:.2f}, z={bolt_centroid_z:.2f}) mm "
+        f"(offset from plate center: Δy={offset_y:.2f} mm, Δz={offset_z:.2f} mm)"
+    )
     lines.append("Positions (y, z):")
     for i, (y, z) in enumerate(bg.positions, start=1):
         lines.append(f"  {i:>2}: y={y:>8.2f}, z={z:>8.2f}")
     lines.append("")
     lines.append(
         "Plate (axis-aligned rectangle in y-z): "
+        f"width={plate.width:.1f}, height={plate.height:.1f}, center={plate.center}, "
         f"corner_a={plate.corner_a}, corner_b={plate.corner_b}, "
         f"t={plate.thickness:.2f}, fu={plate.fu:.1f}, fy={plate.fy}"
     )
@@ -128,6 +150,212 @@ def _render_equations_once(standard: str, meta: dict[str, Any]) -> list[str]:
             lines.append(f"  Note: Tension demand includes prying allowance ({prying*100:.0f}%): Tu_design = Tu * (1 + {prying})")
     
     return lines
+
+
+def _format_full_check(title: str, case: BoltCase, result, check) -> str:
+    """Comprehensive check report with all information in one document."""
+    lines: list[str] = []
+    lines.append(title)
+    lines.append("=" * 80)
+    lines.append("")
+    
+    # 1. BOLT GROUP CONFIGURATION
+    lines.append("1. BOLT GROUP CONFIGURATION")
+    lines.append("-" * 80)
+    bg = case.connection.bolt_group
+    plate = case.connection.plate
+    plate_center_y, plate_center_z = plate.center
+    bolt_centroid_y = bg.Cy
+    bolt_centroid_z = bg.Cz
+    offset_y = bolt_centroid_y - plate_center_y
+    offset_z = bolt_centroid_z - plate_center_z
+    lines.append(f"Bolt grade: {bg.grade}")
+    lines.append(f"Bolt diameter: {bg.diameter:.2f} mm")
+    lines.append(f"Number of bolts: {bg.n}")
+    lines.append(f"Number of shear planes: {case.connection.n_shear_planes}")
+    lines.append(f"Bolt group centroid: (y={bolt_centroid_y:.2f}, z={bolt_centroid_z:.2f}) mm")
+    lines.append(f"Plate center: (y={plate_center_y:.2f}, z={plate_center_z:.2f}) mm")
+    lines.append(f"Bolt group offset from plate center: Δy={offset_y:.2f} mm, Δz={offset_z:.2f} mm")
+    lines.append("")
+    lines.append("Bolt positions (y, z) in mm:")
+    lines.append("  #    y        z")
+    for i, (y, z) in enumerate(bg.positions, start=1):
+        lines.append(f"  {i:>2}  {y:>7.2f}  {z:>7.2f}")
+    lines.append("")
+    lines.append(
+        f"Plate: width={plate.width:.1f} mm, height={plate.height:.1f} mm, "
+        f"t={plate.thickness:.1f} mm, fu={plate.fu:.0f} MPa, fy={plate.fy}"
+    )
+    lines.append(f"Plate bounds: y=[{plate.y_min:.1f}, {plate.y_max:.1f}], z=[{plate.z_min:.1f}, {plate.z_max:.1f}]")
+    lines.append("")
+    
+    # 2. LOAD INFORMATION
+    lines.append("2. LOAD INFORMATION")
+    lines.append("-" * 80)
+    load = case.load
+    lines.append(f"Forces:  Fx={load.Fx:.2f} N, Fy={load.Fy:.2f} N, Fz={load.Fz:.2f} N")
+    lines.append(f"Moments: Mx={load.Mx:.2f} N·mm, My={load.My:.2f} N·mm, Mz={load.Mz:.2f} N·mm")
+    lines.append(f"Location: {load.location}")
+    lines.append("")
+    
+    # 3. ANALYSIS RESULTS
+    lines.append("3. ANALYSIS RESULTS")
+    lines.append("-" * 80)
+    lines.append(f"Method: shear={result.shear_method}, tension={result.tension_method}")
+    lines.append("")
+    lines.append("Per-bolt forces and stresses:")
+    lines.append("  #    y        z        Fy        Fz        Fx        V         tau    sigma_x")
+    lines.append("                        (N)       (N)       (N)       (N)      (MPa)    (MPa)")
+    for i, br in enumerate(result.to_bolt_results(), start=1):
+        lines.append(
+            f"  {i:>2}  {br.y:>7.2f}  {br.z:>7.2f}  "
+            f"{br.Fy:>8.2f}  {br.Fz:>8.2f}  {br.Fx:>8.2f}  {br.shear:>8.2f}  "
+            f"{br.shear_stress:>6.2f}  {br.axial_stress:>7.2f}"
+        )
+    lines.append("")
+    
+    # 4. CHECKING CRITERIA - GROUP LEVEL
+    lines.append("4. CHECKING CRITERIA - GROUP LEVEL")
+    lines.append("-" * 80)
+    meta = getattr(check, "meta", {})
+    standard = meta.get("standard", "")
+    
+    if standard == "aisc":
+        lines.append(f"Standard: AISC 360-22")
+        lines.append(f"Grade: {meta.get('grade', 'N/A')}")
+        lines.append(f"Threads in shear plane: {meta.get('threads_in_shear_plane', True)}")
+        lines.append(f"Connection type: {meta.get('connection_type', 'N/A')}")
+        lines.append(f"Hole type: {meta.get('hole_type', 'N/A')}")
+        lines.append(f"Hole diameter: {meta.get('hole_dia', 0.0):.1f} mm")
+        lines.append(f"Resistance factor (φ): {meta.get('phi', 0.75)}")
+        lines.append(f"Nominal shear stress (Fnv): {meta.get('Fnv', 0.0):.0f} MPa")
+        lines.append(f"Nominal tension stress (Fnt): {meta.get('Fnt', 0.0):.0f} MPa")
+        lines.append(f"Bolt area (Ab): {meta.get('area_b', 0.0):.1f} mm²")
+    elif standard == "as4100":
+        lines.append(f"Standard: AS 4100")
+        lines.append(f"Grade: {meta.get('grade', 'N/A')}")
+        lines.append(f"Connection type: {meta.get('connection_type', 'N/A')}")
+        lines.append(f"Hole type: {meta.get('hole_type', 'N/A')}")
+        lines.append(f"Ultimate tensile strength (fuf): {meta.get('fuf', 0.0):.0f} MPa")
+        lines.append(f"Tensile stress area (As): {meta.get('As', 0.0):.1f} mm²")
+        lines.append(f"Core area (Ac): {meta.get('Ac', 0.0):.1f} mm²")
+        lines.append(f"Prying allowance: {meta.get('prying_allowance', 0.0)*100:.0f}%")
+    lines.append("")
+    
+    # 5. CHECKING CRITERIA - INDIVIDUAL BOLTS
+    lines.append("5. CHECKING CRITERIA - INDIVIDUAL BOLT INPUTS")
+    lines.append("-" * 80)
+    
+    if standard == "aisc":
+        lines.append("  #    Vu      Tu      f_rv    Fnt'     lc    R_bear  R_tear")
+        lines.append("       (kN)    (kN)    (MPa)   (MPa)   (mm)    (kN)    (kN)")
+        for d in check.details:
+            calc = getattr(d, "calc", {})
+            lines.append(
+                f"  {d.bolt_index + 1:>2}  "
+                f"{calc.get('Vu_kN', 0.0):>6.3f}  "
+                f"{calc.get('Tu_kN', 0.0):>6.3f}  "
+                f"{calc.get('f_rv', 0.0):>6.1f}  "
+                f"{calc.get('Fnt_prime', 0.0):>6.1f}  "
+                f"{calc.get('lc', 0.0):>5.1f}  "
+                f"{calc.get('bearing_nom_kN', 0.0):>6.1f}  "
+                f"{calc.get('tear_nom_kN', 0.0):>6.1f}"
+            )
+    elif standard == "as4100":
+        lines.append("  #    Vu      Tu     Tu_pry   a_e     Vb      Vp")
+        lines.append("       (kN)    (kN)    (kN)   (mm)    (kN)    (kN)")
+        for d in check.details:
+            calc = getattr(d, "calc", {})
+            lines.append(
+                f"  {d.bolt_index + 1:>2}  "
+                f"{calc.get('Vu_kN', 0.0):>6.3f}  "
+                f"{calc.get('Tu_kN', 0.0):>6.3f}  "
+                f"{calc.get('Tu_prying_kN', 0.0):>6.3f}  "
+                f"{calc.get('a_e', 0.0):>5.1f}  "
+                f"{calc.get('Vb_N', 0.0)/1000:>6.1f}  "
+                f"{calc.get('Vp_N', 0.0)/1000:>6.1f}"
+            )
+    lines.append("")
+    
+    # 6. LIMIT STATE CHECKS
+    lines.append("6. LIMIT STATE CHECKS")
+    lines.append("-" * 80)
+    
+    # SHEAR CHECK
+    lines.append("")
+    lines.append("6.1 SHEAR RUPTURE")
+    if standard == "aisc":
+        lines.append("Equation: Vn = φ * Fnv * Ab * ns")
+    elif standard == "as4100":
+        lines.append("Equation: Vn = φ * 0.62 * fuf * kr * (nn*Ac + nx*Ao)")
+    lines.append("")
+    lines.append("  #    Applied   Capacity   Utilization")
+    lines.append("        (kN)       (kN)")
+    for d in check.details:
+        lines.append(
+            f"  {d.bolt_index + 1:>2}    {d.shear_demand:>6.3f}     {d.shear_capacity:>6.3f}      {d.shear_util:>5.3f}"
+        )
+    lines.append("")
+    
+    # TENSION CHECK
+    lines.append("6.2 TENSION RUPTURE")
+    if standard == "aisc":
+        lines.append("Equation: Tn = φ * Fnt' * Ab")
+        lines.append("          where Fnt' = min(Fnt, 1.3*Fnt - (Fnt/(φ*Fnv))*f_rv)")
+    elif standard == "as4100":
+        lines.append("Equation: Tn = φ * As * fuf")
+    lines.append("")
+    lines.append("  #    Applied   Capacity   Utilization")
+    lines.append("        (kN)       (kN)")
+    for d in check.details:
+        lines.append(
+            f"  {d.bolt_index + 1:>2}    {d.tension_demand:>6.3f}     {d.tension_capacity:>6.3f}      {d.tension_util:>5.3f}"
+        )
+    lines.append("")
+    
+    # BEARING CHECK
+    lines.append("6.3 BEARING / TEAROUT")
+    if standard == "aisc":
+        lines.append("Equation: Bn = φ * min(R_bearing, R_tearout)")
+        lines.append("          R_bearing = 2.4 * d * t * Fu")
+        lines.append("          R_tearout = 1.2 * lc * t * Fu")
+    elif standard == "as4100":
+        lines.append("Equation: Bn = φ * min(Vb, Vp)")
+        lines.append("          Vb = 3.2 * tp * df * fup")
+        lines.append("          Vp = a_e * tp * fup")
+    lines.append("")
+    lines.append("  #    Applied   Capacity   Utilization")
+    lines.append("        (kN)       (kN)")
+    for d in check.details:
+        lines.append(
+            f"  {d.bolt_index + 1:>2}    {d.shear_demand:>6.3f}     {d.bearing_capacity:>6.3f}      {d.bearing_util:>5.3f}"
+        )
+    lines.append("")
+    
+    # INTERACTION (AS 4100 only)
+    if standard == "as4100":
+        lines.append("6.4 SHEAR-TENSION INTERACTION")
+        lines.append("Equation: U_int = (V*/φVn)² + (T*/φTn)²")
+        lines.append("")
+        lines.append("  #    Utilization")
+        for d in check.details:
+            lines.append(
+                f"  {d.bolt_index + 1:>2}       {d.interaction_util if hasattr(d, 'interaction_util') and d.interaction_util is not None else 0.0:>5.3f}"
+            )
+        lines.append("")
+    
+    # SUMMARY
+    lines.append("7. SUMMARY")
+    lines.append("-" * 80)
+    lines.append(f"Governing bolt: #{check.governing_bolt_index + 1}")
+    lines.append(f"Governing limit state: {check.governing_limit_state}")
+    lines.append(f"Governing utilization: {check.governing_utilization:.4f}")
+    if check.governing_utilization <= 1.0:
+        lines.append("Status: PASS")
+    else:
+        lines.append("Status: FAIL")
+    
+    return "\n".join(lines)
 
 
 def _format_check(title: str, check) -> str:
@@ -212,12 +440,14 @@ def _make_case(*, grade: str, name: str) -> BoltCase:
         spacing_z=60.0,
         diameter=20.0,
         grade=grade,
-        origin=(0.0, 0.0),
+        offset_y=_BOLT_OFFSET_Y,
+        offset_z=_BOLT_OFFSET_Z,
     )
 
-    plate = Plate(
-        corner_a=(-125.0, -80.0),
-        corner_b=(125.0, 80.0),
+    plate = Plate.from_dimensions(
+        width=_PLATE_WIDTH_Y,
+        height=_PLATE_HEIGHT_Z,
+        center=_PLATE_CENTER,
         thickness=12.0,
         fu=450.0,
         fy=350.0,
@@ -232,7 +462,7 @@ def _make_case(*, grade: str, name: str) -> BoltCase:
         My=6_000_000.0,
         Mz=-4_000_000.0,
         # Apply the load at a point ON the plate (x is out-of-plane; y/z lie on the plate rectangle).
-        # Plate bounds are y∈[-125,125], z∈[-80,80] for this example.
+        # Plate bounds are y∈[-width/2,width/2], z∈[-height/2,height/2] (centered at (0,0)) for this example.
         location=(0.0, 50.0, 40.0),
     )
 
@@ -310,6 +540,16 @@ def run() -> None:
         hole_type="standard",
     )
     _write_text(out_dir / "05_check_as4100.txt", _format_check("AS 4100 CHECK (bearing)", check_as4100))
+
+    # --- Full comprehensive checks ---
+    _write_text(
+        out_dir / "06_full_check_aisc.txt",
+        _format_full_check("AISC 360-22 FULL CHECK REPORT", case_aisc, result_aisc, check_aisc)
+    )
+    _write_text(
+        out_dir / "07_full_check_as4100.txt",
+        _format_full_check("AS 4100 FULL CHECK REPORT", case_as4100, result_as4100, check_as4100)
+    )
 
     print("")
     print("Done. Outputs written to:")

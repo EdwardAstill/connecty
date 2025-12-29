@@ -35,11 +35,12 @@ Example usage (Bolts):
     
     # 1. Create bolt group from pattern
     bolts = BoltGroup.from_pattern(
-        rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20
+        rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20,
+        offset_y=10.0, offset_z=-5.0
     )
     
     # 2. Define plate and connection
-    plate = Plate(corner_a=(-100.0, -150.0), corner_b=(100.0, 150.0), thickness=12.0, fu=450.0, fy=350.0)
+    plate = Plate.from_dimensions(width=200.0, height=300.0, center=(0.0, 0.0), thickness=12.0, fu=450.0, fy=350.0)
     connection = BoltConnection(bolt_group=bolts, plate=plate)
     
     # 3. Define load

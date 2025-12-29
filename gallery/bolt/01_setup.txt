@@ -5,14 +5,15 @@ Case: AISC_360_22_A325
 Units: choose any consistent system (this example uses mm, N, N*mm)
 
 Bolt group: n=6, d=20.00, grade=A325
+Bolt group centroid: (y=10.00, z=-5.00) mm (offset from plate center: Δy=10.00 mm, Δz=-5.00 mm)
 Positions (y, z):
-   1: y=  -75.00, z=  -30.00
-   2: y=  -75.00, z=   30.00
-   3: y=    0.00, z=  -30.00
-   4: y=    0.00, z=   30.00
-   5: y=   75.00, z=  -30.00
-   6: y=   75.00, z=   30.00
+   1: y=  -65.00, z=  -35.00
+   2: y=  -65.00, z=   25.00
+   3: y=   10.00, z=  -35.00
+   4: y=   10.00, z=   25.00
+   5: y=   85.00, z=  -35.00
+   6: y=   85.00, z=   25.00
 
-Plate (axis-aligned rectangle in y-z): corner_a=(-125.0, -80.0), corner_b=(125.0, 80.0), t=12.00, fu=450.0, fy=350.0
+Plate (axis-aligned rectangle in y-z): width=250.0, height=160.0, center=(0.0, 0.0), corner_a=(-125.0, -80.0), corner_b=(125.0, 80.0), t=12.00, fu=450.0, fy=350.0
 
 Applied load (forces + moments at a location): Fx=30000.00, Fy=-120000.00, Fz=45000.00, Mx=0.00, My=6000000.00, Mz=-4000000.00, location=(0.0, 50.0, 40.0)

@@ -3,7 +3,7 @@ AS 4100 CHECK (bearing)
 connection_type=bearing, method=elastic
 governing_bolt_index=5
 governing_limit_state=shear
-governing_utilization=0.4428
+governing_utilization=0.4474
 
 Meta:
   Ac: 217.5
@@ -44,51 +44,51 @@ Capacity Equations (AS 4100):
   Note: Tension demand includes prying allowance (25%): Tu_design = Tu * (1 + 0.25)
 
 Per-bolt:
-  bolt #1 @ (y=-75.00, z=-30.00)
-    Demand: V=16.893 kN, T=13.270 kN
-    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=189.540 kN
-    Util: shear=0.1957, tension=0.1058, bearing=0.0891 -> shear (0.1957)
+  bolt #1 @ (y=-65.00, z=-35.00)
+    Demand: V=17.053 kN, T=13.811 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=165.240 kN
+    Util: shear=0.1976, tension=0.1101, bearing=0.1032 -> shear (0.1976)
     Inputs:
-      Vu=16.893 kN, Tu=13.270 kN (with prying: 16.587 kN)
-      a_e=39.0 mm (from edge_clear=50.0 mm)
-      Vb=345.6 kN, Vp=210.6 kN
-  bolt #2 @ (y=-75.00, z=30.00)
-    Demand: V=29.864 kN, T=22.560 kN
-    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=189.540 kN
-    Util: shear=0.3460, tension=0.1798, bearing=0.1576 -> shear (0.3460)
+      Vu=17.053 kN, Tu=13.811 kN (with prying: 17.264 kN)
+      a_e=34.0 mm (from edge_clear=45.0 mm)
+      Vb=345.6 kN, Vp=183.6 kN
+  bolt #2 @ (y=-65.00, z=25.00)
+    Demand: V=30.169 kN, T=24.088 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=213.840 kN
+    Util: shear=0.3496, tension=0.1920, bearing=0.1411 -> shear (0.3496)
     Inputs:
-      Vu=29.864 kN, Tu=22.560 kN (with prying: 28.200 kN)
-      a_e=39.0 mm (from edge_clear=50.0 mm)
-      Vb=345.6 kN, Vp=210.6 kN
-  bolt #3 @ (y=0.00, z=-30.00)
-    Demand: V=14.508 kN, T=11.064 kN
-    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=189.540 kN
-    Util: shear=0.1681, tension=0.0882, bearing=0.0765 -> shear (0.1681)
+      Vu=30.169 kN, Tu=24.088 kN (with prying: 30.109 kN)
+      a_e=44.0 mm (from edge_clear=55.0 mm)
+      Vb=345.6 kN, Vp=237.6 kN
+  bolt #3 @ (y=10.00, z=-35.00)
+    Demand: V=14.370 kN, T=10.944 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=165.240 kN
+    Util: shear=0.1665, tension=0.0872, bearing=0.0870 -> shear (0.1665)
     Inputs:
-      Vu=14.508 kN, Tu=11.064 kN (with prying: 13.830 kN)
-      a_e=39.0 mm (from edge_clear=50.0 mm)
-      Vb=345.6 kN, Vp=210.6 kN
-  bolt #4 @ (y=0.00, z=30.00)
-    Demand: V=28.582 kN, T=20.354 kN
-    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=189.540 kN
-    Util: shear=0.3312, tension=0.1623, bearing=0.1508 -> shear (0.3312)
+      Vu=14.370 kN, Tu=10.944 kN (with prying: 13.680 kN)
+      a_e=34.0 mm (from edge_clear=45.0 mm)
+      Vb=345.6 kN, Vp=183.6 kN
+  bolt #4 @ (y=10.00, z=25.00)
+    Demand: V=28.738 kN, T=21.220 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=213.840 kN
+    Util: shear=0.3330, tension=0.1692, bearing=0.1344 -> shear (0.3330)
     Inputs:
-      Vu=28.582 kN, Tu=20.354 kN (with prying: 25.443 kN)
-      a_e=39.0 mm (from edge_clear=50.0 mm)
-      Vb=345.6 kN, Vp=210.6 kN
-  bolt #5 @ (y=75.00, z=-30.00)
-    Demand: V=29.222 kN, T=8.858 kN
-    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=189.540 kN
-    Util: shear=0.3386, tension=0.0706, bearing=0.1542 -> shear (0.3386)
+      Vu=28.738 kN, Tu=21.220 kN (with prying: 26.525 kN)
+      a_e=44.0 mm (from edge_clear=55.0 mm)
+      Vb=345.6 kN, Vp=237.6 kN
+  bolt #5 @ (y=85.00, z=-35.00)
+    Demand: V=29.520 kN, T=8.140 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=140.940 kN
+    Util: shear=0.3420, tension=0.0649, bearing=0.2095 -> shear (0.3420)
     Inputs:
-      Vu=29.222 kN, Tu=8.858 kN (with prying: 11.073 kN)
-      a_e=39.0 mm (from edge_clear=50.0 mm)
-      Vb=345.6 kN, Vp=210.6 kN
-  bolt #6 @ (y=75.00, z=30.00)
-    Demand: V=38.215 kN, T=18.148 kN
-    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=189.540 kN
-    Util: shear=0.4428, tension=0.1447, bearing=0.2016 -> shear (0.4428)
+      Vu=29.520 kN, Tu=8.140 kN (with prying: 10.175 kN)
+      a_e=29.0 mm (from edge_clear=40.0 mm)
+      Vb=345.6 kN, Vp=156.6 kN
+  bolt #6 @ (y=85.00, z=25.00)
+    Demand: V=38.611 kN, T=18.416 kN
+    Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=140.940 kN
+    Util: shear=0.4474, tension=0.1468, bearing=0.2740 -> shear (0.4474)
     Inputs:
-      Vu=38.215 kN, Tu=18.148 kN (with prying: 22.685 kN)
-      a_e=39.0 mm (from edge_clear=50.0 mm)
-      Vb=345.6 kN, Vp=210.6 kN
+      Vu=38.611 kN, Tu=18.416 kN (with prying: 23.020 kN)
+      a_e=29.0 mm (from edge_clear=40.0 mm)
+      Vb=345.6 kN, Vp=156.6 kN

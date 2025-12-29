@@ -1,0 +1,117 @@
+AISC 360-22 FULL CHECK REPORT
+================================================================================
+
+1. BOLT GROUP CONFIGURATION
+--------------------------------------------------------------------------------
+Bolt grade: A325
+Bolt diameter: 20.00 mm
+Number of bolts: 6
+Number of shear planes: 1
+Bolt group centroid: (y=10.00, z=-5.00) mm
+Plate center: (y=0.00, z=0.00) mm
+Bolt group offset from plate center: Δy=10.00 mm, Δz=-5.00 mm
+
+Bolt positions (y, z) in mm:
+  #    y        z
+   1   -65.00   -35.00
+   2   -65.00    25.00
+   3    10.00   -35.00
+   4    10.00    25.00
+   5    85.00   -35.00
+   6    85.00    25.00
+
+Plate: width=250.0 mm, height=160.0 mm, t=12.0 mm, fu=450 MPa, fy=350.0
+Plate bounds: y=[-125.0, 125.0], z=[-80.0, 80.0]
+
+2. LOAD INFORMATION
+--------------------------------------------------------------------------------
+Forces:  Fx=30000.00 N, Fy=-120000.00 N, Fz=45000.00 N
+Moments: Mx=0.00 N·mm, My=6000000.00 N·mm, Mz=-4000000.00 N·mm
+Location: (0.0, 50.0, 40.0)
+
+3. ANALYSIS RESULTS
+--------------------------------------------------------------------------------
+Method: shear=elastic, tension=accurate
+
+Per-bolt forces and stresses:
+  #    y        z        Fy        Fz        Fx        V         tau    sigma_x
+                        (N)       (N)       (N)       (N)      (MPa)    (MPa)
+   1   -65.00   -35.00  -12258.06  -11854.84  13811.33  17052.78   54.28    43.96
+   2   -65.00    25.00  -27741.94  -11854.84  24087.58  30168.73   96.03    76.67
+   3    10.00   -35.00  -12258.06   7500.00  10943.79  14370.46   45.74    34.84
+   4    10.00    25.00  -27741.94   7500.00  21220.03  28737.87   91.48    67.55
+   5    85.00   -35.00  -12258.06  26854.84   8139.96  29520.21   93.97    25.91
+   6    85.00    25.00  -27741.94  26854.84  18416.21  38610.84  122.90    58.62
+
+4. CHECKING CRITERIA - GROUP LEVEL
+--------------------------------------------------------------------------------
+Standard: AISC 360-22
+Grade: A325
+Threads in shear plane: True
+Connection type: bearing
+Hole type: standard
+Hole diameter: 22.0 mm
+Resistance factor (φ): 0.75
+Nominal shear stress (Fnv): 370 MPa
+Nominal tension stress (Fnt): 620 MPa
+Bolt area (Ab): 314.2 mm²
+
+5. CHECKING CRITERIA - INDIVIDUAL BOLT INPUTS
+--------------------------------------------------------------------------------
+  #    Vu      Tu      f_rv    Fnt'     lc    R_bear  R_tear
+       (kN)    (kN)    (MPa)   (MPa)   (mm)    (kN)    (kN)
+   1  17.053  13.811    54.3   620.0   34.0   259.2   220.3
+   2  30.169  24.088    96.0   591.4   44.0   259.2   285.1
+   3  14.370  10.944    45.7   620.0   34.0   259.2   220.3
+   4  28.738  21.220    91.5   601.6   44.0   259.2   285.1
+   5  29.520   8.140    94.0   596.1   29.0   259.2   187.9
+   6  38.611  18.416   122.9   531.4   29.0   259.2   187.9
+
+6. LIMIT STATE CHECKS
+--------------------------------------------------------------------------------
+
+6.1 SHEAR RUPTURE
+Equation: Vn = φ * Fnv * Ab * ns
+
+  #    Applied   Capacity   Utilization
+        (kN)       (kN)
+   1    17.053     87.179      0.196
+   2    30.169     87.179      0.346
+   3    14.370     87.179      0.165
+   4    28.738     87.179      0.330
+   5    29.520     87.179      0.339
+   6    38.611     87.179      0.443
+
+6.2 TENSION RUPTURE
+Equation: Tn = φ * Fnt' * Ab
+          where Fnt' = min(Fnt, 1.3*Fnt - (Fnt/(φ*Fnv))*f_rv)
+
+  #    Applied   Capacity   Utilization
+        (kN)       (kN)
+   1    13.811     146.084      0.095
+   2    24.088     139.356      0.173
+   3    10.944     146.084      0.075
+   4    21.220     141.754      0.150
+   5     8.140     140.443      0.058
+   6    18.416     125.210      0.147
+
+6.3 BEARING / TEAROUT
+Equation: Bn = φ * min(R_bearing, R_tearout)
+          R_bearing = 2.4 * d * t * Fu
+          R_tearout = 1.2 * lc * t * Fu
+
+  #    Applied   Capacity   Utilization
+        (kN)       (kN)
+   1    17.053     165.240      0.103
+   2    30.169     194.400      0.155
+   3    14.370     165.240      0.087
+   4    28.738     194.400      0.148
+   5    29.520     140.940      0.209
+   6    38.611     140.940      0.274
+
+7. SUMMARY
+--------------------------------------------------------------------------------
+Governing bolt: #6
+Governing limit state: shear
+Governing utilization: 0.4429
+Status: PASS

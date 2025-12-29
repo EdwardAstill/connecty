@@ -76,10 +76,21 @@ class BoltGroup:
         diameter: float,
         grade: str = "A325",
         origin: Point2D = (0.0, 0.0),
+        offset_y: float = 0.0,
+        offset_z: float = 0.0,
     ) -> "BoltGroup":
-        """Create a rectangular bolt pattern centered at `origin`."""
+        """Create a rectangular bolt pattern centered at `origin`.
+
+        You can also apply an explicit offset using `offset_y` / `offset_z` (in the y/z axes).
+        If `offset_y` or `offset_z` is non-zero, `origin` must be left at its default (0, 0).
+        """
         if rows < 1 or cols < 1:
             raise ValueError("rows and cols must be at least 1")
+
+        if (offset_y != 0.0 or offset_z != 0.0) and origin != (0.0, 0.0):
+            raise ValueError("Specify either origin or offset_y/offset_z, not both")
+        if offset_y != 0.0 or offset_z != 0.0:
+            origin = (float(offset_y), float(offset_z))
 
         y0, z0 = origin
         y_start = y0 - (rows - 1) * spacing_y / 2.0
@@ -103,12 +114,19 @@ class BoltGroup:
         grade: str = "A325",
         center: Point2D = (0.0, 0.0),
         start_angle: float = 0.0,
+        offset_y: float = 0.0,
+        offset_z: float = 0.0,
     ) -> "BoltGroup":
         """Create `n` bolts on a circle in the y-z plane."""
         if n < 1:
             raise ValueError("n must be at least 1")
         if radius <= 0.0:
             raise ValueError("radius must be positive")
+
+        if (offset_y != 0.0 or offset_z != 0.0) and center != (0.0, 0.0):
+            raise ValueError("Specify either center or offset_y/offset_z, not both")
+        if offset_y != 0.0 or offset_z != 0.0:
+            center = (float(offset_y), float(offset_z))
 
         cy, cz = center
         positions: list[Point2D] = []
@@ -175,6 +193,40 @@ class Plate:
     fu: float
     fy: float | None = None
 
+    @classmethod
+    def from_dimensions(
+        cls,
+        *,
+        width: float,
+        height: float,
+        thickness: float,
+        fu: float,
+        fy: float | None = None,
+        center: Point2D = (0.0, 0.0),
+    ) -> "Plate":
+        """Create a rectangular plate from width/height (y/z) and an optional center point.
+
+        Notes:
+        - `width` is the plate size in the **y** direction.
+        - `height` is the plate size in the **z** direction.
+        """
+        if width <= 0.0:
+            raise ValueError("Plate width must be positive")
+        if height <= 0.0:
+            raise ValueError("Plate height must be positive")
+
+        cy, cz = center
+        half_w = width / 2.0
+        half_h = height / 2.0
+
+        return cls(
+            corner_a=(cy - half_w, cz - half_h),
+            corner_b=(cy + half_w, cz + half_h),
+            thickness=thickness,
+            fu=fu,
+            fy=fy,
+        )
+
     def __post_init__(self) -> None:
         if self.thickness <= 0.0:
             raise ValueError("Plate thickness must be positive")
@@ -204,6 +256,21 @@ class Plate:
     @property
     def depth_z(self) -> float:
         return self.z_max - self.z_min
+
+    @property
+    def width(self) -> float:
+        """Alias for plate size in y-direction."""
+        return self.depth_y
+
+    @property
+    def height(self) -> float:
+        """Alias for plate size in z-direction."""
+        return self.depth_z
+
+    @property
+    def center(self) -> Point2D:
+        """Plate center (y, z)."""
+        return ((self.y_min + self.y_max) / 2.0, (self.z_min + self.z_max) / 2.0)
 
 
 TensionMethod = Literal["conservative", "accurate"]

@@ -8,7 +8,7 @@ All checks are **unit agnostic**: use any consistent set of units (e.g. mm, N, N
 from connecty import BoltConnection, BoltGroup, Plate, Load
 
 bg = BoltGroup.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, diameter=20, grade="A325")
-plate = Plate(corner_a=(-125, -80), corner_b=(125, 80), thickness=12, fu=450, fy=350)
+plate = Plate.from_dimensions(width=250, height=160, center=(0, 0), thickness=12, fu=450, fy=350)
 conn = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=1)
 
 load = Load(Fy=-120_000, Fz=25_000, location=(0, 40, 80))
