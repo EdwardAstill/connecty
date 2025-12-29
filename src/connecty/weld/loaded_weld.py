@@ -56,6 +56,8 @@ class LoadedWeld:
     load: Load
     method: str = "elastic"
     discretization: int = 200
+    F_EXX: float | None = None
+    include_kds: bool = True
     
     # Calculated results (set in __post_init__)
     point_stresses: List[PointStress] = field(default_factory=list, init=False, repr=False)
@@ -78,10 +80,11 @@ class LoadedWeld:
         }
         
         weld_type = self.weld.parameters.type
-        if self.method not in valid_methods.get(weld_type, ["elastic"]):
+        allowed_methods = valid_methods[weld_type] if weld_type in valid_methods else ["elastic"]
+        if self.method not in allowed_methods:
             raise ValueError(
                 f"Method '{self.method}' not valid for {weld_type} welds. "
-                f"Valid options: {valid_methods.get(weld_type, ['elastic'])}"
+                f"Valid options: {allowed_methods}"
             )
         
         # Calculate stress based on method
@@ -216,13 +219,27 @@ class LoadedWeld:
         
         if self.method == "both":
             # Calculate both results for comparison
-            elastic_loaded = LoadedWeld(self.weld, self.load, method="elastic", discretization=self.discretization)
+            elastic_loaded = LoadedWeld(
+                self.weld,
+                self.load,
+                method="elastic",
+                discretization=self.discretization,
+                F_EXX=self.F_EXX,
+                include_kds=self.include_kds,
+            )
             
             loaded_list = [elastic_loaded]
             
             # Only add ICR if it's a fillet weld
             if self.weld.parameters.type == "fillet":
-                icr_loaded = LoadedWeld(self.weld, self.load, method="icr", discretization=self.discretization)
+                icr_loaded = LoadedWeld(
+                    self.weld,
+                    self.load,
+                    method="icr",
+                    discretization=self.discretization,
+                    F_EXX=self.F_EXX,
+                    include_kds=self.include_kds,
+                )
                 loaded_list.append(icr_loaded)
             
             if len(loaded_list) >= 2:

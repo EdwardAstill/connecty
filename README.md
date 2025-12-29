@@ -1,6 +1,6 @@
 ﻿# Connecty
 
-Weld stress analysis package for structural engineering. Calculates and visualizes stress distribution along welded connections using the elastic method.
+Weld and bolt connection analysis for structural engineering. Calculates and visualizes stress/force distribution and performs AISC-style checks.
 
 ## Features
 
@@ -22,35 +22,28 @@ uv add connecty
 ## Quick Start
 
 ```python
-from sectiony.library import rhs
-from connecty import WeldedSection, WeldParameters, Force
+from connecty import Load, WeldBaseMetal, WeldConnection, WeldParams
 
-# Create a section
-section = rhs(b=100, h=200, t=10, r=15)
-
-# Create welded section
-welded = WeldedSection(section=section)
-
-# Define weld parameters (6mm fillet weld)
-params = WeldParameters(
-    weld_type="fillet",
-    throat_thickness=4.2,
-    leg_size=6.0
+# 1) Create a weld connection from DXF geometry
+connection = WeldConnection.from_dxf(
+    "examples/base1.dxf",
+    parameters=WeldParams(type="fillet", leg=6.0),
+    base_metal=WeldBaseMetal(t=10.0, fy=350.0, fu=450.0),
 )
 
-# Add welds to all outer edges
-welded.weld_all_segments(params)
+# 2) Define applied load (forces + moments at a location)
+load = Load(Fy=-120_000.0, Fz=45_000.0, location=(0.0, 0.0, 0.0))
 
-# Define applied force
-force = Force(
-    Fy=-50000,      # 50kN downward
-    Fz=10000,       # 10kN horizontal  
-    Mx=1e6,         # 1kNm torsion
-    location=(100, 30)  # Point of application
-)
+# 3) Analyze (elastic or icr for fillet welds)
+result = connection.analyze(load, method="icr")
+print(f"Max stress: {result.max_stress:.2f} MPa")
 
-# Calculate and plot stress
-welded.plot_weld_stress(force, save_path="stress.svg")
+# 4) Check (AISC 360-22, fillet welds)
+check = result.check(standard="aisc")
+print(f"Governing utilisation: {check.governing_utilization:.3f} ({check.governing_limit_state})")
+
+# 5) Plot (saved as .svg)
+result.plot(show=False, save_path="weld_stress.svg")
 ```
 
 ## Examples & Gallery
@@ -65,51 +58,54 @@ The generated images will be saved to the `gallery/` directory.
 
 ## API Reference
 
-### WeldParameters
+### WeldParams
 
 ```python
-WeldParameters(
-    weld_type: "fillet" | "butt",
-    throat_thickness: float,  # Effective throat (mm)
-    leg_size: float = None,   # For fillet welds (mm)
-    strength: float = None    # Allowable stress (MPa)
+WeldParams(
+    type: "fillet" | "pjp" | "cjp" | "plug" | "slot",
+    leg: float | None = None,     # Fillet weld leg size (mm)
+    throat: float | None = None,  # Effective throat (mm)
+    area: float | None = None,    # Plug/slot effective area (mm^2)
 )
 ```
 
-### Force
+### Load
 
 ```python
-Force(
+Load(
     Fx: float = 0,  # Axial force
     Fy: float = 0,  # Vertical shear
     Fz: float = 0,  # Horizontal shear
     Mx: float = 0,  # Torsion
     My: float = 0,  # Bending about y
     Mz: float = 0,  # Bending about z
-    location: tuple = (0, 0)  # Point of application (y, z)
+    location: tuple = (0, 0, 0)  # Point of application (x, y, z)
 )
 ```
 
 ### WeldedSection
 
 ```python
+from sectiony.library import rhs
+from connecty import Load, WeldParams, WeldedSection
+
+section = rhs(b=100, h=200, t=10, r=15)
 welded = WeldedSection(section=section)
 
 # Add welds
-welded.add_weld(segment_index, params)
-welded.add_welds([0, 1, 2], params)
+params = WeldParams(type="fillet", leg=6.0)
 welded.weld_all_segments(params)
 
-# Get segment info to identify which edges to weld
+# Optional: inspect available segments
 welded.get_segment_info()
 
 # Calculate stress
-result = welded.calculate_weld_stress(force)
+load = Load(Fy=-50_000.0, Fz=10_000.0, Mx=1_000_000.0, location=(0.0, 0.0, 0.0))
+result = welded.calculate_weld_stress(load, method="elastic")
 print(result.max_stress)
-print(result.utilization(allowable=220))
 
 # Plot
-welded.plot_weld_stress(force, cmap="coolwarm", save_path="output.svg")
+welded.plot_weld_stress(load, cmap="coolwarm", save_path="output.svg")
 ```
 
 ## Stress Calculation Method

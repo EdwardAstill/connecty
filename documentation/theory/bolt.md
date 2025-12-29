@@ -328,7 +328,12 @@ This governs the deformation pattern in the group at ultimate.
 
 ### 2) Identify tension vs compression region
 
-* Decide which side of the plate is in **compression (bearing/contact)** and which bolt rows are in **tension** (compression-side bolts are taken as zero tension). 
+* Decide which side of the plate is in **compression (bearing/contact)** and which bolt rows are in **tension**.
+
+**Important (matches code behavior):**
+- The solver computes **signed** moment-induced axial contributions: bolts on the compression side of a moment receive **negative** axial contributions from that moment.
+- After **summing** all axial contributions (direct $F_x$ + $M_y$ + $M_z$), the reported per-bolt axial force is **clamped** to tension-only:
+  - If $F_{x,\text{bolt}} < 0$, it is set to $0$.
 
 ### 3) Assume a neutral axis (NA) location
 
@@ -336,6 +341,12 @@ Use a practical assumption per handbook guidance (because exact NA is hard to de
 
 * Conservative: NA at bolt-group centroid line, or
 * Empirical: NA at (d/6) from the bottom edge of plate depth (d).
+
+**Sign convention used in the code (per axis):**
+- For $M_y$: the distribution varies with bolt **z** coordinate over the plate range $[z_{\min}, z_{\max}]$.
+  - If $M_y > 0$, the compression edge is $z_{\min}$; if $M_y < 0$, the compression edge is $z_{\max}$.
+- For $M_z$: the distribution varies with bolt **y** coordinate over the plate range $[y_{\min}, y_{\max}]$.
+  - If $M_z > 0$, the compression edge is $y_{\min}$; if $M_z < 0$, the compression edge is $y_{\max}$.
 
 Define:
 
@@ -369,6 +380,27 @@ $$T_i = T_1\frac{y_i}{y_1}$$
 
 Then per-bolt in row $i$: $T_{\text{bolt},i} = T_i/n_i$.
 
+
+### 7) Biaxial Bending (Both My and Mz)
+
+When both out-of-plane moments are present, the neutral-axis method is applied independently to each axis, and the **signed** contributions are summed before enforcing “no compression in bolts”:
+
+1. Calculate tension contribution from $M_y$ using the above method (varies with bolt z-coordinate)
+2. Calculate tension contribution from $M_z$ using the above method (varies with bolt y-coordinate)  
+3. Add direct tension from $F_x$ (if present)
+4. Sum all contributions: $F_{x,\text{bolt}} = F_{x,\text{direct}} + F_{x,M_y} + F_{x,M_z}$
+5. Apply compression rule: if total is negative, set to zero
+
+**How the code models “compression side” for a moment (per axis):**
+- The handbook distribution is solved using **tension-side** bolt rows only (to get the peak row force $T_1$).
+- The compression side is then assigned a **negative** linear extension with the same slope (triangular distribution mirrored about the NA), so that compression from one axis can cancel tension from the other axis during summation.
+
+- A bolt below NA_y (compression zone for $M_z$) gets a negative contribution from $M_z$
+- Same bolt above NA_z (tension zone for $M_y$) gets a positive contribution from $M_y$  
+- The negative contribution can reduce or eliminate the positive contribution
+- Only after summing all contributions is the final clamp applied (negative → 0)
+
+This represents the true biaxial bending behavior where compression effects can counteract tension effects.
 
 
 

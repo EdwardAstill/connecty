@@ -1,0 +1,5 @@
+WELD PLOT
+================================================================================
+Saved image (elastic): C:\Users\Ed\Desktop\eng scripts\connecty\gallery\weld\weld_plot_elastic.svg
+Saved image (icr):     C:\Users\Ed\Desktop\eng scripts\connecty\gallery\weld\weld_plot_icr.svg
+Plots show weld path colored by stress magnitude, with applied load arrow.

@@ -402,7 +402,9 @@ def aisc_weld_stress(
     delta_m: np.ndarray,
     delta_u: np.ndarray,
     theta: np.ndarray,
-    F_EXX: float
+    F_EXX: float,
+    *,
+    include_kds: bool = True,
 ) -> np.ndarray:
     """
     AISC fillet weld stress from deformation.
@@ -427,8 +429,12 @@ def aisc_weld_stress(
     # Normalized deformation ratio
     p_arr = np.clip(delta_clamped / delta_m, 1e-6, 2.1)
     
-    # Strength factor (angle-dependent)
-    strength_factor = 0.60 * F_EXX * aisc_weld_strength_factor(theta)
+    # Strength factor (optionally angle-dependent)
+    if include_kds:
+        k_ds = aisc_weld_strength_factor(theta)
+    else:
+        k_ds = np.ones_like(theta, dtype=float)
+    strength_factor = 0.60 * F_EXX * k_ds
     
     # Deformation factor
     deform_term = np.clip(p_arr * (1.9 - 0.9 * p_arr), 1e-6, None)

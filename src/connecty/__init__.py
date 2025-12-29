@@ -68,6 +68,9 @@ from .weld import (
     WeldedSection,
     WeldGroup,
     WeldSegment,
+    WeldConnection,
+    WeldBaseMetal,
+    LoadedWeldConnection,
     LoadedWeld,
     StressComponents,
     PointStress,
@@ -96,6 +99,7 @@ from .bolt import (
 )
 
 from .bolt.checks import BoltCheckDetail, BoltCheckResult
+from .weld.checks import WeldCheckDetail, WeldCheckResult
 
 __all__ = [
     # Main weld classes
@@ -105,6 +109,9 @@ __all__ = [
     "WeldedSection",
     "WeldGroup",
     "WeldSegment",
+    "WeldConnection",
+    "WeldBaseMetal",
+    "LoadedWeldConnection",
     "Load",
     "LoadedWeld",
     # Weld stress results
@@ -129,6 +136,8 @@ __all__ = [
     "Plate",
     "BoltCheckResult",
     "BoltCheckDetail",
+    "WeldCheckResult",
+    "WeldCheckDetail",
     # Bolt functions
     "plot_bolt_result",
     "plot_bolt_pattern",

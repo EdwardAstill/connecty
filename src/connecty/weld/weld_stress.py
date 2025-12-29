@@ -244,9 +244,12 @@ def calculate_icr_stress(
     if leg is None or throat is None:
         raise ValueError("Leg and throat sizes are required for the ICR method")
     
-    # Use typical electrode strength for stress distribution shape
-    # This is just for the force distribution, not actual capacity checking
-    F_EXX = 483.0  # MPa, typical E70 electrode
+    # Electrode strength is only used for the ICR load-deformation model scaling;
+    # the final stresses are scaled to match the applied load.
+    if loaded_weld.F_EXX is None:
+        F_EXX = 483.0  # MPa, typical E70 electrode (fallback)
+    else:
+        F_EXX = float(loaded_weld.F_EXX)
     
     Cy, Cz = props.Cy, props.Cz
     
@@ -323,7 +326,14 @@ def calculate_icr_stress(
         delta = np.minimum(lambda_limit * c_arr, delta_u)
         
         # Use shared stress calculation
-        F_w = aisc_weld_stress(delta, delta_m, delta_u, theta, F_EXX)
+        F_w = aisc_weld_stress(
+            delta,
+            delta_m,
+            delta_u,
+            theta,
+            F_EXX,
+            include_kds=bool(loaded_weld.include_kds),
+        )
         R_mag = F_w * throat * ds_arr
         
         R_y = R_mag * dir_y
@@ -411,7 +421,10 @@ def calculate_icr_stress(
         theta = math.degrees(math.acos(min(cos_theta, 1.0)))
         
         # Use shared strength factor
-        strength_factor = float(aisc_weld_strength_factor(np.array([theta]))[0])
+        if loaded_weld.include_kds:
+            strength_factor = float(aisc_weld_strength_factor(np.array([theta]))[0])
+        else:
+            strength_factor = 1.0
         
         equiv_stress = stress_value / strength_factor
         

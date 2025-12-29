@@ -62,6 +62,12 @@ def _tension_from_moment_about_axis(
     axis: Literal["y", "z"],
     tension_method: TensionMethod,
 ) -> list[float]:
+    """Calculate bolt tension from moment about an axis.
+    
+    Returns tension values for all bolts, including negative values for bolts
+    in the compression zone. The calling function should sum all components
+    before applying the compression rule (negative total → 0).
+    """
     n = bolt_group.n
     out = [0.0 for _ in range(n)]
     if abs(moment) < 1e-12:
@@ -103,29 +109,39 @@ def _tension_from_moment_about_axis(
 
     y_c = -abs(comp_edge - na)
 
+    # Group bolts by position coordinate (rows)
     rows: Dict[float, list[int]] = {}
     for idx, u in enumerate(u_vals):
         rows.setdefault(float(u), []).append(idx)
 
     tension_sign = 1.0 if moment > 0.0 else -1.0
 
-    row_data: list[tuple[float, int, list[int]]] = []
+    # Separate tension and compression side rows
+    tension_rows: list[tuple[float, int, list[int]]] = []
+    compression_rows: list[tuple[float, int, list[int]]] = []
+    
     for u_key, indices in rows.items():
         rel = float(u_key) - na
-        if tension_sign * rel <= 0.0:
-            continue
         y_i = abs(rel)
-        row_data.append((y_i, len(indices), indices))
+        
+        if tension_sign * rel > 0.0:
+            # Tension side
+            tension_rows.append((y_i, len(indices), indices))
+        else:
+            # Compression side (will get negative values)
+            compression_rows.append((y_i, len(indices), indices))
 
-    if not row_data:
+    # If no bolts on tension side, no moment to distribute
+    if not tension_rows:
         return out
 
-    y_1 = max(y_i for (y_i, _, _) in row_data)
+    y_1 = max(y_i for (y_i, _, _) in tension_rows)
     if y_1 <= 0.0:
         return out
 
+    # Solve for T1 using only tension-side bolts (per handbook method)
     denom = 0.0
-    for (y_i, _, _) in row_data:
+    for (y_i, _, _) in tension_rows:
         denom += y_i * ((y_i / y_1) - (y_c / y_1))
 
     if abs(denom) < 1e-12:
@@ -133,11 +149,20 @@ def _tension_from_moment_about_axis(
 
     T1 = abs(float(moment)) / denom
 
-    for (y_i, n_i, indices) in row_data:
+    # Distribute tension to tension-side bolts (positive values)
+    for (y_i, n_i, indices) in tension_rows:
         T_row = T1 * (y_i / y_1)
         T_per_bolt = T_row / n_i
         for idx in indices:
-            out[idx] += T_per_bolt
+            out[idx] = T_per_bolt
+
+    # Distribute compression to compression-side bolts (negative values)
+    # Use linear distribution from NA, maintaining the same slope as tension side
+    for (y_i, n_i, indices) in compression_rows:
+        T_row = -T1 * (y_i / y_1)  # Negative for compression
+        T_per_bolt = T_row / n_i
+        for idx in indices:
+            out[idx] = T_per_bolt
 
     return out
 

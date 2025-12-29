@@ -1,0 +1,5 @@
+WELD ANALYSIS (ELASTIC)
+================================================================================
+method=elastic
+max_stress=169.800 MPa
+mean_stress=78.572 MPa

@@ -16,6 +16,13 @@ from .welded_section import (
     WeldSegment,
 )
 
+from .geometry import (
+    WeldConnection,
+    WeldBaseMetal,
+)
+
+from .analysis import LoadedWeldConnection
+
 from .loaded_weld import LoadedWeld
 
 from .weld_stress import (
@@ -34,6 +41,8 @@ from .weld_plotter import (
     plot_loaded_weld_comparison,
 )
 
+from .checks import WeldCheckDetail, WeldCheckResult
+
 __all__ = [
     "Weld",
     "WeldParams",
@@ -41,7 +50,12 @@ __all__ = [
     "WeldedSection",
     "WeldGroup",
     "WeldSegment",
+    "WeldConnection",
+    "WeldBaseMetal",
+    "LoadedWeldConnection",
     "LoadedWeld",
+    "WeldCheckDetail",
+    "WeldCheckResult",
     "StressComponents",
     "PointStress",
     "calculate_elastic_stress",

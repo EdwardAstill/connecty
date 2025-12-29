@@ -1,0 +1,27 @@
+WELD EXAMPLE - SETUP
+================================================================================
+Case: AISC_360_22_FILLET_DXF
+
+Units: choose any consistent system (this example uses mm, N, N*mm, MPa)
+
+DXF geometry: C:\Users\Ed\Desktop\eng scripts\connecty\examples\base1.dxf
+
+Weld definition:
+  type=fillet
+  leg w=6.000 mm
+  throat t_e=4.242 mm
+
+Weld group geometry:
+  L_weld=487.014 mm
+  A_we=2065.913 mm^2 (throat * length)
+  centroid=(y=4.828, z=-77.702) mm
+  Ip=8920355.173 mm^4
+
+Base metal (conservative, for fusion-face check):
+  t=10.000 mm, Fy=350.0 MPa, Fu=450.0 MPa
+  is_double_fillet=False
+  is_rect_hss_end_connection=False
+
+Applied load (forces + moments at a location):
+  Fx=0.00 N, Fy=-120000.00 N, Fz=45000.00 N, Mx=0.00 N·mm, My=0.00 N·mm, Mz=0.00 N·mm, location=(0.0, 0.0, 0.0)
+  theta_deg (for k_ds) = None (directional effects ignored)

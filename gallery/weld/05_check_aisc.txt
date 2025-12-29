@@ -1,0 +1,23 @@
+AISC 360-22 CHECK (fillet)
+================================================================================
+method=icr
+governing_limit_state=detailing_max_fillet
+governing_utilization=0.7500
+
+Capacity Equations (AISC 360-22, fillet welds):
+  Weld metal:   φRn_w = 0.75 * 0.60 * FEXX * Awe * kds
+  Base metal:   φRn_b = min(1.00*0.60*Fy*ABM, 0.75*0.60*Fu*ABM)
+               where ABM = nf * t * Lweld
+  Detailing:    w <= w_max(t) (metric max fillet size rule)
+
+Weld group:
+  type=fillet, w=6.000 mm, t_e=4.242 mm, L_weld=487.014 mm
+  stress_demand=85.441 MPa
+  F_EXX=450.0 MPa, k_ds=1.000, theta_deg=None
+
+Utilizations:
+  weld_metal: 0.4219
+  base_metal_fusion_face: 0.1790
+  detailing_max_fillet: 0.7500 (w_max=8.0)
+
+Governing: detailing_max_fillet (0.7500)

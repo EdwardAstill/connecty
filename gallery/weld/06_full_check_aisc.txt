@@ -1,0 +1,46 @@
+AISC 360-22 FULL WELD CHECK REPORT
+================================================================================
+
+1. WELD GROUP CONFIGURATION
+--------------------------------------------------------------------------------
+DXF: C:\Users\Ed\Desktop\eng scripts\connecty\examples\base1.dxf
+Weld type: fillet
+Weld size: w=6.000 mm, throat=4.242 mm
+Total weld length L_weld=487.014 mm
+Effective area Awe=2065.913 mm^2
+Centroid: (y=4.828, z=-77.702) mm
+
+2. MATERIAL / DETAILING INPUTS (CONSERVATIVE)
+--------------------------------------------------------------------------------
+Base metal: t=10.000 mm, Fy=350.0 MPa, Fu=450.0 MPa
+is_double_fillet=False
+is_rect_hss_end_connection=False
+theta_deg=None (k_ds disabled)
+
+3. LOAD INFORMATION
+--------------------------------------------------------------------------------
+Forces:  Fx=0.00 N, Fy=-120000.00 N, Fz=45000.00 N
+Moments: Mx=0.00 N·mm, My=0.00 N·mm, Mz=0.00 N·mm
+Location: (0.0, 0.0, 0.0)
+
+4. ANALYSIS RESULTS
+--------------------------------------------------------------------------------
+Elastic max stress: 169.800 MPa
+ICR max stress:     85.441 MPa (icr_point=(y=24.945, z=-24.056))
+
+5. CHECK RESULTS (AISC 360-22)
+--------------------------------------------------------------------------------
+Governing limit state: detailing_max_fillet
+Governing utilization: 0.7500
+
+Per-limit-state utilization:
+  weld_metal: 0.4219
+  base_metal_fusion_face: 0.1790
+  detailing_max_fillet: 0.7500
+
+Equations:
+  Capacity Equations (AISC 360-22, fillet welds):
+    Weld metal:   φRn_w = 0.75 * 0.60 * FEXX * Awe * kds
+    Base metal:   φRn_b = min(1.00*0.60*Fy*ABM, 0.75*0.60*Fu*ABM)
+                 where ABM = nf * t * Lweld
+    Detailing:    w <= w_max(t) (metric max fillet size rule)
