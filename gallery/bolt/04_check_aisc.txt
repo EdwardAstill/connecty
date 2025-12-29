@@ -27,184 +27,60 @@ Meta:
   tension_mode: per_bolt
   threads_in_shear_plane: True
 
+Capacity Equations (AISC 360-22):
+  Shear:   Vn = φ * Fnv * Ab * ns
+  Tension: Tn = φ * Fnt' * Ab
+           where Fnt' = min(Fnt, 1.3*Fnt - (Fnt/(φ*Fnv))*f_rv), f_rv = Vu/(Ab*ns)
+  Bearing: Bn = φ * min(R_bearing, R_tearout)
+           R_bearing = 2.4 * d * t * Fu
+           R_tearout = 1.2 * lc * t * Fu
+
 Per-bolt:
   bolt #1 @ (y=-75.00, z=-30.00)
     Demand: V=16.893 kN, T=13.270 kN
     Capacity: Vn=87.179 kN, Tn=146.084 kN, Bn=189.540 kN
     Util: shear=0.1938, tension=0.0908, bearing=0.0891 -> shear (0.1938)
-    Trace:
-      Vn = phi * Fnv * Ab * ns = 0.75 * 370.0 * 314.2 * 1 / 1000 = 87.179 kN
-      Tn = phi * Fnt' * Ab     = 0.75 * 620.0 * 314.2 / 1000 = 146.084 kN
-      Bn = phi * min(R_bearing, R_tearout)
-         = 0.75 * min(259.2, 252.7) = 189.540 kN
-    Calc (Raw):
-      Fnt: 620.0
-      Fnt_prime: 620.0
-      Fnv: 370.0
-      Tu_kN: 13.26976597090449
-      Vu_kN: 16.893188351969243
-      area_b: 314.1592653589793
-      bearing_nom_N: 259200.0
-      bearing_nom_kN: 259.2
-      f_rv: 53.77268861596668
-      h_f: 1.0
-      hole_dia: 22.0
-      lc: 39.0
-      n_b_tension: 6
-      n_s: 1
-      phi: 0.75
-      phi_slip: 1.0
-      pretension_kN: 142.0
-      slip_mu: 0.3
-      tear_nom_N: 252719.99999999997
-      tear_nom_kN: 252.71999999999997
+    Inputs:
+      Vu=16.893 kN, Tu=13.270 kN
+      f_rv=53.8 MPa → Fnt'=620.0 MPa
+      lc=39.0 mm → R_bearing=259.2 kN, R_tearout=252.7 kN
   bolt #2 @ (y=-75.00, z=30.00)
     Demand: V=29.864 kN, T=22.560 kN
     Capacity: Vn=87.179 kN, Tn=139.868 kN, Bn=189.540 kN
     Util: shear=0.3426, tension=0.1613, bearing=0.1576 -> shear (0.3426)
-    Trace:
-      Vn = phi * Fnv * Ab * ns = 0.75 * 370.0 * 314.2 * 1 / 1000 = 87.179 kN
-      Tn = phi * Fnt' * Ab     = 0.75 * 593.6 * 314.2 / 1000 = 139.868 kN
-      Bn = phi * min(R_bearing, R_tearout)
-         = 0.75 * min(259.2, 252.7) = 189.540 kN
-    Calc (Raw):
-      Fnt: 620.0
-      Fnt_prime: 593.6167730729051
-      Fnv: 370.0
-      Tu_kN: 22.56008855154965
-      Vu_kN: 29.863546768566106
-      area_b: 314.1592653589793
-      bearing_nom_N: 259200.0
-      bearing_nom_kN: 259.2
-      f_rv: 95.05862172946587
-      h_f: 1.0
-      hole_dia: 22.0
-      lc: 39.0
-      n_b_tension: 6
-      n_s: 1
-      phi: 0.75
-      phi_slip: 1.0
-      pretension_kN: 142.0
-      slip_mu: 0.3
-      tear_nom_N: 252719.99999999997
-      tear_nom_kN: 252.71999999999997
+    Inputs:
+      Vu=29.864 kN, Tu=22.560 kN
+      f_rv=95.1 MPa → Fnt'=593.6 MPa
+      lc=39.0 mm → R_bearing=259.2 kN, R_tearout=252.7 kN
   bolt #3 @ (y=0.00, z=-30.00)
     Demand: V=14.508 kN, T=11.064 kN
     Capacity: Vn=87.179 kN, Tn=146.084 kN, Bn=189.540 kN
     Util: shear=0.1664, tension=0.0757, bearing=0.0765 -> shear (0.1664)
-    Trace:
-      Vn = phi * Fnv * Ab * ns = 0.75 * 370.0 * 314.2 * 1 / 1000 = 87.179 kN
-      Tn = phi * Fnt' * Ab     = 0.75 * 620.0 * 314.2 / 1000 = 146.084 kN
-      Bn = phi * min(R_bearing, R_tearout)
-         = 0.75 * min(259.2, 252.7) = 189.540 kN
-    Calc (Raw):
-      Fnt: 620.0
-      Fnt_prime: 620.0
-      Fnv: 370.0
-      Tu_kN: 11.063883617963315
-      Vu_kN: 14.508286411902045
-      area_b: 314.1592653589793
-      bearing_nom_N: 259200.0
-      bearing_nom_kN: 259.2
-      f_rv: 46.181309964943765
-      h_f: 1.0
-      hole_dia: 22.0
-      lc: 39.0
-      n_b_tension: 6
-      n_s: 1
-      phi: 0.75
-      phi_slip: 1.0
-      pretension_kN: 142.0
-      slip_mu: 0.3
-      tear_nom_N: 252719.99999999997
-      tear_nom_kN: 252.71999999999997
+    Inputs:
+      Vu=14.508 kN, Tu=11.064 kN
+      f_rv=46.2 MPa → Fnt'=620.0 MPa
+      lc=39.0 mm → R_bearing=259.2 kN, R_tearout=252.7 kN
   bolt #4 @ (y=0.00, z=30.00)
     Demand: V=28.582 kN, T=20.354 kN
     Capacity: Vn=87.179 kN, Tn=142.015 kN, Bn=189.540 kN
     Util: shear=0.3279, tension=0.1433, bearing=0.1508 -> shear (0.3279)
-    Trace:
-      Vn = phi * Fnv * Ab * ns = 0.75 * 370.0 * 314.2 * 1 / 1000 = 87.179 kN
-      Tn = phi * Fnt' * Ab     = 0.75 * 602.7 * 314.2 / 1000 = 142.015 kN
-      Bn = phi * min(R_bearing, R_tearout)
-         = 0.75 * min(259.2, 252.7) = 189.540 kN
-    Calc (Raw):
-      Fnt: 620.0
-      Fnt_prime: 602.7294612854356
-      Fnv: 370.0
-      Tu_kN: 20.354206198608477
-      Vu_kN: 28.582197037894186
-      area_b: 314.1592653589793
-      bearing_nom_N: 259200.0
-      bearing_nom_kN: 259.2
-      f_rv: 90.97995886014778
-      h_f: 1.0
-      hole_dia: 22.0
-      lc: 39.0
-      n_b_tension: 6
-      n_s: 1
-      phi: 0.75
-      phi_slip: 1.0
-      pretension_kN: 142.0
-      slip_mu: 0.3
-      tear_nom_N: 252719.99999999997
-      tear_nom_kN: 252.71999999999997
+    Inputs:
+      Vu=28.582 kN, Tu=20.354 kN
+      f_rv=91.0 MPa → Fnt'=602.7 MPa
+      lc=39.0 mm → R_bearing=259.2 kN, R_tearout=252.7 kN
   bolt #5 @ (y=75.00, z=-30.00)
     Demand: V=29.222 kN, T=8.858 kN
     Capacity: Vn=87.179 kN, Tn=140.943 kN, Bn=189.540 kN
     Util: shear=0.3352, tension=0.0628, bearing=0.1542 -> shear (0.3352)
-    Trace:
-      Vn = phi * Fnv * Ab * ns = 0.75 * 370.0 * 314.2 * 1 / 1000 = 87.179 kN
-      Tn = phi * Fnt' * Ab     = 0.75 * 598.2 * 314.2 / 1000 = 140.943 kN
-      Bn = phi * min(R_bearing, R_tearout)
-         = 0.75 * min(259.2, 252.7) = 189.540 kN
-    Calc (Raw):
-      Fnt: 620.0
-      Fnt_prime: 598.1789631611458
-      Fnv: 370.0
-      Tu_kN: 8.858001265022137
-      Vu_kN: 29.222049890312
-      area_b: 314.1592653589793
-      bearing_nom_N: 259200.0
-      bearing_nom_kN: 259.2
-      f_rv: 93.01667374642265
-      h_f: 1.0
-      hole_dia: 22.0
-      lc: 39.0
-      n_b_tension: 6
-      n_s: 1
-      phi: 0.75
-      phi_slip: 1.0
-      pretension_kN: 142.0
-      slip_mu: 0.3
-      tear_nom_N: 252719.99999999997
-      tear_nom_kN: 252.71999999999997
+    Inputs:
+      Vu=29.222 kN, Tu=8.858 kN
+      f_rv=93.0 MPa → Fnt'=598.2 MPa
+      lc=39.0 mm → R_bearing=259.2 kN, R_tearout=252.7 kN
   bolt #6 @ (y=75.00, z=30.00)
     Demand: V=38.215 kN, T=18.148 kN
     Capacity: Vn=87.179 kN, Tn=125.873 kN, Bn=189.540 kN
     Util: shear=0.4383, tension=0.1442, bearing=0.2016 -> shear (0.4383)
-    Trace:
-      Vn = phi * Fnv * Ab * ns = 0.75 * 370.0 * 314.2 * 1 / 1000 = 87.179 kN
-      Tn = phi * Fnt' * Ab     = 0.75 * 534.2 * 314.2 / 1000 = 125.873 kN
-      Bn = phi * min(R_bearing, R_tearout)
-         = 0.75 * min(259.2, 252.7) = 189.540 kN
-    Calc (Raw):
-      Fnt: 620.0
-      Fnt_prime: 534.2236011206853
-      Fnv: 370.0
-      Tu_kN: 18.1483238456673
-      Vu_kN: 38.21491610215976
-      area_b: 314.1592653589793
-      bearing_nom_N: 259200.0
-      bearing_nom_kN: 259.2
-      f_rv: 121.64185595001582
-      h_f: 1.0
-      hole_dia: 22.0
-      lc: 39.0
-      n_b_tension: 6
-      n_s: 1
-      phi: 0.75
-      phi_slip: 1.0
-      pretension_kN: 142.0
-      slip_mu: 0.3
-      tear_nom_N: 252719.99999999997
-      tear_nom_kN: 252.71999999999997
+    Inputs:
+      Vu=38.215 kN, Tu=18.148 kN
+      f_rv=121.6 MPa → Fnt'=534.2 MPa
+      lc=39.0 mm → R_bearing=259.2 kN, R_tearout=252.7 kN

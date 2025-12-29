@@ -102,88 +102,31 @@ def _format_analysis(title: str, result) -> str:
     return "\n".join(lines)
 
 
-def _render_formula_trace(standard: str, calc: dict[str, Any], meta: dict[str, Any]) -> list[str]:
-    """Render explicit calculation traces based on the standard and available calc data."""
+def _render_equations_once(standard: str, meta: dict[str, Any]) -> list[str]:
+    """Render the capacity equations once (without specific values)."""
     lines = []
     
     if standard == "aisc":
-        # Inputs
-        phi = calc.get("phi", 0.75)
-        area_b = calc.get("area_b", 0.0)
+        lines.append("Capacity Equations (AISC 360-22):")
+        lines.append("  Shear:   Vn = φ * Fnv * Ab * ns")
+        lines.append("  Tension: Tn = φ * Fnt' * Ab")
+        lines.append("           where Fnt' = min(Fnt, 1.3*Fnt - (Fnt/(φ*Fnv))*f_rv), f_rv = Vu/(Ab*ns)")
+        lines.append("  Bearing: Bn = φ * min(R_bearing, R_tearout)")
+        lines.append("           R_bearing = 2.4 * d * t * Fu")
+        lines.append("           R_tearout = 1.2 * lc * t * Fu")
         
-        # --- Shear (Vn) ---
-        Fnv = calc.get("Fnv", 0.0)
-        n_s = calc.get("n_s", 1)
-        # Simplified trace for typical case (no fillers)
-        vn_nom = n_s * Fnv * area_b / 1000.0  # kN
-        lines.append(f"      Vn = phi * Fnv * Ab * ns = {phi} * {Fnv:.1f} * {area_b:.1f} * {n_s} / 1000 = {phi * vn_nom:.3f} kN")
-
-        # --- Tension (Tn) ---
-        Fnt_prime = calc.get("Fnt_prime", 0.0)
-        tn_nom = Fnt_prime * area_b / 1000.0 # kN
-        lines.append(f"      Tn = phi * Fnt' * Ab     = {phi} * {Fnt_prime:.1f} * {area_b:.1f} / 1000 = {phi * tn_nom:.3f} kN")
-        
-        # --- Bearing (Bn) ---
-        # min of bearing and tearout
-        br_nom = calc.get("bearing_nom_kN", 0.0)
-        tr_nom = calc.get("tear_nom_kN", 0.0)
-        lines.append(f"      Bn = phi * min(R_bearing, R_tearout)")
-        lines.append(f"         = {phi} * min({br_nom:.1f}, {tr_nom:.1f}) = {phi * min(br_nom, tr_nom):.3f} kN")
-
     elif standard == "as4100":
-        # Resistance factors per the implemented AS 4100 checks:
-        # - shear/tension: ϕ = 0.8
-        # - bearing/tearout: ϕ = 0.9
-        phi_st = 0.8
-        phi_b = 0.9
-        fuf = meta.get("fuf", 0.0)
-        kr = meta.get("reduction_factor_kr", 1.0)
-        
-        # --- Shear (Vn) ---
-        # Vf = phi * 0.62 * fuf * kr * (nn*Ac + nx*Ao)
-        Ac = meta.get("Ac", 0.0)
-        Ao = meta.get("Ao", 0.0)
-        nn = meta.get("nn_shear_planes", 0)
-        nx = meta.get("nx_shear_planes", 0)
-        
-        area_term = nn * Ac + nx * Ao
-        vn_nom = 0.62 * fuf * kr * area_term / 1000.0  # kN
-        
-        lines.append(f"      Vn (Shear)   = phi * 0.62 * fuf * kr * (nn*Ac + nx*Ao)")
-        lines.append(f"                   = {phi_st} * 0.62 * {fuf:.0f} * {kr} * ({nn}*{Ac:.1f} + {nx}*{Ao:.1f})")
-        lines.append(f"                   = {phi_st} * 0.62 * {fuf:.0f} * {kr} * {area_term:.1f} / 1000")
-        lines.append(f"                   = {phi_st * vn_nom:.3f} kN")
-
-        # --- Tension (Tn) ---
-        # Ntf = phi * As * fuf
-        As = meta.get("As", 0.0)
-        ntf_nom = As * fuf / 1000.0  # kN
-        lines.append(f"      Tn (Tension) = phi * As * fuf")
-        lines.append(f"                   = {phi_st} * {As:.1f} * {fuf:.0f} / 1000")
-        lines.append(f"                   = {phi_st * ntf_nom:.3f} kN")
-        
-        # --- Bearing (Bn) ---
-        # Design bearing/tearout capacity: 0.9 * min(Vb, Vp)
-        # Vb = 3.2 * tp * df * fup
-        # Vp = ae * tp * fup, where connecty uses ae := edge_clear (bolt center to nearest plate edge)
-        df = meta.get("bolt_diameter", 0.0)
-        tp = meta.get("plate_thickness", 0.0)
-        fup = meta.get("plate_fu", 0.0)
-        br_cap = calc.get("bearing_capacity_kN", 0.0)
-        ae = calc.get("edge_clear", None)
-        
-        vb = 3.2 * df * tp * fup / 1000.0
-        vp = None if ae is None else (float(ae) * tp * fup / 1000.0)
-        governing = vb if vp is None else min(vb, vp)
-        
-        lines.append(f"      Bn (Bearing) = phi * min(Vb, Vp)")
-        lines.append(f"                   Vb = 3.2 * tp * df * fup = 3.2 * {tp:.1f} * {df:.1f} * {fup:.0f} / 1000 = {vb:.3f} kN")
-        if vp is not None:
-            lines.append(f"                   Vp = ae * tp * fup       = {float(ae):.1f} * {tp:.1f} * {fup:.0f} / 1000 = {vp:.3f} kN")
-        lines.append(f"                   = {phi_b} * {governing:.3f} = {phi_b * governing:.3f} kN")
-        if abs(br_cap - phi_b * governing) > 0.05:
-            lines.append(f"                   → {br_cap:.3f} kN (implemented)")
-
+        lines.append("Capacity Equations (AS 4100):")
+        lines.append("  Shear:   Vn = φ * 0.62 * fuf * kr * (nn*Ac + nx*Ao)")
+        lines.append("  Tension: Tn = φ * As * fuf")
+        lines.append("  Bearing: Bn = φ * min(Vb, Vp)")
+        lines.append("           Vb = 3.2 * tp * df * fup")
+        lines.append("           Vp = a_e * tp * fup")
+        lines.append("           where a_e = edge_clear - dh/2 (AS 4100:2020 Cl. 9.3.2.4)")
+        prying = meta.get("prying_allowance", 0.0)
+        if prying > 0:
+            lines.append(f"  Note: Tension demand includes prying allowance ({prying*100:.0f}%): Tu_design = Tu * (1 + {prying})")
+    
     return lines
 
 
@@ -207,13 +150,19 @@ def _format_check(title: str, check) -> str:
             value = meta[key]
             lines.append(f"  {key}: {value}")
 
+    # Show equations once
+    lines.append("")
+    equation_lines = _render_equations_once(standard, meta)
+    for line in equation_lines:
+        lines.append(line)
+
     lines.append("")
     lines.append("Per-bolt:")
     for d in check.details:
         slip_util = d.slip_util
         slip_part = ""
         if slip_util is not None:
-            slip_part = f", slip_util={slip_util:.4f}"
+            slip_part = f", slip={slip_util:.4f}"
         lines.append(f"  bolt #{d.bolt_index + 1} @ (y={d.point[0]:.2f}, z={d.point[1]:.2f})")
         lines.append(
             f"    Demand: V={d.shear_demand:.3f} kN, T={d.tension_demand:.3f} kN"
@@ -229,19 +178,27 @@ def _format_check(title: str, check) -> str:
             f"-> {d.governing_limit_state} ({d.governing_util:.4f})"
         )
 
+        # Show input values for this bolt
         calc = getattr(d, "calc", {})
         if calc:
-            lines.append("    Trace:")
-            trace_lines = _render_formula_trace(standard, calc, meta)
-            for line in trace_lines:
-                lines.append(line)
-
-            lines.append("    Calc (Raw):")
-            for key in sorted(calc.keys()):
-                value = calc[key]
-                if value is None:
-                    continue
-                lines.append(f"      {key}: {value}")
+            lines.append("    Inputs:")
+            
+            if standard == "aisc":
+                # Show key varying inputs
+                lines.append(f"      Vu={calc.get('Vu_kN', 0.0):.3f} kN, Tu={calc.get('Tu_kN', 0.0):.3f} kN")
+                lines.append(f"      f_rv={calc.get('f_rv', 0.0):.1f} MPa → Fnt'={calc.get('Fnt_prime', 0.0):.1f} MPa")
+                lines.append(f"      lc={calc.get('lc', 0.0):.1f} mm → R_bearing={calc.get('bearing_nom_kN', 0.0):.1f} kN, R_tearout={calc.get('tear_nom_kN', 0.0):.1f} kN")
+                
+            elif standard == "as4100":
+                # Show key varying inputs
+                Tu = calc.get('Tu_kN', 0.0)
+                Tu_prying = calc.get('Tu_prying_kN', 0.0)
+                lines.append(f"      Vu={calc.get('Vu_kN', 0.0):.3f} kN, Tu={Tu:.3f} kN"
+                           + (f" (with prying: {Tu_prying:.3f} kN)" if abs(Tu_prying - Tu) > 0.001 else ""))
+                a_e = calc.get('a_e', 0.0)
+                edge_clear = calc.get('edge_clear_center', 0.0)
+                lines.append(f"      a_e={a_e:.1f} mm (from edge_clear={edge_clear:.1f} mm)")
+                lines.append(f"      Vb={calc.get('Vb_N', 0.0)/1000:.1f} kN, Vp={calc.get('Vp_N', 0.0)/1000:.1f} kN")
 
     return "\n".join(lines)
 
