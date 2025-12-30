@@ -329,7 +329,7 @@ result.plot(
 
 ## 5. Design Checks
 
-Connecty provides automatic design checks for **bolts** (AISC 360-22), and outputs-only for **welds** (you define allowable stress).
+Connecty provides automatic design checks for **bolts** and **fillet welds** (AISC 360-22, LRFD). Manual allowable-stress checks remain available when you want full control.
 
 ### Bolt Design Check (Automatic AISC 360-22)
 

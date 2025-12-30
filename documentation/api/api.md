@@ -12,7 +12,8 @@ Complete API documentation for the Connecty structural connection analysis and d
 4. [Bolt Design Checks](#bolt-design-checks)
 5. [Weld Analysis](#weld-analysis)
 6. [Weld Parameters](#weld-parameters)
-7. [Visualization](#visualization)
+7. [Weld Design Checks](#weld-design-checks)
+8. [Visualization](#visualization)
 
 ---
 
@@ -35,9 +36,14 @@ from connecty import (
     # Weld analysis
     Weld,
     WeldParams,
+    WeldBaseMetal,
+    WeldConnection,
     LoadedWeld,
+    LoadedWeldConnection,
     PointStress,
     StressComponents,
+    WeldCheckResult,
+    WeldCheckDetail,
 )
 ```
 
@@ -410,91 +416,131 @@ Create weld from a structural section (steel shape).
 - `parameters` (`WeldParams`): Weld geometry
 - **Returns:** `Weld`
 
-**Properties:**
+**Properties (calculated automatically):**
 
 ```python
-weld.total_length              # Total weld length [mm, in]
-weld.throat_area               # Effective throat area [mm², in²]
-weld.centroid                  # (y, z) centroid of weld
-weld.polar_moment              # Polar moment of inertia about centroid
+weld.A                         # Throat area (area = throat × length)
+weld.L                         # Total weld length
+weld.Cy, weld.Cz               # Centroid coordinates
+weld.Iy, weld.Iz               # Second moments of area about centroid
+weld.Ip                        # Polar moment (Iy + Iz)
 ```
 
-**Methods:**
+---
 
-#### `analyze(load, method="elastic")`
-Calculate stress distribution along weld.
+### Analyzing a weld
+
+Use `LoadedWeld` to perform analysis (instantiation runs the calculation):
 
 ```python
-loaded = weld.analyze(load, method="elastic")
-# or
-loaded = weld.analyze(load, method="icr")
+from connecty import LoadedWeld
+
+loaded = LoadedWeld(
+    weld,
+    load,
+    method="elastic",
+    discretization=200,
+    F_EXX=483.0,        # optional: stored for utilisation plots/checks
+    include_kds=True    # apply AISC directional strength factor
+)
 ```
 
-- `load` (`Load`): Applied force and location
-- `method` (str): `"elastic"` or `"icr"`
-- **Returns:** `LoadedWeld`
+**Method options by weld type:**
+
+| Weld Type | `method` | Notes |
+|-----------|----------|-------|
+| Fillet    | `"elastic"` | 3D vector method (Fx, Fy, Fz, Mx, My, Mz) |
+| Fillet    | `"icr"` | 2D ICR (Fy, Fz, Mx only) with k_ds benefit |
+| Fillet    | `"both"` | Runs elastic + icr; enables comparison plot |
+| PJP / CJP / Plug / Slot | `"elastic"` | Only option |
 
 ---
 
 ### `LoadedWeld`
 
-Stress results for a weld under load. Same as `analyze()` return value.
+Pointwise stress results for a weld under load.
 
 **Attributes:**
 
 ```python
-loaded.max                     # Maximum stress at any point on weld
-loaded.min                     # Minimum stress at any point on weld
-loaded.mean                    # Average stress along weld
-loaded.method                  # "elastic" or "icr"
+loaded.max                     # Maximum resultant stress
+loaded.max_stress              # Alias for max
+loaded.min                     # Minimum resultant stress
+loaded.min_stress              # Alias for min
+loaded.mean                    # Average resultant stress
+loaded.range                   # Stress range (max - min)
+loaded.method                  # "elastic", "icr", or "both" (fillet only)
 loaded.weld                    # Weld object
 loaded.load                    # Load object
-loaded.stresses                # List of WeldStress objects (one per discretized point)
-loaded.critical_stress         # WeldStress object at maximum location
-loaded.critical_index          # Index of maximum stress point
-```
+loaded.point_stresses          # List[PointStress] (aligned to discretization)
+loaded.max_point               # PointStress at maximum stress
 
-**ICR-Specific Attributes:**
-
-```python
-loaded.icr_point               # (y, z) location of instantaneous center of rotation
+# ICR-only
+loaded.icr_point               # (y, z) instantaneous center of rotation
+loaded.rotation                # Rotation about ICR (radians)
 ```
 
 **Methods:**
+
+#### `at(y, z)`
+Return `StressComponents` at the nearest discretized point.
+
+#### `weld_metal_utilizations(F_EXX=None, phi_w=0.75, conservative_k_ds=False)`
+Pointwise weld-metal utilisation per AISC fillet basis (aligned to `point_stresses`). If `F_EXX` is not passed, uses `LoadedWeld.F_EXX`; raises if neither is set.
+
+#### `directional_factors(conservative_k_ds=False)`
+Return pointwise `k_ds` values (AISC directional strength factor). If `include_kds` was False at analysis or `conservative_k_ds` is True, returns 1.0 everywhere.
 
 #### `plot(**kwargs)`
 Visualize weld and stress distribution.
 
 ```python
 loaded.plot(
-    force=True,
-    colorbar=True,
-    cmap="RdYlGn_r",
+    section=True,          # show section outline if available
+    info=True,             # show max/util info in title
+    cmap="coolwarm",
+    weld_linewidth=5.0,
     show=True,
-    save_path="weld.svg"
+    save_path="weld.svg",  # ".svg" appended if missing
+    legend=False
 )
 ```
 
-- `force` (bool): Show applied load location
-- `colorbar` (bool): Show stress magnitude colorbar
-- `cmap` (str): Matplotlib colormap
-- `show` (bool): Display plot immediately
-- `save_path` (str): Path to save .svg file
+- If `method="both"` on construction, plots elastic vs ICR side-by-side (fillet only).
+
+#### `plot_utilization(**kwargs)`
+Plot weld-metal utilisation along the weld path.
+
+```python
+loaded.plot_utilization(
+    section=True,
+    info=True,
+    cmap="viridis",
+    weld_linewidth=5.0,
+    show=True,
+    save_path=None,        # optional .svg
+    legend=False,
+    F_EXX=None,            # override electrode strength
+    conservative_k_ds=False
+)
+```
+
+#### `plot_directional_factor(**kwargs)`
+Plot `k_ds` along the weld path (fillet only).
 
 ---
 
-### `WeldStress`
+### `PointStress`
 
 Stress at a single point on the weld.
 
 **Attributes:**
 
 ```python
-stress.s                       # Position along weld [0 to total_length]
-stress.y                       # y-coordinate on weld
-stress.z                       # z-coordinate on weld
-stress.value                   # Stress magnitude [MPa, ksi]
-stress.angle                   # Stress direction
+ps.point                     # (y, z) coordinates
+ps.y, ps.z                   # Convenience accessors
+ps.components                # StressComponents object
+ps.stress                    # Resultant stress magnitude
 ```
 
 ---
@@ -525,32 +571,98 @@ For plug/slot, you provide `area` directly.
 
 ---
 
+## Weld Design Checks
+
+### `WeldBaseMetal`
+
+Base metal properties for the weaker/thinner part of the connection:
+
+```python
+WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+# t (thickness), fy (yield), fu (ultimate)
+```
+
+### `WeldConnection`
+
+Wraps a `Weld` with base metal data and connection flags.
+
+```python
+from connecty import WeldConnection, WeldBaseMetal
+
+connection = WeldConnection.from_geometry(
+    geometry=weld.geometry,
+    parameters=weld.parameters,
+    base_metal=WeldBaseMetal(t=10.0, fy=350.0, fu=450.0),
+    is_double_fillet=False,
+    is_rect_hss_end_connection=False,
+)
+result = connection.analyze(load, method="icr", discretization=200)
+```
+
+- `from_geometry(...)` / `from_dxf(...)` helpers build the `Weld` for you.
+- `analyze(...)` returns a `LoadedWeldConnection`.
+
+### `LoadedWeldConnection`
+
+Convenience wrapper over `LoadedWeld` with bolt-style API.
+
+```python
+result.max_stress          # == result.analysis.max
+result.min_stress
+result.mean_stress
+result.max_point
+
+result.plot(...)           # delegates to LoadedWeld.plot
+result.plot_utilization(...)  # util plot
+result.plot_directional_factor(...)  # k_ds plot
+```
+
+#### `check(**kwargs)`
+Perform AISC 360-22 fillet weld check (LRFD):
+
+```python
+check = result.check(
+    standard="aisc",
+    F_EXX=None,               # default: matching electrode = base metal Fu
+    enforce_max_fillet_size=True,
+    conservative_k_ds=False,  # set True to force k_ds=1.0
+)
+```
+
+### `WeldCheckResult` and `WeldCheckDetail`
+
+```python
+check.governing_utilization    # Governing utilisation across weld groups
+check.governing_limit_state    # "weld_metal", "base_metal", or "detailing"
+check.details                  # List[WeldCheckDetail]
+
+detail.leg                     # Fillet leg (w)
+detail.throat                  # Effective throat (t_e)
+detail.theta_deg               # Governing theta used for k_ds (None if k_ds=1.0)
+detail.k_ds                    # Directional factor used
+detail.weld_util               # Weld-metal utilisation
+detail.base_util               # Base-metal utilisation (if applicable)
+detail.detailing_max_util      # Utilisation vs max fillet size limit (if checked)
+detail.governing_util          # Governing utilisation for this weld
+detail.governing_limit_state   # Governing limit state string
+```
+
+Notes:
+- Fillet welds are auto-checked; other types require advanced inputs and are not auto-checked here.
+- `k_ds` is automatically computed at the governing point unless disabled or HSS end-connection restriction applies.
+- Electrode defaults to matching the weaker base metal (`F_EXX = fu`).
+
+---
+
 ## Visualization
 
 ### Plotting Methods
 
-Both `BoltResult` and `LoadedWeld` have `.plot()` methods.
-
-**Common Parameters:**
+Both bolt and weld results expose `.plot()` helpers. When `save_path` is provided, `.svg` is appended automatically; set `show=False` for headless environments.
 
 ```python
-result.plot(
-    force=True,              # Show applied load
-    colorbar=True,           # Show magnitude colorbar
-    cmap="coolwarm",         # Matplotlib colormap
-    title=None,              # Custom title
-    show=True,               # Display immediately
-    save_path="output.svg"   # Save to file
-)
+result.plot(save_path="output.svg", show=True)
 ```
-
-**Available Colormaps:**
-
-- `"coolwarm"` — Blue (low) to red (high)
-- `"viridis"` — Purple to yellow (perceptually uniform)
-- `"RdYlGn_r"` — Red (high) to green (low)
-- `"plasma"` — Purple to yellow
-- See [matplotlib colormaps](https://matplotlib.org/stable/tutorials/colors/colormaps.html) for more
 
 ### Bolt Plot Parameters
 
@@ -568,13 +680,21 @@ Additional parameters and behavior specific to `BoltResult.plot`:
 - ICR point shown (for ICR results; axial mode is not available)
 - Title shows bolt count, size, max force
 
-**Weld Plot Features:**
+### Weld Plot Parameters
 
-- Weld path drawn as line
-- Stress distribution shown as color gradient along weld
-- Applied load location marked
-- Critical stress point highlighted
-- ICR point shown (if ICR method used)
+`LoadedWeld.plot` (stress), `plot_utilization`, and `plot_directional_factor` accept:
+
+- `section` — Show section outline when available
+- `info` — Include summary text (max stress / utilisation / k_ds)
+- `cmap` — Matplotlib colormap (`"coolwarm"`, `"viridis"`, `"plasma"`, etc.)
+- `weld_linewidth` — Line weight for weld path
+- `legend` — Show load legend
+- `show` — Display immediately (set False for automation)
+- `save_path` — Optional file path; `.svg` appended if missing
+- `F_EXX` (utilisation plot) — Override electrode strength; otherwise uses `LoadedWeld.F_EXX`
+- `conservative_k_ds` (utilisation/k_ds plots) — Force `k_ds = 1.0`
+
+`LoadedWeld.plot` automatically shows the applied load; for `method="both"` it renders an elastic vs ICR comparison when applicable.
 
 ---
 
@@ -662,7 +782,7 @@ results_dict = check.info
 ### Complete Weld Analysis
 
 ```python
-from connecty import Weld, WeldParams, Load
+from connecty import Weld, WeldParams, Load, LoadedWeld
 from sectiony.library import rhs
 
 # Define weld
@@ -673,7 +793,14 @@ weld = Weld.from_section(section, WeldParams(type="fillet", leg=6.0))
 load = Load(Fy=-100e3, location=(50, 0))
 
 # Analyze
-loaded = weld.analyze(load, method="elastic")
+loaded = LoadedWeld(
+    weld,
+    load,
+    method="elastic",
+    discretization=200,
+    F_EXX=483.0,          # optional storage for utilisation plots/checks
+    include_kds=True,
+)
 print(f"Max stress: {loaded.max:.1f} MPa")
 
 # Define allowable (example: E70 fillet weld)
@@ -687,6 +814,39 @@ print(f"Utilization: {utilization:.1%}")
 
 # Visualize
 loaded.plot(save_path="weld_analysis.svg")
+loaded.plot_utilization(save_path="weld_util.svg", F_EXX=F_EXX)
+```
+
+### Weld Analysis + AISC Check (Fillet)
+
+```python
+from connecty import (
+    Weld,
+    WeldParams,
+    WeldConnection,
+    WeldBaseMetal,
+    Load,
+)
+from sectiony.library import rhs
+
+section = rhs(b=100, h=200, t=10, r=15)
+weld = Weld.from_section(section, WeldParams(type="fillet", leg=6.0))
+base_metal = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+
+# Build connection with base metal data
+connection = WeldConnection(
+    weld=weld,
+    base_metal=base_metal,
+    is_double_fillet=False,
+    is_rect_hss_end_connection=False,
+)
+
+load = Load(Fy=-120000, Fz=45000, location=(0, 0))
+result = connection.analyze(load, method="icr")
+
+check = result.check(standard="aisc")
+print(f"Governing util: {check.governing_utilization:.2f}")
+print(f"Limit state: {check.governing_limit_state}")
 ```
 
 ---
@@ -723,7 +883,7 @@ Common exceptions and causes:
 |-----------|-------|----------|
 | `ValueError` | Invalid bolt grade, hole type, or connection type | Check parameter values match allowed options |
 | `ValueError` | Missing required design parameters | Provide `plate_fu`, `plate_thickness`, edge distances for bearing checks |
-| `ValueError` | Invalid method name | Use `"elastic"` or `"icr"` only |
+| `ValueError` | Invalid method name | Use `"elastic"`, `"icr"`, or `"both"` (fillet only) |
 | `RuntimeError` | ICR solver did not converge | Check load location is reasonable; try elastic method |
 
 ---

@@ -166,6 +166,7 @@ print(f"Mean stress: {loaded.mean:.1f} MPa")
 |-----------|-----------|-------------|
 | **Fillet** | `"elastic"` | Conservative vector sum (default) |
 | **Fillet** | `"icr"` | ICR method with angle benefit |
+| **Fillet** | `"both"` | Runs elastic + ICR and enables comparison plotting |
 | **PJP** | `"elastic"` | Vector analysis (only option) |
 | **CJP** | `"elastic"` | Vector analysis (only option) |
 | **Plug/Slot** | `"elastic"` | Shear-only analysis (only option) |
@@ -197,6 +198,8 @@ The Instantaneous Center of Rotation method:
 
 **Important:** ICR is a **2D analysis**. It considers only in-plane loads ($F_y, F_z$) and torsion ($M_x$). Out-of-plane loads ($F_x, M_y, M_z$) are **ignored** by the ICR solver. For combined 3D loading, use the **Elastic Method**.
 
+*Directional factor control:* pass `include_kds=False` to `LoadedWeld` to force $k_{ds}=1.0$ (also affects utilisation and directional-factor helpers).
+
 ```python
 # ICR method for fillet welds
 loaded = LoadedWeld(weld, load, method="icr")
@@ -217,12 +220,14 @@ loaded = LoadedWeld(weld, load, method="elastic")
 
 # Properties
 loaded.max              # Maximum resultant stress (MPa)
+loaded.max_stress       # Alias for max
 loaded.min              # Minimum resultant stress (MPa)
+loaded.min_stress       # Alias for min
 loaded.mean             # Average stress (MPa)
 loaded.range            # Stress range (max - min) (MPa)
 loaded.max_point        # PointStress object at max location
 loaded.point_stresses   # List of all PointStress objects
-loaded.method           # "elastic" or "icr"
+loaded.method           # "elastic", "icr", or "both" (fillet only)
 
 # ICR-specific
 loaded.icr_point        # (y, z) location of instantaneous center
@@ -255,20 +260,25 @@ print(f"Bending: {stress.f_bending:.1f} MPa")
 print(f"Resultant: {stress.resultant:.1f} MPa")
 ```
 
+### Utilisation & k_ds helpers
+
+- `loaded.weld_metal_utilizations(F_EXX=None, phi_w=0.75, conservative_k_ds=False)`: pointwise weld-metal utilisation (AISC fillet basis), aligned to `point_stresses`. Requires `F_EXX` here or on `LoadedWeld`.
+- `loaded.directional_factors(conservative_k_ds=False)`: pointwise directional factors ($k_{ds}$). Returns 1.0 everywhere if `include_kds=False` at analysis or `conservative_k_ds=True`.
+
 ---
 
 ## Visualization
 
 ```python
-# Plot stress distribution
+# Plot stress distribution (elastic or ICR)
 loaded.plot(
     section=True,        # Show section geometry
-    force=True,          # Show applied load
-    colorbar=True,       # Show stress magnitude colorbar
-    cmap="coolwarm",     # Matplotlib colormap
-    weld_linewidth=5.0,  # Width of weld path
-    show=True,           # Display immediately
-    save_path="weld_analysis.svg"  # Save to file
+    info=True,           # Show summary text
+    cmap="coolwarm",
+    weld_linewidth=5.0,
+    show=True,
+    save_path="weld_analysis.svg",  # ".svg" appended if missing
+    legend=False
 )
 ```
 
@@ -278,6 +288,33 @@ Features:
 - Applied load location marked
 - ICR point shown (if ICR method used)
 - Title shows method and max stress
+
+### Utilisation plot
+
+```python
+loaded.plot_utilization(
+    section=True,
+    info=True,
+    cmap="viridis",
+    weld_linewidth=5.0,
+    save_path="weld_util.svg",   # ".svg" appended if missing
+    F_EXX=483.0,                 # optional override
+    conservative_k_ds=False,
+)
+```
+
+### Directional factor (k_ds) plot
+
+```python
+loaded.plot_directional_factor(
+    section=True,
+    info=True,
+    cmap="plasma",
+    weld_linewidth=5.0,
+    save_path="kds.svg",
+    conservative_k_ds=False,
+)
+```
 
 ### Comparison Plots
 
@@ -299,7 +336,43 @@ plot_loaded_weld_comparison(
 
 ## Design Checks
 
-Connecty outputs stress only. To check adequacy, you provide the allowable stress:
+Connecty supports both an automatic AISC 360-22 fillet weld check and manual allowable-stress checks.
+
+### Automatic AISC fillet check (LRFD)
+
+Use `WeldConnection` + `LoadedWeldConnection.check()` for built-in checking:
+
+```python
+from connecty import WeldConnection, WeldBaseMetal
+
+base = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+connection = WeldConnection(
+    weld=weld,
+    base_metal=base,
+    is_double_fillet=False,
+    is_rect_hss_end_connection=False,
+)
+
+result = connection.analyze(load, method="icr")  # or "elastic" / "both" (fillet)
+check = result.check(
+    standard="aisc",
+    F_EXX=None,                  # default: matching electrode = base metal Fu
+    enforce_max_fillet_size=True,
+    conservative_k_ds=False,     # set True to force k_ds = 1.0
+)
+
+print(check.governing_utilization)
+print(check.governing_limit_state)
+```
+
+Key notes:
+- Fillet welds are auto-checked; other types require advanced inputs.
+- `k_ds` is computed at the governing location unless disabled or HSS end-connection restriction applies.
+- Directional factor / utilisation plots respect `conservative_k_ds` and `include_kds`.
+
+### Manual stress-based check
+
+You can still perform a custom allowable-stress check:
 
 ```python
 loaded = LoadedWeld(weld, load, method="elastic")
