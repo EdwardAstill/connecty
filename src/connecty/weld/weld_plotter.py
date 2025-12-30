@@ -67,6 +67,141 @@ def plot_loaded_weld(
     return ax
 
 
+def plot_loaded_weld_utilization(
+    loaded: LoadedWeld,
+    section: bool = True,
+    force: bool = True,
+    colorbar: bool = True,
+    cmap: str = "viridis",
+    weld_linewidth: float = 5.0,
+    ax: plt.Axes | None = None,
+    show: bool = True,
+    save_path: str | None = None,
+    info: bool = True,
+    legend: bool = False,
+    F_EXX: float | None = None,
+    conservative_k_ds: bool = False,
+) -> plt.Axes:
+    """
+    Plot weld path colored by weld-metal utilisation (AISC weld metal basis).
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
+    else:
+        fig = ax.figure
+
+    weld = loaded.weld
+
+    if section and weld.section is not None:
+        _plot_section_outline(ax, weld.section)
+
+    utils = loaded.weld_metal_utilizations(F_EXX=F_EXX, conservative_k_ds=bool(conservative_k_ds))
+    if utils:
+        _plot_loaded_weld_scalar_field(ax, loaded, utils, cmap, weld_linewidth)
+
+        if colorbar:
+            util_min = float(min(utils))
+            util_max = float(max(utils))
+            norm = mcolors.Normalize(vmin=util_min, vmax=util_max)
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])
+            cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.8, aspect=30)
+            cbar.set_label("Utilization (-)", fontsize=10)
+
+    if force:
+        _plot_force_arrow(ax, loaded.load, weld, legend=legend)
+
+    ax.set_aspect("equal")
+    ax.set_xlabel("z", fontsize=11)
+    ax.set_ylabel("y", fontsize=11)
+
+    title = f"Weld Utilization ({loaded.method.upper()} method)"
+    if info and utils:
+        title += f"\nMax Util: {max(utils):.2f}"
+    ax.set_title(title, fontsize=12)
+
+    plt.tight_layout()
+
+    if save_path:
+        if not save_path.endswith(".svg"):
+            save_path += ".svg"
+        fig.savefig(save_path, format="svg", bbox_inches="tight")
+        print(f"Saved: {save_path}")
+
+    if show:
+        plt.show()
+
+    return ax
+
+
+def plot_loaded_weld_directional_factor(
+    loaded: LoadedWeld,
+    section: bool = True,
+    force: bool = True,
+    colorbar: bool = True,
+    cmap: str = "plasma",
+    weld_linewidth: float = 5.0,
+    ax: plt.Axes | None = None,
+    show: bool = True,
+    save_path: str | None = None,
+    info: bool = True,
+    legend: bool = False,
+    conservative_k_ds: bool = False,
+) -> plt.Axes:
+    """
+    Plot weld path colored by the AISC directional strength factor (k_ds).
+
+    Notes:
+    - k_ds is computed from the local in-plane stress resultant direction and local weld tangent.
+    - If `conservative_k_ds` is True (or analysis has include_kds=False), k_ds is 1.0 everywhere.
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
+    else:
+        fig = ax.figure
+
+    weld = loaded.weld
+
+    if section and weld.section is not None:
+        _plot_section_outline(ax, weld.section)
+
+    kds_values = loaded.directional_factors(conservative_k_ds=bool(conservative_k_ds))
+    if kds_values:
+        _plot_loaded_weld_scalar_field(ax, loaded, kds_values, cmap, weld_linewidth, vmin=1.0, vmax=1.5)
+
+        if colorbar:
+            norm = mcolors.Normalize(vmin=1.0, vmax=1.5)
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])
+            cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.8, aspect=30)
+            cbar.set_label("k_ds (-)", fontsize=10)
+
+    if force:
+        _plot_force_arrow(ax, loaded.load, weld, legend=legend)
+
+    ax.set_aspect("equal")
+    ax.set_xlabel("z", fontsize=11)
+    ax.set_ylabel("y", fontsize=11)
+
+    title = "Directional Factor (k_ds)"
+    if info and kds_values:
+        title += f"\nMin/Max: {min(kds_values):.2f} / {max(kds_values):.2f}"
+    ax.set_title(title, fontsize=12)
+
+    plt.tight_layout()
+
+    if save_path:
+        if not save_path.endswith(".svg"):
+            save_path += ".svg"
+        fig.savefig(save_path, format="svg", bbox_inches="tight")
+        print(f"Saved: {save_path}")
+
+    if show:
+        plt.show()
+
+    return ax
+
+
 def plot_loaded_weld_comparison(
     loaded_list: Sequence[LoadedWeld],
     section: bool = True,
@@ -280,6 +415,71 @@ def _plot_loaded_weld_stress(
     all_y = [ps.y for ps in loaded.point_stresses]
     all_z = [ps.z for ps in loaded.point_stresses]
     
+    if all_y and all_z:
+        margin = max(max(all_y) - min(all_y), max(all_z) - min(all_z)) * 0.2
+        ax.set_xlim(min(all_z) - margin, max(all_z) + margin)
+        ax.set_ylim(min(all_y) - margin, max(all_y) + margin)
+
+
+def _plot_loaded_weld_scalar_field(
+    ax: plt.Axes,
+    loaded: LoadedWeld,
+    values: list[float],
+    cmap: str,
+    linewidth: float,
+    vmin: float | None = None,
+    vmax: float | None = None,
+) -> None:
+    """Plot weld path colored by an arbitrary scalar value aligned to `loaded.point_stresses`."""
+    if not loaded.point_stresses:
+        return
+    if len(values) != len(loaded.point_stresses):
+        raise ValueError("values must align with loaded.point_stresses")
+
+    weld = loaded.weld
+
+    value_min = float(min(values)) if vmin is None else float(vmin)
+    value_max = float(max(values)) if vmax is None else float(vmax)
+
+    if value_max - value_min > 1e-12:
+        norm = mcolors.Normalize(vmin=value_min, vmax=value_max)
+    else:
+        norm = mcolors.Normalize(vmin=0.0, vmax=max(value_max, 1.0))
+
+    colormap = plt.get_cmap(cmap)
+
+    for contour in weld.geometry.contours:
+        for segment in contour.segments:
+            seg_points = segment.discretize(resolution=100)
+
+            if len(seg_points) < 2:
+                continue
+
+            seg_values: list[float] = []
+            for sp in seg_points:
+                min_dist = float("inf")
+                nearest_value = 0.0
+                for idx, ps in enumerate(loaded.point_stresses):
+                    dist = math.hypot(ps.y - sp[0], ps.z - sp[1])
+                    if dist < min_dist:
+                        min_dist = dist
+                        nearest_value = float(values[idx])
+                seg_values.append(nearest_value)
+
+            points = np.array([[p[1], p[0]] for p in seg_points])  # (z, y) for plotting
+            segments = np.array([points[:-1], points[1:]]).transpose(1, 0, 2)
+
+            colors: list[tuple[float, float, float, float]] = []
+            for i in range(len(seg_values) - 1):
+                avg_value = (seg_values[i] + seg_values[i + 1]) / 2.0
+                colors.append(colormap(norm(avg_value)))
+
+            lc = LineCollection(segments, colors=colors, linewidths=linewidth)
+            ax.add_collection(lc)
+
+    all_y = [ps.y for ps in loaded.point_stresses]
+    all_z = [ps.z for ps in loaded.point_stresses]
+
     if all_y and all_z:
         margin = max(max(all_y) - min(all_y), max(all_z) - min(all_z)) * 0.2
         ax.set_xlim(min(all_z) - margin, max(all_z) + margin)

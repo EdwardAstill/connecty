@@ -254,9 +254,22 @@ def calculate_icr_stress(
     Cy, Cz = props.Cy, props.Cz
     
     # Get applied loads at centroid
-    Mx_total, _, _ = load.get_moments_about(0, Cy, Cz)
+    Mx_total, My_total, Mz_total = load.get_moments_about(0, Cy, Cz)
     Fy_app = load.Fy
     Fz_app = load.Fz
+
+    # ICR method is strictly an in-plane (y-z) weld group method:
+    # - Allowed: Fy, Fz, and Mx (torsion about x)
+    # - Not supported: Fx, My, Mz (out-of-plane normal demand)
+    if (
+        abs(load.Fx) > ZERO_TOLERANCE
+        or abs(My_total) > ZERO_TOLERANCE
+        or abs(Mz_total) > ZERO_TOLERANCE
+    ):
+        raise ValueError(
+            "ICR method only supports in-plane loading (Fy, Fz, Mx) for planar weld groups. "
+            "Out-of-plane loading detected (Fx/My/Mz). Use method='elastic' for 3D loading."
+        )
     
     # Total in-plane shear
     P_total = math.hypot(Fy_app, Fz_app)

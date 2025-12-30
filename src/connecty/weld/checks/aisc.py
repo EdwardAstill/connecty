@@ -7,15 +7,23 @@ import math
 from .models import WeldCheckDetail, WeldCheckResult, get_governing
 
 
-def _auto_compute_governing_theta(result) -> float | None:
+def _auto_compute_governing_theta(
+    result,
+    *,
+    F_EXX: float,
+    phi_w: float,
+) -> float | None:
     """
     Compute theta corresponding to the governing (maximum utilization) point.
     
     This function scans all discretized points and finds the one that maximizes
-    the ratio (stress / k_ds), which corresponds to the highest utilization.
+    the weld-metal utilization:
+        u_i = stress_i / (phi_w * 0.60 * F_EXX * k_ds_i)
     
     Args:
         result: LoadedWeldConnection result object
+        F_EXX: Electrode strength (MPa)
+        phi_w: LRFD resistance factor for weld metal
         
     Returns:
         Angle in degrees that corresponds to the governing limit state, or None.
@@ -38,7 +46,7 @@ def _auto_compute_governing_theta(result) -> float | None:
         # Return None -> k_ds=1.0 (conservative)
         return None
         
-    best_util_proxy = -1.0
+    best_util = -1.0
     governing_theta = None
     
     for ps, (pt_ds, _, (tan_y, tan_z), _) in zip(analysis.point_stresses, points_ds):
@@ -67,12 +75,11 @@ def _auto_compute_governing_theta(result) -> float | None:
             theta = math.degrees(math.acos(cos_theta))
             k_ds = _aisc_kds(theta)
             
-        # Utilization proxy = stress / k_ds
-        # (Capacity R_n proportional to k_ds)
-        util_proxy = stress / k_ds
+        denom = float(phi_w) * 0.60 * float(F_EXX) * float(k_ds)
+        util = float(stress) / denom if denom > 0.0 else math.inf
         
-        if util_proxy > best_util_proxy:
-            best_util_proxy = util_proxy
+        if util > best_util:
+            best_util = util
             governing_theta = theta
             
     return governing_theta
@@ -136,6 +143,9 @@ def check_aisc(
     stress_demand = float(result.max_stress)  # MPa (N/mm^2) if using mm+N
     Ru_equiv = stress_demand * A_we  # N
 
+    # Weld metal resistance factor (AISC J2.2, LRFD)
+    phi_w = 0.75
+
     # k_ds: automatic by default, can be disabled
     if connection.is_rect_hss_end_connection or conservative_k_ds:
         # HSS end connection restriction OR user requests conservative approach
@@ -143,7 +153,7 @@ def check_aisc(
         theta_used = None
     else:
         # Automatically compute theta at governing (max utilization) location
-        theta_computed = _auto_compute_governing_theta(result)
+        theta_computed = _auto_compute_governing_theta(result, F_EXX=float(F_EXX), phi_w=float(phi_w))
         if theta_computed is None:
             k_ds = 1.0
             theta_used = None
@@ -152,7 +162,6 @@ def check_aisc(
             theta_used = float(theta_computed)
 
     # Weld metal capacity (AISC J2.2, LRFD)
-    phi_w = 0.75
     weld_capacity = phi_w * 0.60 * float(F_EXX) * A_we * k_ds  # N
     weld_util = Ru_equiv / weld_capacity if weld_capacity > 0.0 else math.inf
 

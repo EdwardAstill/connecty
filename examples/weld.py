@@ -277,6 +277,24 @@ def run() -> None:
         info=True,
     )
 
+    plot_path_util_elastic = out_dir / "weld_util_elastic.svg"
+    result_elastic.plot_utilization(
+        section=False,
+        show=False,
+        save_path=str(plot_path_util_elastic),
+        legend=True,
+        info=True,
+    )
+
+    plot_path_util_icr = out_dir / "weld_util_icr.svg"
+    result_icr.plot_utilization(
+        section=False,
+        show=False,
+        save_path=str(plot_path_util_icr),
+        legend=True,
+        info=True,
+    )
+
     _write_text(
         out_dir / "02_plot.txt",
         "\n".join(
@@ -285,6 +303,8 @@ def run() -> None:
                 "=" * 80,
                 f"Saved image (elastic): {plot_path_elastic}",
                 f"Saved image (icr):     {plot_path_icr}",
+                f"Saved image (elastic util): {plot_path_util_elastic}",
+                f"Saved image (icr util):     {plot_path_util_icr}",
                 "Plots show weld path colored by stress magnitude, with applied load arrow.",
             ]
         ),

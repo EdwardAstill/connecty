@@ -66,6 +66,12 @@ class LoadedWeldConnection:
     def plot(self, *args, **kwargs):
         return self._analysis.plot(*args, **kwargs)
 
+    def plot_utilization(self, *args, **kwargs):
+        return self._analysis.plot_utilization(*args, **kwargs)
+
+    def plot_directional_factor(self, *args, **kwargs):
+        return self._analysis.plot_directional_factor(*args, **kwargs)
+
     def check(self, **kwargs):
         from .checks import check_weld_group
 
