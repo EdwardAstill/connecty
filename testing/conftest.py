@@ -1,22 +1,21 @@
 import pytest
 
 from sectiony.library import rhs
-from connecty import Load, WeldParams, WeldedSection
+from connecty import Load, WeldBaseMetal, WeldConnection, WeldParams
 
 
 @pytest.fixture
-def welded_section() -> WeldedSection:
-    """Default welded RHS section for continuity tests."""
+def welded_section() -> WeldConnection:
+    """Default RHS weld path for continuity tests (new API)."""
     section = rhs(b=100, h=200, t=10, r=15)
-    welded = WeldedSection(section=section)
-    params = WeldParams(
-        type="fillet",
-        throat_thickness=4.2,
-        leg_size=6.0,
-    )
-    welded.weld_all_segments(params)
-    welded.calculate_properties()
-    return welded
+
+    params = WeldParams(type="fillet", throat=4.2, leg=6.0)
+    base_metal = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+
+    if section.geometry is None:
+        raise ValueError("Test section has no geometry")
+
+    return WeldConnection.from_geometry(geometry=section.geometry, parameters=params, base_metal=base_metal)
 
 
 @pytest.fixture

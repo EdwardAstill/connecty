@@ -21,14 +21,14 @@ def _auto_compute_governing_theta(
         u_i = stress_i / (phi_w * 0.60 * F_EXX * k_ds_i)
     
     Args:
-        result: LoadedWeldConnection result object
+        result: WeldResult result object
         F_EXX: Electrode strength (MPa)
         phi_w: LRFD resistance factor for weld metal
         
     Returns:
         Angle in degrees that corresponds to the governing limit state, or None.
     """
-    # Check if result has analysis attribute (real LoadedWeldConnection vs test dummy)
+    # Check if result has analysis attribute (real WeldResult vs test dummy)
     if not hasattr(result, 'analysis'):
         return None
     
@@ -118,7 +118,7 @@ def check_aisc(
     This check is intentionally conservative and aligns with documentation/standards/weld.md.
     
     Args:
-        result: LoadedWeldConnection result
+        result: WeldResult result
         F_EXX: Electrode strength (MPa)
         enforce_max_fillet_size: Check maximum fillet size detailing limit
         conservative_k_ds: If True, force k_ds=1.0 (ignores directional benefit)

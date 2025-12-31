@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 from sectiony.geometry import Contour, Geometry, Line
 
-from connecty import Load, LoadedWeld, Weld, WeldParams
+from connecty import Load, WeldBaseMetal, WeldConnection, WeldParams
 
 
-def _make_weld_line(*, start_y: float, start_z: float, end_y: float, end_z: float) -> Weld:
+def _make_weld_line(*, start_y: float, start_z: float, end_y: float, end_z: float) -> WeldConnection:
     geom = Geometry(
         contours=[
             Contour(
@@ -16,15 +16,17 @@ def _make_weld_line(*, start_y: float, start_z: float, end_y: float, end_z: floa
         ]
     )
     params = WeldParams(type="fillet", leg=6.0)
-    return Weld(geometry=geom, parameters=params, section=None)
+    base_metal = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+    return WeldConnection.from_geometry(geometry=geom, parameters=params, base_metal=base_metal)
 
 
 def test_elastic_fx_only_is_uniform_axial() -> None:
-    weld = _make_weld_line(start_y=-50.0, start_z=0.0, end_y=50.0, end_z=0.0)
+    connection = _make_weld_line(start_y=-50.0, start_z=0.0, end_y=50.0, end_z=0.0)
     load = Load(Fx=12_000.0, location=(0.0, 0.0, 0.0))
 
-    loaded = LoadedWeld(weld=weld, load=load, method="elastic", discretization=60)
-    props = weld._calculate_properties(loaded.discretization)
+    result = connection.analyze(load, method="elastic", discretization=60)
+    loaded = result.analysis
+    props = result.weld._calculate_properties(loaded.discretization)
     expected_axial = load.Fx / props.A
 
     assert loaded.point_stresses
@@ -36,11 +38,12 @@ def test_elastic_fx_only_is_uniform_axial() -> None:
 
 
 def test_elastic_my_produces_axial_gradient_over_z() -> None:
-    weld = _make_weld_line(start_y=0.0, start_z=-50.0, end_y=0.0, end_z=50.0)
+    connection = _make_weld_line(start_y=0.0, start_z=-50.0, end_y=0.0, end_z=50.0)
     load = Load(My=2_500_000.0, location=(0.0, 0.0, 0.0))
 
-    loaded = LoadedWeld(weld=weld, load=load, method="elastic", discretization=80)
-    props = weld._calculate_properties(loaded.discretization)
+    result = connection.analyze(load, method="elastic", discretization=80)
+    loaded = result.analysis
+    props = result.weld._calculate_properties(loaded.discretization)
     Cy = props.Cy
     Cz = props.Cz
     Iy = props.Iy
@@ -64,11 +67,12 @@ def test_elastic_my_produces_axial_gradient_over_z() -> None:
 
 
 def test_elastic_mz_produces_axial_gradient_over_y() -> None:
-    weld = _make_weld_line(start_y=-50.0, start_z=0.0, end_y=50.0, end_z=0.0)
+    connection = _make_weld_line(start_y=-50.0, start_z=0.0, end_y=50.0, end_z=0.0)
     load = Load(Mz=2_500_000.0, location=(0.0, 0.0, 0.0))
 
-    loaded = LoadedWeld(weld=weld, load=load, method="elastic", discretization=80)
-    props = weld._calculate_properties(loaded.discretization)
+    result = connection.analyze(load, method="elastic", discretization=80)
+    loaded = result.analysis
+    props = result.weld._calculate_properties(loaded.discretization)
     Cy = props.Cy
     Iz = props.Iz
 
@@ -97,11 +101,12 @@ def test_elastic_fy_with_x_eccentricity_creates_out_of_plane_bending_mz() -> Non
     Elastic method should accept this 3D loading and produce a linear bending (axial)
     stress distribution over y.
     """
-    weld = _make_weld_line(start_y=-50.0, start_z=0.0, end_y=50.0, end_z=0.0)
+    connection = _make_weld_line(start_y=-50.0, start_z=0.0, end_y=50.0, end_z=0.0)
     load = Load(Fy=5_000.0, location=(100.0, 0.0, 0.0))
 
-    loaded = LoadedWeld(weld=weld, load=load, method="elastic", discretization=80)
-    props = weld._calculate_properties(loaded.discretization)
+    result = connection.analyze(load, method="elastic", discretization=80)
+    loaded = result.analysis
+    props = result.weld._calculate_properties(loaded.discretization)
     Cy = props.Cy
     Iz = props.Iz
 

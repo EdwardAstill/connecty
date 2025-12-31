@@ -1,69 +1,15 @@
-"""
-Weld stress analysis for welded connections.
+"""Welds public API (new surface)."""
 
-Supports fillet, PJP, CJP, and plug/slot welds per AISC 360.
-"""
-
-from .weld import (
-    Weld,
-    WeldParams,
-    WeldProperties,
-)
-
-from .welded_section import (
-    WeldedSection,
-    WeldGroup,
-    WeldSegment,
-)
-
-from .geometry import (
-    WeldConnection,
-    WeldBaseMetal,
-)
-
-from .analysis import LoadedWeldConnection
-
-from .loaded_weld import LoadedWeld
-
-from .weld_stress import (
-    StressComponents,
-    PointStress,
-    calculate_elastic_stress,
-    calculate_icr_stress,
-)
-
-from .weld_plotter import (
-    plot_stress_result,
-    plot_stress_comparison,
-    plot_weld_geometry,
-    plot_stress_components,
-    plot_loaded_weld,
-    plot_loaded_weld_comparison,
-)
-
+from .analysis import WeldResult
 from .checks import WeldCheckDetail, WeldCheckResult
+from .geometry import WeldBaseMetal, WeldConnection
+from .weld import WeldParams
 
 __all__ = [
-    "Weld",
     "WeldParams",
-    "WeldProperties",
-    "WeldedSection",
-    "WeldGroup",
-    "WeldSegment",
     "WeldConnection",
     "WeldBaseMetal",
-    "LoadedWeldConnection",
-    "LoadedWeld",
+    "WeldResult",
     "WeldCheckDetail",
     "WeldCheckResult",
-    "StressComponents",
-    "PointStress",
-    "calculate_elastic_stress",
-    "calculate_icr_stress",
-    "plot_stress_result",
-    "plot_stress_comparison",
-    "plot_weld_geometry",
-    "plot_stress_components",
-    "plot_loaded_weld",
-    "plot_loaded_weld_comparison",
 ]

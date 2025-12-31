@@ -7,7 +7,7 @@ Tests verify that:
 """
 
 import pytest
-from connecty import BoltConnection, BoltGroup, Load, Plate
+from connecty import BoltConnection, BoltLayout, BoltParams, Load, Plate
 
 
 class TestUniaxialBending:
@@ -24,12 +24,13 @@ class TestUniaxialBending:
             (0.0, +180.0),
         ]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=200.0, height=400.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         # Positive My causes compression at z_min
         load = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=500000.0, Mz=0.0)
@@ -38,7 +39,7 @@ class TestUniaxialBending:
         na_z = plate.z_min + plate.depth_z / 6.0  # -200 + 400/6 = -133.33
         
         for idx, (y, z) in enumerate(bolt_positions):
-            tension = result.bolt_results[idx].Fx
+            tension = result.bolt_forces[idx].Fx
             
             if z < na_z:
                 # Bolt in compression zone should have zero tension
@@ -55,20 +56,21 @@ class TestUniaxialBending:
             (0.0, +100.0),
         ]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=200.0, height=300.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         load = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=100000.0, Mz=0.0)
         result = connection.analyze(load=load, tension_method="conservative")
         
-        na_z = bolt_group.Cz  # Should be 0.0
+        na_z = layout.Cz  # Should be 0.0
         
         for idx, (y, z) in enumerate(bolt_positions):
-            tension = result.bolt_results[idx].Fx
+            tension = result.bolt_forces[idx].Fx
             
             if z < na_z:
                 assert abs(tension) < 0.01, f"Bolt {idx+1} below centroid should have Fx≈0"
@@ -84,12 +86,13 @@ class TestUniaxialBending:
             (+150.0, 0.0),
         ]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=400.0, height=200.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         # Positive Mz causes compression at y_min
         load = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=0.0, Mz=500000.0)
@@ -98,7 +101,7 @@ class TestUniaxialBending:
         na_y = plate.y_min + plate.depth_y / 6.0  # -200 + 400/6 = -133.33
         
         for idx, (y, z) in enumerate(bolt_positions):
-            tension = result.bolt_results[idx].Fx
+            tension = result.bolt_forces[idx].Fx
             
             if y < na_y:
                 assert abs(tension) < 0.01, f"Bolt {idx+1} at y={y} below NA should have Fx≈0"
@@ -120,12 +123,13 @@ class TestBiaxialBending:
             (+80.0, -120.0),   # Above NA_y, below NA_z
         ]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=300.0, height=300.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         # NA_y = -150 + 300/6 = -100 + 50 = -50
         # NA_z = -150 + 300/6 = -50
@@ -135,21 +139,21 @@ class TestBiaxialBending:
         # Test 1: Only My (should give positive tension to bolt 0)
         load_my = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=100000.0, Mz=0.0)
         result_my = connection.analyze(load=load_my, tension_method="accurate")
-        tension_my_bolt0 = result_my.bolt_results[0].Fx
+        tension_my_bolt0 = result_my.bolt_forces[0].Fx
         
         assert tension_my_bolt0 > 0.0, "My alone should create tension for bolt 0 (above NA_z)"
         
         # Test 2: Only Mz (should give zero tension to bolt 0 - below NA_y)
         load_mz = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=0.0, Mz=100000.0)
         result_mz = connection.analyze(load=load_mz, tension_method="accurate")
-        tension_mz_bolt0 = result_mz.bolt_results[0].Fx
+        tension_mz_bolt0 = result_mz.bolt_forces[0].Fx
         
         assert abs(tension_mz_bolt0) < 0.01, "Mz alone should give zero (bolt 0 below NA_y)"
         
         # Test 3: Both moments (compression from Mz should reduce tension from My for bolt 0)
         load_both = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=100000.0, Mz=100000.0)
         result_both = connection.analyze(load=load_both, tension_method="accurate")
-        tension_both_bolt0 = result_both.bolt_results[0].Fx
+        tension_both_bolt0 = result_both.bolt_forces[0].Fx
         
         # The combined tension should be less than My alone (cancelled by Mz compression)
         assert tension_both_bolt0 < tension_my_bolt0, \
@@ -168,18 +172,19 @@ class TestBiaxialBending:
             (+80.0, +80.0),  # Top-right
         ]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=300.0, height=300.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         # Apply equal moments in both directions
         load = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=200000.0, Mz=200000.0)
         result = connection.analyze(load=load, tension_method="accurate")
         
-        tensions = [br.Fx for br in result.bolt_results]
+        tensions = [br.Fx for br in result.bolt_forces]
         
         # Top-right bolt should have highest tension (furthest from both NAs)
         assert tensions[3] > tensions[0], "Top-right should have more tension than bottom-left"
@@ -200,12 +205,13 @@ class TestDirectTensionWithMoments:
             (0.0, +150.0),  # Would be in tension from My
         ]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=200.0, height=400.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         # Large direct Fx with moment
         load = Load(Fx=50000.0, Fy=0.0, Fz=0.0, Mx=0.0, My=100000.0, Mz=0.0)
@@ -213,7 +219,7 @@ class TestDirectTensionWithMoments:
         
         # Both bolts should have positive tension (direct Fx dominates)
         for idx, (y, z) in enumerate(bolt_positions):
-            tension = result.bolt_results[idx].Fx
+            tension = result.bolt_forces[idx].Fx
             assert tension > 0.0, f"Bolt {idx+1} should have tension from large direct Fx"
             
             # Direct component
@@ -224,12 +230,13 @@ class TestDirectTensionWithMoments:
         """Test that moment compression reduces but doesn't eliminate large direct Fx."""
         bolt_positions = [(0.0, -150.0), (0.0, +150.0)]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=200.0, height=400.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         # Moderate direct Fx
         load_fx_only = Load(Fx=10000.0, Fy=0.0, Fz=0.0, Mx=0.0, My=0.0, Mz=0.0)
@@ -239,14 +246,14 @@ class TestDirectTensionWithMoments:
         result_fx_and_my = connection.analyze(load=load_fx_and_my, tension_method="accurate")
         
         # Bottom bolt: direct Fx should be reduced by My compression
-        tension_bottom_fx_only = result_fx_only.bolt_results[0].Fx
-        tension_bottom_combined = result_fx_and_my.bolt_results[0].Fx
+        tension_bottom_fx_only = result_fx_only.bolt_forces[0].Fx
+        tension_bottom_combined = result_fx_and_my.bolt_forces[0].Fx
         
         assert tension_bottom_combined < tension_bottom_fx_only, "Moment compression should reduce tension"
         
         # Top bolt: direct Fx should be increased by My tension
-        tension_top_fx_only = result_fx_only.bolt_results[1].Fx
-        tension_top_combined = result_fx_and_my.bolt_results[1].Fx
+        tension_top_fx_only = result_fx_only.bolt_forces[1].Fx
+        tension_top_combined = result_fx_and_my.bolt_forces[1].Fx
         
         assert tension_top_combined > tension_top_fx_only, "Moment tension should increase tension"
 
@@ -261,12 +268,13 @@ class TestEdgeCases:
         # So bolts at z < -66.67 are in compression
         bolt_positions = [(0.0, -90.0), (0.0, -80.0)]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=200.0, height=200.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         na_z = plate.z_min + plate.depth_z / 6.0  # -100 + 33.33 = -66.67
         
@@ -280,19 +288,20 @@ class TestEdgeCases:
         
         # All bolts should have zero tension (all in compression zone)
         for idx in range(len(bolt_positions)):
-            tension = result.bolt_results[idx].Fx
+            tension = result.bolt_forces[idx].Fx
             assert abs(tension) < 0.01, f"Bolt {idx+1} in compression zone should have Fx≈0"
     
     def test_zero_moment(self) -> None:
         """Test with zero moment (only direct Fx)."""
         bolt_positions = [(0.0, -50.0), (0.0, +50.0)]
         
-        bolt_group = BoltGroup(positions=bolt_positions, diameter=20.0, grade="A325")
+        layout = BoltLayout(points=bolt_positions)
+        bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
             width=200.0, height=200.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
-        connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+        connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
         
         load = Load(Fx=10000.0, Fy=0.0, Fz=0.0, Mx=0.0, My=0.0, Mz=0.0)
         result = connection.analyze(load=load, tension_method="accurate")
@@ -300,7 +309,7 @@ class TestEdgeCases:
         expected_per_bolt = 10000.0 / 2
         
         for idx in range(len(bolt_positions)):
-            tension = result.bolt_results[idx].Fx
+            tension = result.bolt_forces[idx].Fx
             assert abs(tension - expected_per_bolt) < 0.1, f"Bolt {idx+1} should have {expected_per_bolt} N"
 
 

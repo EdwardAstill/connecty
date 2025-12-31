@@ -17,14 +17,14 @@ from matplotlib.patches import Circle
 from matplotlib.lines import Line2D
 
 from ..common.load import Load
-from .geometry import BoltGroup, Plate
+from .geometry import BoltLayout, Plate
 
 if TYPE_CHECKING:
-    from .analysis import LoadedBoltConnection
+    from .analysis import BoltResult
 
 
 def plot_bolt_result(
-    result: "LoadedBoltConnection",
+    result: "BoltResult",
     *,
     force: bool = True,
     bolt_forces: bool = True,
@@ -48,9 +48,11 @@ def plot_bolt_result(
     else:
         fig = ax.figure
 
-    bolt_group = result.bolt_group
-    bolt_results_list = result.to_bolt_results()
+    layout = result.connection.layout
+    bolt_results_list = result.to_bolt_forces()
     plate = result.connection.plate
+    if plate is None:
+        raise ValueError("Plate is required to plot a bolt result (needs plate outline/limits).")
 
     _plot_plate(ax, plate)
 
@@ -75,7 +77,7 @@ def plot_bolt_result(
 
     colormap = plt.get_cmap(cmap)
 
-    bolt_diameter = bolt_group.diameter
+    bolt_diameter = float(result.connection.bolt.diameter)
     visual_radius = bolt_diameter / 2.0
 
     y_coords = [bf.y for bf in bolt_results_list]
@@ -142,13 +144,13 @@ def plot_bolt_result(
         _plot_applied_force(
             ax=ax,
             load=result.load,
-            bolt_group=bolt_group,
+            bolt_group=layout,
             force_unit=force_unit,
             length_unit=length_unit,
         )
 
     if mode == "axial":
-        _plot_neutral_axes(ax=ax, result=result, bolt_group=bolt_group)
+        _plot_neutral_axes(ax=ax, result=result, bolt_group=layout)
 
     if result.icr_point is not None:
         ax.plot(
@@ -172,7 +174,7 @@ def plot_bolt_result(
     ax.set_ylim(plate.y_min - margin, plate.y_max + margin)
 
     title = f"Bolt Connection Analysis ({result.shear_method.upper()} method)"
-    title += f"\n{bolt_group.n} × {bolt_group.diameter:.1f}{length_unit} bolts"
+    title += f"\n{layout.n} × {bolt_diameter:.1f}{length_unit} bolts"
     if bolt_results_list:
         title += f" | {title_metric}: {force_max:.2f} {force_unit}"
     ax.set_title(title, fontsize=12)
@@ -192,12 +194,13 @@ def plot_bolt_result(
 
 
 def plot_bolt_pattern(
-    bolt_group: BoltGroup,
+    bolt_group: BoltLayout,
     *,
     ax: plt.Axes | None = None,
     show: bool = True,
     save_path: str | Path | None = None,
     length_unit: str = "mm",
+    bolt_diameter: float = 1.0,
 ) -> plt.Axes:
     """Plot bolt group pattern without analysis results."""
     if ax is None:
@@ -205,10 +208,9 @@ def plot_bolt_pattern(
     else:
         fig = ax.figure
 
-    bolt_diameter = bolt_group.diameter
-    visual_radius = bolt_diameter / 2.0
+    visual_radius = float(bolt_diameter) / 2.0
 
-    for i, (y, z) in enumerate(bolt_group.positions):
+    for i, (y, z) in enumerate(bolt_group.points):
         circle = Circle(
             (z, y),
             radius=visual_radius,
@@ -238,8 +240,8 @@ def plot_bolt_pattern(
     ax.grid(True, alpha=0.3, linestyle="--")
     ax.legend(loc="upper right")
 
-    y_coords = [p[0] for p in bolt_group.positions]
-    z_coords = [p[1] for p in bolt_group.positions]
+    y_coords = [p[0] for p in bolt_group.points]
+    z_coords = [p[1] for p in bolt_group.points]
     margin = max(
         max(y_coords) - min(y_coords),
         max(z_coords) - min(z_coords),
@@ -249,7 +251,7 @@ def plot_bolt_pattern(
     ax.set_xlim(min(z_coords) - margin, max(z_coords) + margin)
     ax.set_ylim(min(y_coords) - margin, max(y_coords) + margin)
 
-    ax.set_title(f"Bolt Pattern: {bolt_group.n} × {bolt_diameter:.1f}{length_unit} bolts", fontsize=12)
+    ax.set_title(f"Bolt Pattern: {bolt_group.n} bolts", fontsize=12)
 
     plt.tight_layout()
 
@@ -269,7 +271,7 @@ def _plot_applied_force(
     *,
     ax: plt.Axes,
     load: Load,
-    bolt_group: BoltGroup,
+    bolt_group: BoltLayout,
     force_unit: str,
     length_unit: str,
 ) -> None:
@@ -313,9 +315,11 @@ def _plot_plate(ax: plt.Axes, plate: Plate) -> None:
     ax.add_patch(rect)
 
 
-def _plot_neutral_axes(*, ax: plt.Axes, result: "LoadedBoltConnection", bolt_group: BoltGroup) -> None:
+def _plot_neutral_axes(*, ax: plt.Axes, result: "BoltResult", bolt_group: BoltLayout) -> None:
     """Plot neutral axis lines used by the plate tension method."""
     plate = result.connection.plate
+    if plate is None:
+        return
 
     Cy, Cz = bolt_group.Cy, bolt_group.Cz
     load_at_centroid = result.load.equivalent_at((0.0, Cy, Cz))

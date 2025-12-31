@@ -9,7 +9,7 @@ so weld workflows can follow:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -38,7 +38,7 @@ class WeldBaseMetal:
             raise ValueError("Base metal tensile strength fu must be > 0")
 
 
-@dataclass(frozen=True)
+@dataclass
 class WeldConnection:
     """
     Weld group + base metal properties for design checking.
@@ -48,10 +48,22 @@ class WeldConnection:
     - The weld group is represented by a `Weld` (geometry + weld parameters).
     """
 
-    weld: Weld
-    base_metal: WeldBaseMetal
+    params: WeldParams
+    path: Geometry
+    base_metal: WeldBaseMetal | None = None
+    section: object | None = None
     is_double_fillet: bool = False
     is_rect_hss_end_connection: bool = False
+
+    _weld: Weld = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._weld = Weld(geometry=self.path, parameters=self.params, section=self.section)
+
+    @property
+    def weld(self) -> Weld:
+        """Internal weld object used by the analysis engine."""
+        return self._weld
 
     @classmethod
     def from_geometry(
@@ -59,13 +71,13 @@ class WeldConnection:
         *,
         geometry: Geometry,
         parameters: WeldParams,
-        base_metal: WeldBaseMetal,
+        base_metal: WeldBaseMetal | None = None,
         is_double_fillet: bool = False,
         is_rect_hss_end_connection: bool = False,
     ) -> "WeldConnection":
-        weld = Weld(geometry=geometry, parameters=parameters, section=None)
         return cls(
-            weld=weld,
+            params=parameters,
+            path=geometry,
             base_metal=base_metal,
             is_double_fillet=bool(is_double_fillet),
             is_rect_hss_end_connection=bool(is_rect_hss_end_connection),
@@ -77,7 +89,7 @@ class WeldConnection:
         dxf_path: str | Path,
         *,
         parameters: WeldParams,
-        base_metal: WeldBaseMetal,
+        base_metal: WeldBaseMetal | None = None,
         is_double_fillet: bool = False,
         is_rect_hss_end_connection: bool = False,
     ) -> "WeldConnection":
@@ -101,11 +113,11 @@ class WeldConnection:
         *,
         method: WeldMethod = "elastic",
         discretization: int = 200,
-    ) -> "LoadedWeldConnection":
-        """Analyze this weld connection and return a `LoadedWeldConnection`."""
-        from .analysis import LoadedWeldConnection
+    ) -> "WeldResult":
+        """Analyze this weld connection and return a `WeldResult`."""
+        from .analysis import WeldResult
 
-        return LoadedWeldConnection(
+        return WeldResult(
             connection=self,
             load=load,
             method=method,

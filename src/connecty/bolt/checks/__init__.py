@@ -32,9 +32,15 @@ def check_bolt_group(
     assume_uniform_tension_if_missing: bool = True,
 ) -> BoltCheckResult:
     """Check a bolt group result per AISC 360-22 or AS 4100."""
-    grade = result.connection.bolt_group.grade
-    bolt_diameter = result.connection.bolt_group.diameter
+    bolt = result.connection.bolt
+    grade = bolt.grade
+    bolt_diameter = float(bolt.diameter)
     plate = result.connection.plate
+
+    if plate is None:
+        raise ValueError("Plate is required for bolt checks (bearing/tear-out geometry).")
+    if grade is None:
+        raise ValueError("BoltParams.grade is required for bolt code checks (AISC/AS4100).")
 
     if standard is None:
         standard = "aisc" if grade in ("A325", "A490") else "as4100"

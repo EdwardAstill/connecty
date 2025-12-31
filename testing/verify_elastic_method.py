@@ -6,7 +6,7 @@ import math
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from connecty import Load, WeldParams, WeldedSection
+from connecty import Load, WeldBaseMetal, WeldConnection, WeldParams
 from sectiony.geometry import Line
 from sectiony import Section, Geometry, Contour
 
@@ -61,28 +61,19 @@ def test_elastic_method_verification():
     geometry = Geometry(contours=[contour])
     section = Section(name="Dummy", geometry=geometry)
     
-    welded = WeldedSection(section=section)
-    weld_params = WeldParams(type="fillet", throat_thickness=10.0)
-    
-    # Weld the single line
-    welded.add_weld(0, weld_params)
-    welded.calculate_properties()
-    
-    props = welded.weld_group.properties
+    base_metal = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+    connection = WeldConnection.from_geometry(geometry=geometry, parameters=WeldParams(type="fillet", throat=10.0), base_metal=base_metal)
+    result = connection.analyze(Load(Fy=-10000, location=(0, 0, 100)), method="elastic", discretization=21)
+    props = result.weld._calculate_properties(result.analysis.discretization)
     print(f"\nProperties:")
     print(f"Area: {props.A:.2f} mm² (Expected: 1000.00)")
     print(f"Ip: {props.Ip:.2f} mm⁴ (Expected: ~833333.33)")
     
-    # 2. Apply Load
-    # Force at z=100, y=0. Fy = -10000
-    force = Load(Fy=-10000, location=(0, 0, 100))
-    
-    # 3. Calculate
-    result = welded.calculate_weld_stress(force, discretization=21) # Ensure point at top
+    # 2. Already applied the load in the analyze() call above.
     
     # 4. Check Point at Top (y=50)
     # Find point closest to y=50
-    top_point = max(result.point_stresses, key=lambda ps: ps.y)
+    top_point = max(result.analysis.point_stresses, key=lambda ps: ps.y)
     
     print(f"\nResults at Top Point (y={top_point.y:.2f}, z={top_point.z:.2f}):")
     

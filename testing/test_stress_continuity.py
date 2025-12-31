@@ -4,20 +4,16 @@ Test script to verify stress continuity around welds.
 This script checks that stress values change smoothly as we move around
 the weld perimeter, ensuring there are no discontinuities or jumps.
 """
-import sys
-from pathlib import Path
 from typing import Tuple, Dict, Optional
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
+from sectiony.geometry import Contour, Geometry
 from sectiony.library import rhs, chs, i
-from connecty import Load, WeldParams, WeldedSection
+from connecty import Load, WeldBaseMetal, WeldConnection, WeldParams
 import math
 
 
 def test_stress_continuity(
-    welded_section: WeldedSection,
+    welded_section: WeldConnection,
     force: Load,
     discretization: int = 200,
     max_relative_change: float = 0.02,  # 2% max change between consecutive points
@@ -39,8 +35,8 @@ def test_stress_continuity(
     Returns:
         (passed, results_dict) where results_dict contains test statistics
     """
-    # Calculate stress distribution
-    result = welded_section.calculate_weld_stress(force, discretization=discretization)
+    # Calculate stress distribution (elastic supports full 3D demand)
+    result = welded_section.analyze(force, method="elastic", discretization=discretization).analysis
     
     if not result.point_stresses:
         raise ValueError("No stress points calculated")
@@ -227,9 +223,10 @@ def test_multiple_scenarios():
     # Test 1: Simple RHS with vertical load
     print("\n[Test 1] RHS 100x200x10 - Vertical Load at Centroid")
     section1 = rhs(b=100, h=200, t=10, r=15)
-    welded1 = WeldedSection(section=section1)
-    weld_params1 = WeldParams(type="fillet", throat_thickness=4.2, leg_size=6.0)
-    welded1.weld_all_segments(weld_params1)
+    base1 = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+    welded1 = WeldConnection.from_geometry(
+        geometry=section1.geometry, parameters=WeldParams(type="fillet", throat=4.2, leg=6.0), base_metal=base1
+    )
     
     force1 = Load(Fy=-100000, location=(0, 0, 0))
     passed1, results1 = test_stress_continuity(welded1, force1, discretization=200)
@@ -238,9 +235,10 @@ def test_multiple_scenarios():
     # Test 2: RHS with eccentric load (creates torsion)
     print("\n[Test 2] RHS 100x200x10 - Eccentric Vertical Load")
     section2 = rhs(b=100, h=200, t=10, r=15)
-    welded2 = WeldedSection(section=section2)
-    weld_params2 = WeldParams(type="fillet", throat_thickness=4.2, leg_size=6.0)
-    welded2.weld_all_segments(weld_params2)
+    base2 = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+    welded2 = WeldConnection.from_geometry(
+        geometry=section2.geometry, parameters=WeldParams(type="fillet", throat=4.2, leg=6.0), base_metal=base2
+    )
     
     force2 = Load(Fy=-100000, location=(0, 50, 0))  # Eccentric
     passed2, results2 = test_stress_continuity(welded2, force2, discretization=200)
@@ -249,9 +247,10 @@ def test_multiple_scenarios():
     # Test 3: RHS with combined loading (shear + torsion)
     print("\n[Test 3] RHS 100x200x10 - Combined Shear and Torsion")
     section3 = rhs(b=100, h=200, t=10, r=15)
-    welded3 = WeldedSection(section=section3)
-    weld_params3 = WeldParams(type="fillet", throat_thickness=4.2, leg_size=6.0)
-    welded3.weld_all_segments(weld_params3)
+    base3 = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+    welded3 = WeldConnection.from_geometry(
+        geometry=section3.geometry, parameters=WeldParams(type="fillet", throat=4.2, leg=6.0), base_metal=base3
+    )
     
     force3 = Load(Fy=-80000, Fz=20000, Mx=2000000, location=(0, 0, 0))
     passed3, results3 = test_stress_continuity(welded3, force3, discretization=200)
@@ -260,9 +259,10 @@ def test_multiple_scenarios():
     # Test 4: Circular Hollow Section (CHS) - tests arc segments
     print("\n[Test 4] CHS 200x10 - Vertical Load with Torsion")
     section4 = chs(d=200, t=10)
-    welded4 = WeldedSection(section=section4)
-    weld_params4 = WeldParams(type="cjp", throat_thickness=10.0)
-    welded4.weld_all_segments(weld_params4)
+    base4 = WeldBaseMetal(t=10.0, fy=350.0, fu=450.0)
+    welded4 = WeldConnection.from_geometry(
+        geometry=section4.geometry, parameters=WeldParams(type="cjp", throat=10.0), base_metal=base4
+    )
     
     force4 = Load(Fy=-50000, Mx=3e6, location=(0, 0, 0))
     passed4, results4 = test_stress_continuity(welded4, force4, discretization=200)
@@ -271,11 +271,28 @@ def test_multiple_scenarios():
     # Test 5: I-beam - tests multiple segments
     print("\n[Test 5] I-Beam 400x200x20x10 - Bending Moment")
     section5 = i(d=400, b=200, tf=20, tw=10, r=15)
-    welded5 = WeldedSection(section=section5)
-    weld_params5 = WeldParams(type="fillet", throat_thickness=6.0)
-    welded5.add_welds([0, 1, 2, 3], weld_params5)  # Top flange
-    welded5.add_welds([8, 9, 10, 11], weld_params5)  # Bottom flange
-    welded5.calculate_properties()
+    base5 = WeldBaseMetal(t=20.0, fy=350.0, fu=450.0)
+    if section5.geometry is None:
+        raise ValueError("I-beam section has no geometry")
+
+    # Match the intent of the legacy WeldedSection test: weld only selected flange segments.
+    # Legacy indices: top flange [0..3], bottom flange [8..11].
+    contour0 = section5.geometry.contours[0]
+    segs = list(contour0.segments)
+
+    top_idxs = [0, 1, 2, 3]
+    bot_idxs = [8, 9, 10, 11]
+    top_segs = [segs[i] for i in top_idxs]
+    bot_segs = [segs[i] for i in bot_idxs]
+
+    geometry5 = Geometry(
+        contours=[
+            Contour(segments=top_segs, hollow=False),
+            Contour(segments=bot_segs, hollow=False),
+        ]
+    )
+
+    welded5 = WeldConnection.from_geometry(geometry=geometry5, parameters=WeldParams(type="fillet", throat=6.0), base_metal=base5)
     
     force5 = Load(My=5e6, location=(0, 0, 0))
     passed5, results5 = test_stress_continuity(welded5, force5, discretization=200, max_relative_change=0.05)

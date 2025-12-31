@@ -6,8 +6,8 @@ import math
 
 import numpy as np
 
-from ..geometry import BoltGroup, Point2D
-from ..results import BoltResult
+from ..geometry import BoltLayout, Point2D
+from ..results import BoltForce
 from ...common.icr_solver import (
     ZERO_TOLERANCE,
     POSITION_TOLERANCE,
@@ -22,9 +22,11 @@ from ...common.load import Load
 from .elastic import solve_elastic_shear
 
 
-def solve_icr_shear(*, bolt_group: BoltGroup, load: Load) -> tuple[list[BoltResult], Point2D | None]:
+def solve_icr_shear(
+    *, layout: BoltLayout, bolt_diameter: float, load: Load
+) -> tuple[list[BoltForce], Point2D | None]:
     """Return per-bolt in-plane shear forces using the ICR method."""
-    props = bolt_group._calculate_properties()
+    props = layout._calculate_properties()
     Cy = props.Cy
     Cz = props.Cz
 
@@ -35,10 +37,10 @@ def solve_icr_shear(*, bolt_group: BoltGroup, load: Load) -> tuple[list[BoltResu
 
     P_total = math.hypot(Fy_app, Fz_app)
     if P_total < ZERO_TOLERANCE or abs(Mx_app) < ZERO_TOLERANCE:
-        return solve_elastic_shear(bolt_group=bolt_group, load=load), None
+        return solve_elastic_shear(layout=layout, bolt_diameter=float(bolt_diameter), load=load), None
 
-    y_arr = np.array([p[0] for p in bolt_group.positions], dtype=float)
-    z_arr = np.array([p[1] for p in bolt_group.positions], dtype=float)
+    y_arr = np.array([p[0] for p in layout.points], dtype=float)
+    z_arr = np.array([p[1] for p in layout.points], dtype=float)
 
     R_ult = 100.0
     ck_params = CrawfordKulakParams()
@@ -52,7 +54,7 @@ def solve_icr_shear(*, bolt_group: BoltGroup, load: Load) -> tuple[list[BoltResu
         y_arr,
         z_arr,
         eccentricity,
-        characteristic_size=bolt_group.diameter,
+        characteristic_size=float(bolt_diameter),
     )
 
     def evaluate_icr(icr_dist: float) -> tuple[float, dict] | None:
@@ -103,28 +105,28 @@ def solve_icr_shear(*, bolt_group: BoltGroup, load: Load) -> tuple[list[BoltResu
     config = ICRSearchConfig(max_iterations=100, tolerance=1e-6, refine_bisection=True)
     result = find_icr_distance(evaluate_icr, target_ratio, dist_min, dist_max, eccentricity, config)
     if result is None:
-        return solve_elastic_shear(bolt_group=bolt_group, load=load), None
+        return solve_elastic_shear(layout=layout, bolt_diameter=float(bolt_diameter), load=load), None
 
     _, best_data, _ = result
     P_base = float(best_data["P_base"])
     if P_base < POSITION_TOLERANCE:
-        return solve_elastic_shear(bolt_group=bolt_group, load=load), None
+        return solve_elastic_shear(layout=layout, bolt_diameter=float(bolt_diameter), load=load), None
 
     scale = P_total / P_base
     R_arr = best_data["R_arr"] * scale
     dir_y_arr = best_data["dir_y"]
     dir_z_arr = best_data["dir_z"]
 
-    bolt_results: list[BoltResult] = []
-    for idx, (y, z) in enumerate(bolt_group.positions):
+    bolt_results: list[BoltForce] = []
+    for idx, (y, z) in enumerate(layout.points):
         R = float(R_arr[idx])
         bolt_results.append(
-            BoltResult(
+            BoltForce(
                 point=(y, z),
                 Fy=R * float(dir_y_arr[idx]),
                 Fz=R * float(dir_z_arr[idx]),
                 Fx=0.0,
-                diameter=bolt_group.diameter,
+                diameter=float(bolt_diameter),
             )
         )
 

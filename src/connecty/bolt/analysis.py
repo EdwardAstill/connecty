@@ -1,4 +1,4 @@
-"""User-facing bolt analysis object (result + convenience methods)."""
+"""BoltResult: a BoltConnection subjected to a Load, with calculated bolt forces."""
 
 from __future__ import annotations
 
@@ -7,20 +7,20 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..common.load import Load
-from .geometry import BoltConnection, BoltGroup, Point2D, ShearMethod, TensionMethod
-from .results import BoltResult
+from .geometry import BoltConnection, BoltLayout, Point2D, ShearMethod, TensionMethod
+from .results import BoltForce
 
 
 @dataclass
-class LoadedBoltConnection:
-    """A `BoltConnection` subjected to a `Load`, with calculated bolt forces/stresses."""
+class BoltResult:
+    """A `BoltConnection` subjected to a `Load`, with calculated per-bolt forces."""
 
     connection: BoltConnection
     load: Load
     shear_method: ShearMethod = "elastic"
     tension_method: TensionMethod = "conservative"
 
-    bolt_results: list[BoltResult] = field(default_factory=list, init=False, repr=False)
+    bolt_forces: list[BoltForce] = field(default_factory=list, init=False, repr=False)
     icr_point: Point2D | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
@@ -29,73 +29,86 @@ class LoadedBoltConnection:
         from .solvers.tension import calculate_plate_bolt_tensions
 
         if self.shear_method == "elastic":
-            self.bolt_results = solve_elastic_shear(bolt_group=self.connection.bolt_group, load=self.load)
+            self.bolt_forces = solve_elastic_shear(
+                layout=self.connection.layout,
+                bolt_diameter=float(self.connection.bolt.diameter),
+                load=self.load,
+            )
             self.icr_point = None
         elif self.shear_method == "icr":
-            results, icr_point = solve_icr_shear(bolt_group=self.connection.bolt_group, load=self.load)
-            self.bolt_results = results
+            results, icr_point = solve_icr_shear(
+                layout=self.connection.layout,
+                bolt_diameter=float(self.connection.bolt.diameter),
+                load=self.load,
+            )
+            self.bolt_forces = results
             self.icr_point = icr_point
         else:
             raise ValueError("shear_method must be 'elastic' or 'icr'")
 
-        tensions = calculate_plate_bolt_tensions(
-            bolt_group=self.connection.bolt_group,
-            plate=self.connection.plate,
-            load=self.load,
-            tension_method=self.tension_method,
-        )
+        if self.connection.plate is None:
+            if abs(self.load.Fx) > 1e-12 or abs(self.load.My) > 1e-12 or abs(self.load.Mz) > 1e-12:
+                raise ValueError("Plate is required for out-of-plane bolt effects (Fx/My/Mz).")
+            tensions = [0.0 for _ in range(self.connection.layout.n)]
+        else:
+            tensions = calculate_plate_bolt_tensions(
+                layout=self.connection.layout,
+                plate=self.connection.plate,
+                load=self.load,
+                tension_method=self.tension_method,
+            )
 
-        for idx, br in enumerate(self.bolt_results):
-            br.Fx = float(tensions[idx])
-            br.n_shear_planes = int(self.connection.n_shear_planes)
+        for idx, bf in enumerate(self.bolt_forces):
+            bf.Fx = float(tensions[idx])
+            bf.n_shear_planes = int(self.connection.n_shear_planes)
 
     @property
-    def bolt_group(self) -> BoltGroup:
-        return self.connection.bolt_group
+    def layout(self) -> BoltLayout:
+        return self.connection.layout
 
     @property
     def method(self) -> str:
-        """Alias used by checks/legacy code paths."""
+        """Convenience alias used by checks."""
         return self.shear_method
 
-    def to_bolt_results(self) -> list[BoltResult]:
-        return list(self.bolt_results)
+    def to_bolt_forces(self) -> list[BoltForce]:
+        return list(self.bolt_forces)
 
     @property
     def max_shear_force(self) -> float:
-        if not self.bolt_results:
+        if not self.bolt_forces:
             return 0.0
-        return float(np.max([br.shear for br in self.bolt_results]))
+        return float(np.max([bf.shear for bf in self.bolt_forces]))
 
     @property
     def max_axial_force(self) -> float:
-        if not self.bolt_results:
+        if not self.bolt_forces:
             return 0.0
-        return float(np.max([br.axial for br in self.bolt_results]))
+        return float(np.max([bf.axial for bf in self.bolt_forces]))
 
     @property
     def max_resultant_force(self) -> float:
-        if not self.bolt_results:
+        if not self.bolt_forces:
             return 0.0
-        return float(np.max([br.resultant for br in self.bolt_results]))
+        return float(np.max([bf.resultant for bf in self.bolt_forces]))
 
     @property
     def max_shear_stress(self) -> float:
-        if not self.bolt_results:
+        if not self.bolt_forces:
             return 0.0
-        return float(np.max([br.shear_stress for br in self.bolt_results]))
+        return float(np.max([bf.shear_stress for bf in self.bolt_forces]))
 
     @property
     def max_axial_stress(self) -> float:
-        if not self.bolt_results:
+        if not self.bolt_forces:
             return 0.0
-        return float(np.max([br.axial_stress for br in self.bolt_results]))
+        return float(np.max([bf.axial_stress for bf in self.bolt_forces]))
 
     @property
     def max_combined_stress(self) -> float:
-        if not self.bolt_results:
+        if not self.bolt_forces:
             return 0.0
-        return float(np.max([br.combined_stress for br in self.bolt_results]))
+        return float(np.max([bf.combined_stress for bf in self.bolt_forces]))
 
     def plot(
         self,

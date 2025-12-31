@@ -34,18 +34,12 @@ class WeldParams:
     leg: float | None = None
     throat: float | None = None
     area: float | None = None
-    
-    # Legacy aliases for compatibility
-    leg_size: float | None = None
-    throat_thickness: float | None = None
+
+    # Strength (optional; unit-agnostic)
+    electrode: str | None = None
+    F_EXX: float | None = None
     
     def __post_init__(self) -> None:
-        # Apply alias fields if provided
-        if self.leg is None and self.leg_size is not None:
-            self.leg = self.leg_size
-        if self.throat is None and self.throat_thickness is not None:
-            self.throat = self.throat_thickness
-        
         # Auto-calculate throat from leg for fillet welds
         if self.type == "fillet":
             if self.throat is None and self.leg is not None:
@@ -54,6 +48,15 @@ class WeldParams:
             elif self.throat is not None and self.leg is None:
                 # Back-calculate leg from throat
                 self.leg = self.throat / 0.707
+
+        # Optional: derive F_EXX from electrode label (e.g. "E70" -> 70.0).
+        # No unit conversion is performed; connecty is unit-agnostic.
+        if self.F_EXX is None and self.electrode is not None:
+            import re
+
+            match = re.search(r"(\d+(\.\d+)?)", str(self.electrode))
+            if match is not None:
+                self.F_EXX = float(match.group(1))
 
 
 @dataclass

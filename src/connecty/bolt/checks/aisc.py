@@ -93,7 +93,7 @@ def check_aisc(
     slip_mu = AISC_SLIP_COEFFICIENT[slip_class]
     h_f = 0.85 if fillers >= 2 else 1.0
 
-    bolt_results = result.to_bolt_results()
+    bolt_results = result.to_bolt_forces()
     n_b = n_b_tension if n_b_tension is not None else len(bolt_results)
 
     if tension_per_bolt is not None:

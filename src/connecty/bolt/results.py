@@ -9,7 +9,7 @@ Point2D = tuple[float, float]  # (y, z)
 
 
 @dataclass
-class BoltResult:
+class BoltForce:
     """Forces and derived stresses at a single bolt location."""
 
     point: Point2D
@@ -83,4 +83,6 @@ class BoltResult:
             return 0.0
         return math.sqrt(self.shear_stress**2 + abs(self.axial_stress) ** 2)
 
+
+__all__ = ["BoltForce"]
 

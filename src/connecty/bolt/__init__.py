@@ -1,32 +1,18 @@
-"""
-Bolt group analysis for bolted connections.
+"""Bolts public API (new surface)."""
 
-Calculates force distribution using elastic and ICR methods.
-"""
-
-from .bolt import (
-    BoltGroup,
-    BoltParameters,
-    BoltProperties,
-    BoltResult,
-    LoadedBoltConnection,
-)
-
-from .plotting import (
-    plot_bolt_result,
-    plot_bolt_pattern,
-)
-
-from .geometry import BoltConnection, Plate
+from .analysis import BoltResult
+from .geometry import BoltConnection, BoltLayout, BoltParams, BoltProperties, Plate
+from .plotting import plot_bolt_pattern, plot_bolt_result
+from .results import BoltForce
 
 __all__ = [
-    "BoltGroup",
-    "BoltParameters",
+    "BoltLayout",
+    "BoltParams",
     "BoltProperties",
-    "BoltResult",
-    "LoadedBoltConnection",
     "BoltConnection",
     "Plate",
+    "BoltForce",
+    "BoltResult",
     "plot_bolt_result",
     "plot_bolt_pattern",
 ]

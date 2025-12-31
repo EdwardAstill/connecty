@@ -22,7 +22,7 @@ import matplotlib
 
 matplotlib.use("Agg")  # non-interactive backend for scripts/CI
 
-from connecty import BoltConnection, BoltGroup, Load, Plate
+from connecty import BoltConnection, BoltLayout, BoltParams, Load, Plate
 
 
 @dataclass(frozen=True)
@@ -57,13 +57,16 @@ def _write_text(path: Path, text: str) -> None:
 
 
 def _format_setup(case: BoltCase) -> str:
-    bg = case.connection.bolt_group
+    layout = case.connection.layout
+    bolt = case.connection.bolt
     plate = case.connection.plate
     load = case.load
+    if plate is None:
+        raise ValueError("Bolt example requires a plate")
 
     plate_center_y, plate_center_z = plate.center
-    bolt_centroid_y = bg.Cy
-    bolt_centroid_z = bg.Cz
+    bolt_centroid_y = layout.Cy
+    bolt_centroid_z = layout.Cz
     offset_y = bolt_centroid_y - plate_center_y
     offset_z = bolt_centroid_z - plate_center_z
 
@@ -74,13 +77,13 @@ def _format_setup(case: BoltCase) -> str:
     lines.append("")
     lines.append("Units: choose any consistent system (this example uses mm, N, N*mm)")
     lines.append("")
-    lines.append(f"Bolt group: n={bg.n}, d={bg.diameter:.2f}, grade={bg.grade}")
+    lines.append(f"Bolt layout: n={layout.n}, d={bolt.diameter:.2f}, grade={bolt.grade}")
     lines.append(
         f"Bolt group centroid: (y={bolt_centroid_y:.2f}, z={bolt_centroid_z:.2f}) mm "
         f"(offset from plate center: Δy={offset_y:.2f} mm, Δz={offset_z:.2f} mm)"
     )
     lines.append("Positions (y, z):")
-    for i, (y, z) in enumerate(bg.positions, start=1):
+    for i, (y, z) in enumerate(layout.points, start=1):
         lines.append(f"  {i:>2}: y={y:>8.2f}, z={z:>8.2f}")
     lines.append("")
     lines.append(
@@ -115,7 +118,7 @@ def _format_analysis(title: str, result) -> str:
     lines.append("")
     lines.append("Per-bolt forces/stresses:")
     lines.append("  #    y        z        Fy        Fz        Fx        R      tau    sigma    comb")
-    for i, br in enumerate(result.to_bolt_results(), start=1):
+    for i, br in enumerate(result.to_bolt_forces(), start=1):
         lines.append(
             f"  {i:>2}  {br.y:>7.2f}  {br.z:>7.2f}  "
             f"{br.Fy:>8.2f}  {br.Fz:>8.2f}  {br.Fx:>8.2f}  {br.resultant:>8.2f}  "
@@ -162,16 +165,19 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     # 1. BOLT GROUP CONFIGURATION
     lines.append("1. BOLT GROUP CONFIGURATION")
     lines.append("-" * 80)
-    bg = case.connection.bolt_group
+    layout = case.connection.layout
+    bolt = case.connection.bolt
     plate = case.connection.plate
+    if plate is None:
+        raise ValueError("Bolt example requires a plate")
     plate_center_y, plate_center_z = plate.center
-    bolt_centroid_y = bg.Cy
-    bolt_centroid_z = bg.Cz
+    bolt_centroid_y = layout.Cy
+    bolt_centroid_z = layout.Cz
     offset_y = bolt_centroid_y - plate_center_y
     offset_z = bolt_centroid_z - plate_center_z
-    lines.append(f"Bolt grade: {bg.grade}")
-    lines.append(f"Bolt diameter: {bg.diameter:.2f} mm")
-    lines.append(f"Number of bolts: {bg.n}")
+    lines.append(f"Bolt grade: {bolt.grade}")
+    lines.append(f"Bolt diameter: {bolt.diameter:.2f} mm")
+    lines.append(f"Number of bolts: {layout.n}")
     lines.append(f"Number of shear planes: {case.connection.n_shear_planes}")
     lines.append(f"Bolt group centroid: (y={bolt_centroid_y:.2f}, z={bolt_centroid_z:.2f}) mm")
     lines.append(f"Plate center: (y={plate_center_y:.2f}, z={plate_center_z:.2f}) mm")
@@ -179,7 +185,7 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     lines.append("")
     lines.append("Bolt positions (y, z) in mm:")
     lines.append("  #    y        z")
-    for i, (y, z) in enumerate(bg.positions, start=1):
+    for i, (y, z) in enumerate(layout.points, start=1):
         lines.append(f"  {i:>2}  {y:>7.2f}  {z:>7.2f}")
     lines.append("")
     lines.append(
@@ -206,7 +212,7 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     lines.append("Per-bolt forces and stresses:")
     lines.append("  #    y        z        Fy        Fz        Fx        V         tau    sigma_x")
     lines.append("                        (N)       (N)       (N)       (N)      (MPa)    (MPa)")
-    for i, br in enumerate(result.to_bolt_results(), start=1):
+    for i, br in enumerate(result.to_bolt_forces(), start=1):
         lines.append(
             f"  {i:>2}  {br.y:>7.2f}  {br.z:>7.2f}  "
             f"{br.Fy:>8.2f}  {br.Fz:>8.2f}  {br.Fx:>8.2f}  {br.shear:>8.2f}  "
@@ -433,16 +439,15 @@ def _format_check(title: str, check) -> str:
 
 def _make_case(*, grade: str, name: str) -> BoltCase:
     # Geometry (same for all cases, only grade changes for check standard defaults)
-    bolt_group = BoltGroup.from_pattern(
+    layout = BoltLayout.from_pattern(
         rows=3,
         cols=2,
         spacing_y=75.0,
         spacing_z=60.0,
-        diameter=20.0,
-        grade=grade,
         offset_y=_BOLT_OFFSET_Y,
         offset_z=_BOLT_OFFSET_Z,
     )
+    bolt = BoltParams(diameter=20.0, grade=grade)
 
     plate = Plate.from_dimensions(
         width=_PLATE_WIDTH_Y,
@@ -453,7 +458,7 @@ def _make_case(*, grade: str, name: str) -> BoltCase:
         fy=350.0,
     )
 
-    connection = BoltConnection(bolt_group=bolt_group, plate=plate, n_shear_planes=1)
+    connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
 
     load = Load(
         Fx=30_000.0,

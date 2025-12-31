@@ -2,7 +2,7 @@
 Bolt connection geometry models.
 
 This module contains *input* data structures only (geometry + material/bolt specs).
-Analysis is performed by `LoadedBoltConnection` in `connecty.bolt.analysis`.
+Analysis is performed by `BoltResult` in `connecty.bolt.analysis`.
 """
 
 from __future__ import annotations
@@ -18,18 +18,44 @@ from ..common.load import Load
 Point2D = tuple[float, float]  # (y, z)
 
 
-@dataclass
-class BoltParameters:
-    """Bolt configuration parameters."""
+_BOLT_GRADE_PROPERTIES: dict[str, dict[str, float]] = {
+    # Typical values used for general connection design.
+    # Units are user-defined; connecty is unit-agnostic.
+    "A325": {"fy": 660.0, "fu": 830.0},
+    "A490": {"fy": 940.0, "fu": 1040.0},
+    "8.8": {"fy": 640.0, "fu": 800.0},
+    "10.9": {"fy": 900.0, "fu": 1000.0},
+}
+
+
+@dataclass(frozen=True)
+class BoltParams:
+    """Bolt properties + size (unit-agnostic)."""
 
     diameter: float
-    grade: str = "A325"
+    grade: str | None = None
+    fy: float | None = None
+    fu: float | None = None
 
     def __post_init__(self) -> None:
         if self.diameter <= 0.0:
             raise ValueError("Bolt diameter must be positive")
-        if self.grade not in ("A325", "A490", "8.8", "10.9"):
-            raise ValueError(f"Bolt grade must be A325, A490, 8.8, or 10.9, got {self.grade}")
+
+        if self.grade is None and (self.fy is None or self.fu is None):
+            raise ValueError("Provide either grade or both fy and fu")
+
+        if self.grade is not None and self.grade not in _BOLT_GRADE_PROPERTIES:
+            raise ValueError(f"Unsupported bolt grade: {self.grade}")
+
+        if self.fy is None and self.grade is not None:
+            object.__setattr__(self, "fy", float(_BOLT_GRADE_PROPERTIES[self.grade]["fy"]))
+        if self.fu is None and self.grade is not None:
+            object.__setattr__(self, "fu", float(_BOLT_GRADE_PROPERTIES[self.grade]["fu"]))
+
+        if self.fy is not None and self.fy <= 0.0:
+            raise ValueError("Bolt fy must be positive")
+        if self.fu is not None and self.fu <= 0.0:
+            raise ValueError("Bolt fu must be positive")
 
 
 @dataclass(frozen=True)
@@ -45,26 +71,16 @@ class BoltProperties:
 
 
 @dataclass
-class BoltGroup:
-    """A group of bolts defined by (y, z) positions and bolt parameters."""
+class BoltLayout:
+    """A 2D bolt layout (y-z plane). Geometry only."""
 
-    positions: list[Point2D]
-    diameter: float
-    grade: str = "A325"
+    points: list[Point2D]
 
     _properties: BoltProperties | None = field(default=None, repr=False, init=False)
 
     def __post_init__(self) -> None:
-        if len(self.positions) < 1:
-            raise ValueError("Bolt group must have at least one bolt")
-        if self.diameter <= 0.0:
-            raise ValueError("Bolt diameter must be positive")
-        if self.grade not in ("A325", "A490", "8.8", "10.9"):
-            raise ValueError(f"Bolt grade must be A325, A490, 8.8, or 10.9, got {self.grade}")
-
-    @property
-    def parameters(self) -> BoltParameters:
-        return BoltParameters(diameter=self.diameter, grade=self.grade)
+        if len(self.points) < 1:
+            raise ValueError("Bolt layout must have at least one bolt")
 
     @classmethod
     def from_pattern(
@@ -73,12 +89,10 @@ class BoltGroup:
         cols: int,
         spacing_y: float,
         spacing_z: float,
-        diameter: float,
-        grade: str = "A325",
         origin: Point2D = (0.0, 0.0),
         offset_y: float = 0.0,
         offset_z: float = 0.0,
-    ) -> "BoltGroup":
+    ) -> "BoltLayout":
         """Create a rectangular bolt pattern centered at `origin`.
 
         You can also apply an explicit offset using `offset_y` / `offset_z` (in the y/z axes).
@@ -96,27 +110,25 @@ class BoltGroup:
         y_start = y0 - (rows - 1) * spacing_y / 2.0
         z_start = z0 - (cols - 1) * spacing_z / 2.0
 
-        positions: list[Point2D] = []
+        points: list[Point2D] = []
         for i in range(rows):
             for j in range(cols):
                 y = y_start + i * spacing_y
                 z = z_start + j * spacing_z
-                positions.append((y, z))
+                points.append((y, z))
 
-        return cls(positions=positions, diameter=diameter, grade=grade)
+        return cls(points=points)
 
     @classmethod
     def from_circle(
         cls,
         n: int,
         radius: float,
-        diameter: float,
-        grade: str = "A325",
         center: Point2D = (0.0, 0.0),
         start_angle: float = 0.0,
         offset_y: float = 0.0,
         offset_z: float = 0.0,
-    ) -> "BoltGroup":
+    ) -> "BoltLayout":
         """Create `n` bolts on a circle in the y-z plane."""
         if n < 1:
             raise ValueError("n must be at least 1")
@@ -129,21 +141,21 @@ class BoltGroup:
             center = (float(offset_y), float(offset_z))
 
         cy, cz = center
-        positions: list[Point2D] = []
+        points: list[Point2D] = []
         for i in range(n):
             angle = math.radians(start_angle + i * 360.0 / n)
             y = cy + radius * math.sin(angle)
             z = cz + radius * math.cos(angle)
-            positions.append((y, z))
+            points.append((y, z))
 
-        return cls(positions=positions, diameter=diameter, grade=grade)
+        return cls(points=points)
 
     def _calculate_properties(self) -> BoltProperties:
         if self._properties is not None:
             return self._properties
 
-        y_arr = np.array([p[0] for p in self.positions], dtype=float)
-        z_arr = np.array([p[1] for p in self.positions], dtype=float)
+        y_arr = np.array([p[0] for p in self.points], dtype=float)
+        z_arr = np.array([p[1] for p in self.points], dtype=float)
 
         Cy = float(np.mean(y_arr))
         Cz = float(np.mean(z_arr))
@@ -155,12 +167,12 @@ class BoltGroup:
         Iy = float(np.sum(dz_arr**2))
         Ip = Iy + Iz
 
-        self._properties = BoltProperties(Cy=Cy, Cz=Cz, n=len(self.positions), Iy=Iy, Iz=Iz, Ip=Ip)
+        self._properties = BoltProperties(Cy=Cy, Cz=Cz, n=len(self.points), Iy=Iy, Iz=Iz, Ip=Ip)
         return self._properties
 
     @property
     def n(self) -> int:
-        return len(self.positions)
+        return len(self.points)
 
     @property
     def Cy(self) -> float:
@@ -281,16 +293,20 @@ ShearMethod = Literal["elastic", "icr"]
 class BoltConnection:
     """Bolt group + plate definition for connection geometry."""
 
-    bolt_group: BoltGroup
-    plate: Plate
+    layout: BoltLayout
+    bolt: BoltParams
+    plate: Plate | None = None
     n_shear_planes: int = 1
 
     def __post_init__(self) -> None:
         if self.n_shear_planes < 1:
             raise ValueError("n_shear_planes must be at least 1")
 
-        radius = self.bolt_group.diameter / 2.0
-        for y, z in self.bolt_group.positions:
+        if self.plate is None:
+            return
+
+        radius = float(self.bolt.diameter) / 2.0
+        for y, z in self.layout.points:
             dist_to_y_min = y - self.plate.y_min
             dist_to_y_max = self.plate.y_max - y
             dist_to_z_min = z - self.plate.z_min
@@ -312,15 +328,24 @@ class BoltConnection:
         *,
         shear_method: ShearMethod = "elastic",
         tension_method: TensionMethod = "conservative",
-    ) -> "LoadedBoltConnection":
-        """Analyze this connection and return a `LoadedBoltConnection`."""
-        from .analysis import LoadedBoltConnection
+    ) -> "BoltResult":
+        """Analyze this connection and return a `BoltResult`."""
+        from .analysis import BoltResult
 
-        return LoadedBoltConnection(
+        return BoltResult(
             connection=self,
             load=load,
             shear_method=shear_method,
             tension_method=tension_method,
         )
+__all__ = [
+    "BoltParams",
+    "BoltProperties",
+    "BoltLayout",
+    "Plate",
+    "BoltConnection",
+    "TensionMethod",
+    "ShearMethod",
+]
 
 

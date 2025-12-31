@@ -1,4 +1,4 @@
-"""User-facing weld analysis object (connection + load + convenience methods)."""
+"""WeldResult: a WeldConnection subjected to a Load, with calculated weld stresses."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from .weld import Weld
 
 
 @dataclass
-class LoadedWeldConnection:
+class WeldResult:
     """A `WeldConnection` subjected to a `Load`, with calculated weld stresses."""
 
     connection: WeldConnection
@@ -22,8 +22,17 @@ class LoadedWeldConnection:
     _analysis: LoadedWeld = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        # Match electrode by default for analysis inputs (conservative and cancels in scaling)
-        F_EXX = float(self.connection.base_metal.fu)
+        # Provide a strength scale for ICR when available (unit-agnostic).
+        # - Prefer an explicit WeldParams.F_EXX if provided
+        # - Else, if base metal is provided, default to matching-electrode assumption: F_EXX = Fu
+        # - Else, leave None and let the analysis engine fall back
+        F_EXX: float | None
+        if self.connection.params.F_EXX is not None:
+            F_EXX = float(self.connection.params.F_EXX)
+        elif self.connection.base_metal is not None:
+            F_EXX = float(self.connection.base_metal.fu)
+        else:
+            F_EXX = None
 
         # If HSS end-connection restriction applies, disable directional strength increase in ICR.
         include_kds = not bool(self.connection.is_rect_hss_end_connection)

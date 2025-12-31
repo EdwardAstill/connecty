@@ -104,7 +104,7 @@ def check_as4100(
             pretension = AS4100_PRETENSION_KN[size_key][grade]
         slip_capacity = 0.7 * slip_coefficient * n_e * pretension * hole_type_factor
 
-    bolt_results = result.to_bolt_results()
+    bolt_results = result.to_bolt_forces()
 
     if tension_per_bolt is not None:
         tension_mode = "override"

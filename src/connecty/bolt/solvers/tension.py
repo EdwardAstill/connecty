@@ -5,25 +5,25 @@ from __future__ import annotations
 from typing import Dict, Literal
 
 from ...common.load import Load
-from ..geometry import BoltGroup, Plate
+from ..geometry import BoltLayout, Plate
 
 TensionMethod = Literal["conservative", "accurate"]
 
 
 def calculate_plate_bolt_tensions(
     *,
-    bolt_group: BoltGroup,
+    layout: BoltLayout,
     plate: Plate,
     load: Load,
     tension_method: TensionMethod,
 ) -> list[float]:
     """Return per-bolt tension (Fx) from the plate neutral-axis method."""
-    n = bolt_group.n
+    n = layout.n
     if n < 1:
         return []
 
-    Cy = bolt_group.Cy
-    Cz = bolt_group.Cz
+    Cy = layout.Cy
+    Cz = layout.Cz
     _, My_total, Mz_total = load.get_moments_about(0.0, Cy, Cz)
     My = float(My_total)
     Mz = float(Mz_total)
@@ -32,14 +32,14 @@ def calculate_plate_bolt_tensions(
     per_bolt = [Fx_direct / n for _ in range(n)]
 
     add_my = _tension_from_moment_about_axis(
-        bolt_group=bolt_group,
+        layout=layout,
         plate=plate,
         moment=My,
         axis="y",
         tension_method=tension_method,
     )
     add_mz = _tension_from_moment_about_axis(
-        bolt_group=bolt_group,
+        layout=layout,
         plate=plate,
         moment=Mz,
         axis="z",
@@ -56,7 +56,7 @@ def calculate_plate_bolt_tensions(
 
 def _tension_from_moment_about_axis(
     *,
-    bolt_group: BoltGroup,
+    layout: BoltLayout,
     plate: Plate,
     moment: float,
     axis: Literal["y", "z"],
@@ -68,21 +68,21 @@ def _tension_from_moment_about_axis(
     in the compression zone. The calling function should sum all components
     before applying the compression rule (negative total → 0).
     """
-    n = bolt_group.n
+    n = layout.n
     out = [0.0 for _ in range(n)]
     if abs(moment) < 1e-12:
         return out
 
     if axis == "y":
-        u_vals = [p[1] for p in bolt_group.positions]  # z
+        u_vals = [p[1] for p in layout.points]  # z
         u_min = plate.z_min
         u_max = plate.z_max
-        u_centroid = float(bolt_group.Cz)
+        u_centroid = float(layout.Cz)
     elif axis == "z":
-        u_vals = [p[0] for p in bolt_group.positions]  # y
+        u_vals = [p[0] for p in layout.points]  # y
         u_min = plate.y_min
         u_max = plate.y_max
-        u_centroid = float(bolt_group.Cy)
+        u_centroid = float(layout.Cy)
     else:
         raise ValueError("axis must be 'y' or 'z'")
 

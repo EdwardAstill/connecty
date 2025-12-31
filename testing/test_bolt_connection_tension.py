@@ -1,14 +1,15 @@
 import pytest
 
-from connecty import BoltConnection, BoltGroup, Load, Plate
+from connecty import BoltConnection, BoltLayout, BoltParams, Load, Plate
 
 
 def test_tension_conservative_vs_accurate_changes_na_and_forces():
     # 2 rows (y), 3 cols (z)
-    bg = BoltGroup.from_pattern(rows=2, cols=3, spacing_y=100.0, spacing_z=50.0, diameter=20.0)
+    layout = BoltLayout.from_pattern(rows=2, cols=3, spacing_y=100.0, spacing_z=50.0)
+    bolt = BoltParams(diameter=20.0, grade="A325")
 
     plate = Plate(corner_a=(-60.0, -60.0), corner_b=(60.0, 60.0), thickness=10.0, fu=450.0, fy=350.0)  # y,z
-    conn = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=1)
+    conn = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
 
     # Apply pure My (causes gradient across z)
     f = Load(My=1.0e6, location=(0.0, 0.0, 0.0))
@@ -16,8 +17,8 @@ def test_tension_conservative_vs_accurate_changes_na_and_forces():
     r_cons = conn.analyze(f, shear_method="elastic", tension_method="conservative")
     r_acc = conn.analyze(f, shear_method="elastic", tension_method="accurate")
 
-    fx_cons = [bf.Fx for bf in r_cons.to_bolt_results()]
-    fx_acc = [bf.Fx for bf in r_acc.to_bolt_results()]
+    fx_cons = [bf.Fx for bf in r_cons.to_bolt_forces()]
+    fx_acc = [bf.Fx for bf in r_acc.to_bolt_forces()]
 
     # Must produce some tension on at least one bolt
     assert max(fx_cons) > 0
@@ -34,9 +35,10 @@ def test_tension_sums_my_and_mz_contributions():
     tension from another. So Fx(My+Mz) != Fx(My) + Fx(Mz) in general, because
     negative contributions are now properly handled before the final zeroing.
     """
-    bg = BoltGroup.from_pattern(rows=2, cols=2, spacing_y=100.0, spacing_z=100.0, diameter=20.0)
+    layout = BoltLayout.from_pattern(rows=2, cols=2, spacing_y=100.0, spacing_z=100.0)
+    bolt = BoltParams(diameter=20.0, grade="A325")
     plate = Plate(corner_a=(-60.0, -60.0), corner_b=(60.0, 60.0), thickness=10.0, fu=450.0, fy=350.0)
-    conn = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=1)
+    conn = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
 
     f_my = Load(My=1.0e6, location=(0.0, 0.0, 0.0))
     f_mz = Load(Mz=1.0e6, location=(0.0, 0.0, 0.0))
@@ -47,10 +49,10 @@ def test_tension_sums_my_and_mz_contributions():
     r_both = conn.analyze(f_both, shear_method="elastic", tension_method="conservative")
 
     # Check that biaxial bending properly accounts for compression cancellation
-    for i in range(bg.n):
-        both = r_both.to_bolt_results()[i].Fx
-        my = r_my.to_bolt_results()[i].Fx
-        mz = r_mz.to_bolt_results()[i].Fx
+    for i in range(layout.n):
+        both = r_both.to_bolt_forces()[i].Fx
+        my = r_my.to_bolt_forces()[i].Fx
+        mz = r_mz.to_bolt_forces()[i].Fx
         
         # With proper compression handling:
         # - If both My and Mz create tension (both > 0 before zeroing), then both ≈ my + mz
@@ -66,17 +68,18 @@ def test_tension_sums_my_and_mz_contributions():
 
 
 def test_shear_planes_reduce_shear_stress():
-    bg = BoltGroup.from_pattern(rows=1, cols=1, spacing_y=100.0, spacing_z=100.0, diameter=20.0)
+    layout = BoltLayout.from_pattern(rows=1, cols=1, spacing_y=100.0, spacing_z=100.0)
+    bolt = BoltParams(diameter=20.0, grade="A325")
     plate = Plate(corner_a=(-10.0, -10.0), corner_b=(10.0, 10.0), thickness=10.0, fu=450.0, fy=350.0)
 
     f = Load(Fy=10000.0, location=(0.0, 0.0, 0.0))
 
-    conn_1 = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=1)
-    conn_2 = BoltConnection(bolt_group=bg, plate=plate, n_shear_planes=2)
+    conn_1 = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
+    conn_2 = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=2)
 
     r1 = conn_1.analyze(f, shear_method="elastic", tension_method="conservative")
     r2 = conn_2.analyze(f, shear_method="elastic", tension_method="conservative")
 
-    b1 = r1.to_bolt_results()[0]
-    b2 = r2.to_bolt_results()[0]
+    b1 = r1.to_bolt_forces()[0]
+    b2 = r2.to_bolt_forces()[0]
     assert b1.shear_stress == pytest.approx(b2.shear_stress * 2.0)

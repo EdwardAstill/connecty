@@ -28,9 +28,16 @@ def check_weld_group(
     if standard_norm != "aisc":
         raise ValueError("standard must be 'aisc'")
 
+    if getattr(result.connection, "base_metal", None) is None:
+        raise ValueError("WeldConnection.base_metal is required for weld checks.")
+
     if F_EXX is None:
-        # Matching electrode assumption (conservative): use weaker/thinner base metal Fu.
-        F_EXX_value = float(result.connection.base_metal.fu)
+        # Prefer explicit weld params strength; else matching-electrode assumption: F_EXX = base metal Fu.
+        params_F_EXX = getattr(result.connection.params, "F_EXX", None)
+        if params_F_EXX is not None:
+            F_EXX_value = float(params_F_EXX)
+        else:
+            F_EXX_value = float(result.connection.base_metal.fu)
     else:
         F_EXX_value = float(F_EXX)
 

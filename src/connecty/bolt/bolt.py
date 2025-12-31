@@ -8,24 +8,18 @@ Implementation lives in:
 
 from __future__ import annotations
 
-from .analysis import LoadedBoltConnection
-from .geometry import (
-    BoltConnection,
-    BoltGroup,
-    BoltParameters,
-    BoltProperties,
-    Plate,
-)
-from .results import BoltResult
+from .analysis import BoltResult
+from .geometry import BoltConnection, BoltLayout, BoltParams, BoltProperties, Plate
+from .results import BoltForce
 
 __all__ = [
-    "BoltParameters",
+    "BoltParams",
     "BoltProperties",
-    "BoltGroup",
+    "BoltLayout",
     "Plate",
     "BoltConnection",
+    "BoltForce",
     "BoltResult",
-    "LoadedBoltConnection",
 ]
 
 
