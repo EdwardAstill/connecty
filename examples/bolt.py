@@ -32,8 +32,8 @@ class BoltCase:
     load: Load
 
 
-_PLATE_WIDTH_Y = 250.0
-_PLATE_HEIGHT_Z = 160.0
+_PLATE_WIDTH_Z = 160.0  # width along z-axis
+_PLATE_HEIGHT_Y = 250.0  # height along y-axis
 _PLATE_CENTER = (0.0, 0.0)
 
 # Small offset so the bolt group is not perfectly centered on the plate
@@ -450,8 +450,8 @@ def _make_case(*, grade: str, name: str) -> BoltCase:
     bolt = BoltParams(diameter=20.0, grade=grade)
 
     plate = Plate.from_dimensions(
-        width=_PLATE_WIDTH_Y,
-        height=_PLATE_HEIGHT_Z,
+        width=_PLATE_WIDTH_Z,
+        height=_PLATE_HEIGHT_Y,
         center=_PLATE_CENTER,
         thickness=12.0,
         fu=450.0,

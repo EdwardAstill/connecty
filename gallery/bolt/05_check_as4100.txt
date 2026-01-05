@@ -77,18 +77,18 @@ Per-bolt:
       a_e=44.0 mm (from edge_clear=55.0 mm)
       Vb=345.6 kN, Vp=237.6 kN
   bolt #5 @ (y=85.00, z=-35.00)
-    Demand: V=29.520 kN, T=8.140 kN
+    Demand: V=29.520 kN, T=8.076 kN
     Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=140.940 kN
-    Util: shear=0.3420, tension=0.0649, bearing=0.2095 -> shear (0.3420)
+    Util: shear=0.3420, tension=0.0644, bearing=0.2095 -> shear (0.3420)
     Inputs:
-      Vu=29.520 kN, Tu=8.140 kN (with prying: 10.175 kN)
+      Vu=29.520 kN, Tu=8.076 kN (with prying: 10.095 kN)
       a_e=29.0 mm (from edge_clear=40.0 mm)
       Vb=345.6 kN, Vp=156.6 kN
   bolt #6 @ (y=85.00, z=25.00)
-    Demand: V=38.611 kN, T=18.416 kN
+    Demand: V=38.611 kN, T=18.352 kN
     Capacity: Vn=86.304 kN, Tn=156.800 kN, Bn=140.940 kN
-    Util: shear=0.4474, tension=0.1468, bearing=0.2740 -> shear (0.4474)
+    Util: shear=0.4474, tension=0.1463, bearing=0.2740 -> shear (0.4474)
     Inputs:
-      Vu=38.611 kN, Tu=18.416 kN (with prying: 23.020 kN)
+      Vu=38.611 kN, Tu=18.352 kN (with prying: 22.941 kN)
       a_e=29.0 mm (from edge_clear=40.0 mm)
       Vb=345.6 kN, Vp=156.6 kN

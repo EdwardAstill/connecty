@@ -216,11 +216,11 @@ class Plate:
         fy: float | None = None,
         center: Point2D = (0.0, 0.0),
     ) -> "Plate":
-        """Create a rectangular plate from width/height (y/z) and an optional center point.
+        """Create a rectangular plate from width/height (z/y) and an optional center point.
 
         Notes:
-        - `width` is the plate size in the **y** direction.
-        - `height` is the plate size in the **z** direction.
+        - `width` is the plate size in the **z** direction.
+        - `height` is the plate size in the **y** direction.
         """
         if width <= 0.0:
             raise ValueError("Plate width must be positive")
@@ -232,8 +232,8 @@ class Plate:
         half_h = height / 2.0
 
         return cls(
-            corner_a=(cy - half_w, cz - half_h),
-            corner_b=(cy + half_w, cz + half_h),
+            corner_a=(cy - half_h, cz - half_w),
+            corner_b=(cy + half_h, cz + half_w),
             thickness=thickness,
             fu=fu,
             fy=fy,

@@ -27,7 +27,7 @@ class TestUniaxialBending:
         layout = BoltLayout(points=bolt_positions)
         bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
-            width=200.0, height=400.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
+            width=400.0, height=200.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
         connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
@@ -59,7 +59,7 @@ class TestUniaxialBending:
         layout = BoltLayout(points=bolt_positions)
         bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
-            width=200.0, height=300.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
+            width=300.0, height=200.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
         connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
@@ -89,7 +89,7 @@ class TestUniaxialBending:
         layout = BoltLayout(points=bolt_positions)
         bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
-            width=400.0, height=200.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
+            width=200.0, height=400.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
         connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
@@ -208,7 +208,7 @@ class TestDirectTensionWithMoments:
         layout = BoltLayout(points=bolt_positions)
         bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
-            width=200.0, height=400.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
+            width=400.0, height=200.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
         connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
@@ -233,7 +233,7 @@ class TestDirectTensionWithMoments:
         layout = BoltLayout(points=bolt_positions)
         bolt = BoltParams(diameter=20.0, grade="A325")
         plate = Plate.from_dimensions(
-            width=200.0, height=400.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
+            width=400.0, height=200.0, thickness=10.0, fu=400.0, center=(0.0, 0.0)
         )
         
         connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)

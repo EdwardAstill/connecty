@@ -4,7 +4,7 @@ Case: AISC_360_22_A325
 
 Units: choose any consistent system (this example uses mm, N, N*mm)
 
-Bolt group: n=6, d=20.00, grade=A325
+Bolt layout: n=6, d=20.00, grade=A325
 Bolt group centroid: (y=10.00, z=-5.00) mm (offset from plate center: Δy=10.00 mm, Δz=-5.00 mm)
 Positions (y, z):
    1: y=  -65.00, z=  -35.00
