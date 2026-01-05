@@ -29,7 +29,7 @@ class LoadedWeld:
     Attributes:
         weld: Weld object defining geometry and parameters
         load: Load object defining applied forces and moments
-        method: Analysis method - "elastic", "icr", or "both"
+        method: Analysis method - "elastic" or "icr"
         discretization: Number of points to discretize the weld path
         
     Example:
@@ -72,7 +72,7 @@ class LoadedWeld:
         
         # Validate method for weld type
         valid_methods = {
-            "fillet": ["elastic", "icr", "both"],
+            "fillet": ["elastic", "icr"],
             "pjp": ["elastic"],
             "cjp": ["base_metal", "elastic"],
             "plug": ["elastic"],
@@ -95,12 +95,6 @@ class LoadedWeld:
             self.rotation = None
         elif self.method == "icr":
             calculate_icr_stress(self, self.discretization)
-        elif self.method == "both":
-            # For "both", calculate elastic method
-            # (could enhance later to store both results)
-            calculate_elastic_stress(self, self.discretization)
-            self.icr_point = None
-            self.rotation = None
         else:
             raise ValueError(f"Unknown method: {self.method}")
     
@@ -402,7 +396,6 @@ class LoadedWeld:
         Plot weld stress distribution.
         
         Uses the method specified when creating the LoadedWeld.
-        For comparison plots, use method="both" when creating the LoadedWeld.
         
         Args:
             section: Show section outline (default True)
@@ -417,72 +410,18 @@ class LoadedWeld:
         Returns:
             Matplotlib axes or figure object
         """
-        from .weld_plotter import plot_loaded_weld, plot_loaded_weld_comparison
+        from .weld_plotter import plot_loaded_weld
         
-        if self.method == "both":
-            # Calculate both results for comparison
-            elastic_loaded = LoadedWeld(
-                self.weld,
-                self.load,
-                method="elastic",
-                discretization=self.discretization,
-                F_EXX=self.F_EXX,
-                include_kds=self.include_kds,
-            )
-            
-            loaded_list = [elastic_loaded]
-            
-            # Only add ICR if it's a fillet weld
-            if self.weld.parameters.type == "fillet":
-                icr_loaded = LoadedWeld(
-                    self.weld,
-                    self.load,
-                    method="icr",
-                    discretization=self.discretization,
-                    F_EXX=self.F_EXX,
-                    include_kds=self.include_kds,
-                )
-                loaded_list.append(icr_loaded)
-            
-            if len(loaded_list) >= 2:
-                return plot_loaded_weld_comparison(
-                    loaded_list,
-                    section=section,
-                    force=True,
-                    colorbar=True,
-                    cmap=cmap,
-                    weld_linewidth=weld_linewidth,
-                    show=show,
-                    save_path=save_path,
-                    info=info,
-                    legend=legend
-                )
-            else:
-                # Fallback to single plot
-                return plot_loaded_weld(
-                    elastic_loaded,
-                    section=section,
-                    force=True,
-                    colorbar=True,
-                    cmap=cmap,
-                    weld_linewidth=weld_linewidth,
-                    show=show,
-                    save_path=save_path,
-                    info=info,
-                    legend=legend
-                )
-        else:
-            # Standard single method plot
-            return plot_loaded_weld(
-                self,
-                section=section,
-                force=True,
-                colorbar=True,
-                cmap=cmap,
-                weld_linewidth=weld_linewidth,
-                show=show,
-                save_path=save_path,
-                info=info,
-                legend=legend
-            )
+        return plot_loaded_weld(
+            self,
+            section=section,
+            force=True,
+            colorbar=True,
+            cmap=cmap,
+            weld_linewidth=weld_linewidth,
+            show=show,
+            save_path=save_path,
+            info=info,
+            legend=legend,
+        )
 

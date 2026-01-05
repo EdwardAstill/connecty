@@ -18,7 +18,7 @@ from sectiony.geometry import Geometry
 from ..common.load import Load
 from .weld import Weld, WeldParams
 
-WeldMethod = Literal["elastic", "icr", "both"]
+WeldMethod = Literal["elastic", "icr"]
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,3 @@
-## New API (refined spec)
-
 ### Goals
 - **Consistent model**: `Connection` + `Load` → `Result` → `CheckResult`
 - **Unit-agnostic**: Connecty never assumes a unit system. Outputs are in the same derived units as inputs.
@@ -26,7 +24,7 @@ Single load object used by both bolts and welds.
 
 ## Bolts
 
-### `BoltLayout` (formerly `BoltGroup` / `BoltPlacement`)
+### `BoltLayout`
 Geometry/layout only. **2D only**.
 
 - **Fields**:

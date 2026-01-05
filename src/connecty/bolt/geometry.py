@@ -9,11 +9,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import math
-from typing import Literal
+from typing import Literal, TYPE_CHECKING
 
 import numpy as np
 
 from ..common.load import Load
+
+if TYPE_CHECKING:
+    from .analysis import BoltResult
 
 Point2D = tuple[float, float]  # (y, z)
 
@@ -327,8 +330,8 @@ class BoltConnection:
         load: Load,
         *,
         shear_method: ShearMethod = "elastic",
-        tension_method: TensionMethod = "conservative",
-    ) -> "BoltResult":
+        tension_method: TensionMethod = "accurate",
+    ) -> BoltResult:
         """Analyze this connection and return a `BoltResult`."""
         from .analysis import BoltResult
 

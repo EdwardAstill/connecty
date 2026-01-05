@@ -171,7 +171,8 @@ def check_aisc(
     Fy = float(connection.base_metal.fy)
     Fu = float(connection.base_metal.fu)
 
-    A_BM = float(n_f) * t * L_weld
+    # Per AISC J2.4: fusion face area uses leg size (w), not plate thickness (t)
+    A_BM = float(n_f) * w * L_weld
     base_phiRn_yield = 1.00 * 0.60 * Fy * A_BM
     base_phiRn_rupture = 0.75 * 0.60 * Fu * A_BM
     base_capacity = min(base_phiRn_yield, base_phiRn_rupture)

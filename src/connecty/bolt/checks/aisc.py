@@ -159,7 +159,7 @@ def check_aisc(
         slip_util: float | None = None
         k_sc: float | None = None
         if connection_type == "slip-critical":
-            k_sc = max(0.0, 1.0 - Tu / (1.13 * pretension * n_b))
+            k_sc = max(0.0, 1.0 - Tu / (1.13 * pretension))
             slip_cap = phi_slip * slip_mu * 1.13 * h_f * pretension * n_s * k_sc
             slip_util = Vu / slip_cap if slip_cap > 0.0 else math.inf
 

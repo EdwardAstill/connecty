@@ -118,6 +118,8 @@ For simplicity and conservatism, `connecty` instead uses the **minimum clear dis
 
 This approach may result in lower reported bearing or tear-out capacities compared to hand calculations that consider force direction explicitly.
 
+**Software Note:** Because `connecty` uses the minimum clear distance to **any** edge, the reported utilization may be significantly higher than a manual check if the shear force is directed away from the closest edge. Users should verify the force direction if bearing or tear-out governs the design.
+
 ### 4) Slip resistance (slip-critical joints) — J3.8 / J3.9
 
 When `connection_type="slip-critical"`, `connecty` evaluates slip in addition to the bearing-type limit states:
@@ -140,10 +142,10 @@ with:
 and:
 
 $$
-k_{sc} = \max\left(0,\ 1 - \frac{T_u}{D_u T_b n_b}\right)
+k_{sc} = \max\left(0,\ 1 - \frac{T_u}{D_u T_b}\right)
 $$
 
-where $n_b$ is the number of bolts assumed to share the applied tension (defaults to total bolts).
+where $T_u$ is the **per-bolt** tension demand for that bolt (from the bolt-group analysis output).
 
 ## Utilisations reported by `connecty`
 
@@ -173,6 +175,8 @@ The governing utilisation is the maximum across applicable limit states.
     for $N_t^*>0$, where $\alpha$ = `prying_allowance` (default 0.25).
 
   - This is a **simplified, handbook-based approximation** (e.g. Steel Designers Handbook) and does **not** represent a full prying force calculation per AS 4100 Clause 9.1.2.2.
+
+  - **Warning:** The 0.25 prying factor is a simplified approximation. For connections with thin, flexible end plates, prying forces can exceed this estimate. Users are responsible for validating this factor per AS 4100 Clause 9.1.2.2 for specific geometries.
 
   - Users may override or disable this factor where a more detailed prying analysis is required.
 

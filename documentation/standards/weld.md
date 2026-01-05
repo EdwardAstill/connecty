@@ -56,6 +56,16 @@ This is conservative and typical in practice. If a specified electrode is known 
 
 **Impact:** Since base metal fusion-face capacity is always checked for fillets, the governing limit state is automatically captured.
 
+**Typical matching electrode strengths:**
+
+| Material Grade | $F_y$ (Base Metal) | Matching Electrode | $F_{EXX}$ |
+| --- | --- | --- | --- |
+| A36 | 250 MPa | E70 | 485 MPa |
+| A572 Gr 50 | 345 MPa | E70 | 485 MPa |
+| A992 | 345 MPa | E70 | 485 MPa |
+
+For convenience, these common matching electrode strengths are provided as defaults. Users may override with actual electrode strength if known.
+
 ### Material properties: single set per weld group
 
 Instead of tracking properties for both connected parts, `connecty` requires only the **weaker/thinner material**:
@@ -254,14 +264,16 @@ For fillet weld groups, base metal shear capacity at the fusion face is evaluate
 * Fusion-face shear area:
 
 $$
-A_{BM} = n_f \, t \, L_{weld}
+A_{BM} = n_f \, w \, L_{weld}
 $$
 
 Where:
 
-* $t$ = thickness of thinner connected part
+* $w$ = fillet weld leg size
 * $n_f$ = number of fusion faces (1 for single fillet line, 2 for double fillet)
 * $L_{weld}$ = total effective weld length; for weld groups with multiple segments, use $L_{weld} = \sum L_i$ (sum of effective segment lengths)
+
+*Note: Per AISC J2.4, the fusion face of a fillet weld is the leg size ($w$), not the plate thickness. While base metal shear yielding/rupture of the plate itself (using thickness $t$) may be a separate limit state, AISC J2.4 specifically requires checking the fusion face area where the weld meets the base metal.*
 
 Base metal design shear capacity:
 
@@ -283,17 +295,12 @@ $$
 
 CJP welds are treated as **base metal connections**.
 
-* **Tension (normal to weld):**
+Because AISC assigns different $\phi$ and $F_n$ factors based on the force direction relative to the weld axis, `connecty` applies the following logic to the resultant demand $R_u$:
 
-$$
-\phi = 0.90, \quad R_n = F_y A_{BM}
-$$
-
-* **Shear:**
-
-$$
-\phi = 1.00, \quad R_n = 0.60 F_y A_{BM}
-$$
+1. **Default (Conservative):** $\phi = 0.75$ and $R_n = 0.60 F_y A_{BM}$ (Assumes shear governs strength but uses the more restrictive tension $\phi$).
+2. **Directional (Optional):** If the user specifies the force is purely normal (tension) or purely parallel (shear), the specific AISC Table J2.5 factors are applied:
+   - **Tension (normal to weld):** $\phi = 0.90$, $R_n = F_y A_{BM}$
+   - **Shear:** $\phi = 1.00$, $R_n = 0.60 F_y A_{BM}$
 
 Weld metal strength is **not checked**.
 
