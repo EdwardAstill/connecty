@@ -59,8 +59,7 @@ class WeldCheckResult:
     governing_utilization: float = 0.0
     meta: dict[str, Any] = field(default_factory=dict)
 
-    @property
-    def info(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "method": self.method,
             "governing_limit_state": self.governing_limit_state,
@@ -68,6 +67,10 @@ class WeldCheckResult:
             "meta": dict(self.meta),
             "details": [d.info for d in self.details],
         }
+
+    @property
+    def info(self) -> dict[str, Any]:
+        return self.to_dict()
 
 
 def get_governing(details: list[WeldCheckDetail]) -> tuple[str | None, float]:

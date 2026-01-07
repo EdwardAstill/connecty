@@ -207,6 +207,10 @@ class Plate:
     thickness: float
     fu: float
     fy: float | None = None
+    hole_type: HoleType = "standard"
+    hole_orientation: float | None = None
+    surface_class: SurfaceClass | None = None
+    slip_coefficient: float | None = None
 
     @classmethod
     def from_dimensions(
@@ -218,6 +222,10 @@ class Plate:
         fu: float,
         fy: float | None = None,
         center: Point2D = (0.0, 0.0),
+        hole_type: HoleType = "standard",
+        hole_orientation: float | None = None,
+        surface_class: SurfaceClass | None = None,
+        slip_coefficient: float | None = None,
     ) -> "Plate":
         """Create a rectangular plate from width/height (z/y) and an optional center point.
 
@@ -240,6 +248,10 @@ class Plate:
             thickness=thickness,
             fu=fu,
             fy=fy,
+            hole_type=hole_type,
+            hole_orientation=hole_orientation,
+            surface_class=surface_class,
+            slip_coefficient=slip_coefficient,
         )
 
     def __post_init__(self) -> None:
@@ -247,6 +259,12 @@ class Plate:
             raise ValueError("Plate thickness must be positive")
         if self.fu <= 0.0:
             raise ValueError("Plate fu (ultimate strength) must be positive")
+        
+        if self.slip_coefficient is None:
+            if self.surface_class == "A":
+                object.__setattr__(self, "slip_coefficient", 0.30)
+            elif self.surface_class == "B":
+                object.__setattr__(self, "slip_coefficient", 0.50)
 
     @property
     def y_min(self) -> float:
@@ -290,6 +308,8 @@ class Plate:
 
 TensionMethod = Literal["conservative", "accurate"]
 ShearMethod = Literal["elastic", "icr"]
+HoleType = Literal["standard", "oversize", "short-slot", "long-slot"]
+SurfaceClass = Literal["A", "B"]
 
 
 @dataclass(frozen=True)
@@ -349,6 +369,7 @@ __all__ = [
     "BoltConnection",
     "TensionMethod",
     "ShearMethod",
+    "HoleType",
 ]
 
 

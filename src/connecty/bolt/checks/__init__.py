@@ -1,10 +1,13 @@
 """Bolt design checks (AISC 360-22 and AS 4100)."""
 
 from __future__ import annotations
+from typing import Any
 
-from .models import BoltCheckDetail, BoltCheckResult, get_governing
 from .aisc import check_aisc
 from .as4100 import check_as4100
+
+BoltCheckDetail = dict[str, Any]
+BoltCheckResult = dict[str, Any]
 
 
 def check_bolt_group(
@@ -12,15 +15,15 @@ def check_bolt_group(
     *,
     standard: str | None = None,
     connection_type: str | None = None,
-    hole_type: str = "standard",
+    hole_type: str | None = None,
     slot_orientation: str = "perpendicular",
     threads_in_shear_plane: bool = True,
-    slip_class: str = "A",
+    slip_class: str | None = None,
     n_s: int | None = None,
     fillers: int = 0,
     n_b_tension: int | None = None,
     hole_type_factor: float = 1.0,
-    slip_coefficient: float = 0.35,
+    slip_coefficient: float | None = None,
     n_e: int = 1,
     nn_shear_planes: int = 1,
     nx_shear_planes: int = 0,
@@ -30,7 +33,7 @@ def check_bolt_group(
     pretension_override: float | None = None,
     require_explicit_tension: bool = False,
     assume_uniform_tension_if_missing: bool = True,
-) -> BoltCheckResult:
+) -> dict[str, Any]:
     """Check a bolt group result per AISC 360-22 or AS 4100."""
     bolt = result.connection.bolt
     grade = bolt.grade
@@ -39,6 +42,11 @@ def check_bolt_group(
 
     if plate is None:
         raise ValueError("Plate is required for bolt checks (bearing/tear-out geometry).")
+
+    if hole_type is None:
+        # If not provided, use hole_type from Plate (defaulting to standard if somehow missing)
+        hole_type = getattr(plate, "hole_type", "standard")
+
     if grade is None:
         raise ValueError("BoltParams.grade is required for bolt code checks (AISC/AS4100).")
 
@@ -55,6 +63,10 @@ def check_bolt_group(
         # If not provided, default to the connection's configured number of shear planes.
         if n_s is None:
             n_s = int(getattr(result.connection, "n_shear_planes", 1))
+
+        if slip_class is None:
+            slip_class = getattr(plate, "surface_class", "A") or "A"
+
         return check_aisc(
             result=result,
             grade=grade,
@@ -70,9 +82,15 @@ def check_bolt_group(
             n_b_tension=n_b_tension,
             tension_per_bolt=tension_per_bolt,
             pretension_override=pretension_override,
+            prying_factor=prying_allowance,
         )
 
     if standard_norm == "as4100":
+        if slip_coefficient is None:
+            slip_coefficient = getattr(plate, "slip_coefficient", 0.35)
+            if slip_coefficient is None:
+                slip_coefficient = 0.35
+
         return check_as4100(
             result=result,
             grade=grade,
@@ -97,11 +115,9 @@ def check_bolt_group(
 
 
 __all__ = [
-    "BoltCheckDetail",
-    "BoltCheckResult",
     "check_bolt_group",
     "check_aisc",
     "check_as4100",
+    "BoltCheckDetail",
+    "BoltCheckResult",
 ]
-
-

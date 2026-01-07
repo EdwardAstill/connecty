@@ -42,7 +42,19 @@ Bolt properties + size.
   - `fu: float | None`  # derived from grade if not specified
 
 ### `Plate` (bolt-only)
-As-is, but used only in bolt checks/models that need out-of-plane + bearing + tear-out.
+
+- **Fields**:
+  - `corner_a: tuple[float, float]` (top-left / bottom-right coordinates)
+  - `corner_b: tuple[float, float]`
+  - `thickness: float`
+  - `fu: float`
+  - `fy: float | None`
+  - `hole_type: Literal["standard", "oversize", "short-slot", "long-slot"]` (default "standard")
+  - `hole_orientation: float | None` (angle in degrees, default None)
+  - `surface_class: Literal["A", "B"] | None` (default None)
+  - `slip_coefficient: float | None` (derived from surface_class if None)
+
+
 
 ### `BoltConnection`
 - **Fields**:
@@ -57,10 +69,17 @@ As-is, but used only in bolt checks/models that need out-of-plane + bearing + te
 - **Fields**:
   - `connection: BoltConnection`
   - `load: Load`
+  - `bolt_forces: Dict[str, list[float]]`
   - `shear_method: Literal["elastic","icr"]`
   - `tension_method: Literal["conservative","accurate"]`
+
+  Bolt forces should look like this:
+  {"Fx": [float, float, float, ...], "Fy": [float, float, float, ...], "Fz": [float, float, float, ...]}
+  where the list index corresponds to the bolt index.
+  
 - **Method**:
-  - `check(...)` (same concept as current; attaches to result)
+  - `check_aisc(...)` -> `Dict`
+  - `check_as4100(...)` -> `Dict`
 
 ---
 
@@ -76,7 +95,7 @@ Defines weld type/size and strength source.
   - `electrode: str | None`
   - `F_EXX: float | None`  # if not provided, derive from electrode (if given)
 
-### `WeldConnection` (formerly “Weld”)
+### `WeldConnection`
 - **Fields**:
   - `params: WeldParams`
   - `path: Geometry/Path object` (contours need not be closed)
@@ -91,13 +110,8 @@ Defines weld type/size and strength source.
   - `load: Load`
   - `method: Literal["elastic","icr"]`
 - **Method**:
-  - `check(...)` (same concept as current; attaches to result)
+  - `check_aisc(...)` -> `Dict`
+  - `check_as4100(...)` -> `Dict`
 
 ---
 
-## Checks (both bolts and welds)
-- Checks attach to `BoltResult` / `WeldResult`.
-- Output structure stays aligned with current approach:
-  - `details: list[...]`
-  - `governing_utilization`
-  - `governing_limit_state`

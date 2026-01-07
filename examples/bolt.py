@@ -223,7 +223,7 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     # 4. CHECKING CRITERIA - GROUP LEVEL
     lines.append("4. CHECKING CRITERIA - GROUP LEVEL")
     lines.append("-" * 80)
-    meta = getattr(check, "meta", {})
+    meta = check.get("meta", {})
     standard = meta.get("standard", "")
     
     if standard == "aisc":
@@ -255,10 +255,10 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     if standard == "aisc":
         lines.append("  #    Vu      Tu      f_rv    Fnt'     lc    R_bear  R_tear")
         lines.append("       (kN)    (kN)    (MPa)   (MPa)   (mm)    (kN)    (kN)")
-        for d in check.details:
-            calc = getattr(d, "calc", {})
+        for d in check["details"]:
+            calc = d.get("calc", {})
             lines.append(
-                f"  {d.bolt_index + 1:>2}  "
+                f"  {d['bolt_index'] + 1:>2}  "
                 f"{calc.get('Vu_kN', 0.0):>6.3f}  "
                 f"{calc.get('Tu_kN', 0.0):>6.3f}  "
                 f"{calc.get('f_rv', 0.0):>6.1f}  "
@@ -270,10 +270,10 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     elif standard == "as4100":
         lines.append("  #    Vu      Tu     Tu_pry   a_e     Vb      Vp")
         lines.append("       (kN)    (kN)    (kN)   (mm)    (kN)    (kN)")
-        for d in check.details:
-            calc = getattr(d, "calc", {})
+        for d in check["details"]:
+            calc = d.get("calc", {})
             lines.append(
-                f"  {d.bolt_index + 1:>2}  "
+                f"  {d['bolt_index'] + 1:>2}  "
                 f"{calc.get('Vu_kN', 0.0):>6.3f}  "
                 f"{calc.get('Tu_kN', 0.0):>6.3f}  "
                 f"{calc.get('Tu_prying_kN', 0.0):>6.3f}  "
@@ -297,9 +297,9 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     lines.append("")
     lines.append("  #    Applied   Capacity   Utilization")
     lines.append("        (kN)       (kN)")
-    for d in check.details:
+    for d in check["details"]:
         lines.append(
-            f"  {d.bolt_index + 1:>2}    {d.shear_demand:>6.3f}     {d.shear_capacity:>6.3f}      {d.shear_util:>5.3f}"
+            f"  {d['bolt_index'] + 1:>2}    {d['shear_demand_kN']:>6.3f}     {d['shear_capacity_kN']:>6.3f}      {d['shear_util']:>5.3f}"
         )
     lines.append("")
     
@@ -313,9 +313,9 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     lines.append("")
     lines.append("  #    Applied   Capacity   Utilization")
     lines.append("        (kN)       (kN)")
-    for d in check.details:
+    for d in check["details"]:
         lines.append(
-            f"  {d.bolt_index + 1:>2}    {d.tension_demand:>6.3f}     {d.tension_capacity:>6.3f}      {d.tension_util:>5.3f}"
+            f"  {d['bolt_index'] + 1:>2}    {d['tension_demand_kN']:>6.3f}     {d['tension_capacity_kN']:>6.3f}      {d['tension_util']:>5.3f}"
         )
     lines.append("")
     
@@ -332,9 +332,9 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
     lines.append("")
     lines.append("  #    Applied   Capacity   Utilization")
     lines.append("        (kN)       (kN)")
-    for d in check.details:
+    for d in check["details"]:
         lines.append(
-            f"  {d.bolt_index + 1:>2}    {d.shear_demand:>6.3f}     {d.bearing_capacity:>6.3f}      {d.bearing_util:>5.3f}"
+            f"  {d['bolt_index'] + 1:>2}    {d['shear_demand_kN']:>6.3f}     {d['bearing_capacity_kN']:>6.3f}      {d['bearing_util']:>5.3f}"
         )
     lines.append("")
     
@@ -344,19 +344,19 @@ def _format_full_check(title: str, case: BoltCase, result, check) -> str:
         lines.append("Equation: U_int = (V*/φVn)² + (T*/φTn)²")
         lines.append("")
         lines.append("  #    Utilization")
-        for d in check.details:
+        for d in check["details"]:
             lines.append(
-                f"  {d.bolt_index + 1:>2}       {d.interaction_util if hasattr(d, 'interaction_util') and d.interaction_util is not None else 0.0:>5.3f}"
+                f"  {d['bolt_index'] + 1:>2}       {d.get('interaction_util', 0.0):>5.3f}"
             )
         lines.append("")
     
     # SUMMARY
     lines.append("7. SUMMARY")
     lines.append("-" * 80)
-    lines.append(f"Governing bolt: #{check.governing_bolt_index + 1}")
-    lines.append(f"Governing limit state: {check.governing_limit_state}")
-    lines.append(f"Governing utilization: {check.governing_utilization:.4f}")
-    if check.governing_utilization <= 1.0:
+    lines.append(f"Governing bolt: #{check['governing_bolt_index'] + 1}")
+    lines.append(f"Governing limit state: {check['governing_limit_state']}")
+    lines.append(f"Governing utilization: {check['governing_utilization']:.4f}")
+    if check["governing_utilization"] <= 1.0:
         lines.append("Status: PASS")
     else:
         lines.append("Status: FAIL")
@@ -368,13 +368,13 @@ def _format_check(title: str, check) -> str:
     lines: list[str] = []
     lines.append(title)
     lines.append("=" * 80)
-    lines.append(f"connection_type={check.connection_type}, method={check.method}")
-    lines.append(f"governing_bolt_index={check.governing_bolt_index}")
-    lines.append(f"governing_limit_state={check.governing_limit_state}")
-    lines.append(f"governing_utilization={check.governing_utilization:.4f}")
+    lines.append(f"connection_type={check.get('connection_type')}, method={check.get('method')}")
+    lines.append(f"governing_bolt_index={check.get('governing_bolt_index')}")
+    lines.append(f"governing_limit_state={check.get('governing_limit_state')}")
+    lines.append(f"governing_utilization={check.get('governing_utilization', 0.0):.4f}")
 
     # Method-wide inputs/constants
-    meta = getattr(check, "meta", {})
+    meta = check.get("meta", {})
     standard = meta.get("standard", "")
 
     if meta:
@@ -392,28 +392,28 @@ def _format_check(title: str, check) -> str:
 
     lines.append("")
     lines.append("Per-bolt:")
-    for d in check.details:
-        slip_util = d.slip_util
+    for d in check["details"]:
+        slip_util = d.get("slip_util")
         slip_part = ""
         if slip_util is not None:
             slip_part = f", slip={slip_util:.4f}"
-        lines.append(f"  bolt #{d.bolt_index + 1} @ (y={d.point[0]:.2f}, z={d.point[1]:.2f})")
+        lines.append(f"  bolt #{d['bolt_index'] + 1} @ (y={d['point'][0]:.2f}, z={d['point'][1]:.2f})")
         lines.append(
-            f"    Demand: V={d.shear_demand:.3f} kN, T={d.tension_demand:.3f} kN"
+            f"    Demand: V={d.get('shear_demand_kN', 0.0):.3f} kN, T={d.get('tension_demand_kN', 0.0):.3f} kN"
         )
         lines.append(
-            f"    Capacity: Vn={d.shear_capacity:.3f} kN, Tn={d.tension_capacity:.3f} kN, "
-            f"Bn={d.bearing_capacity:.3f} kN"
-            + ("" if d.slip_capacity is None else f", Sn={d.slip_capacity:.3f} kN")
+            f"    Capacity: Vn={d.get('shear_capacity_kN', 0.0):.3f} kN, Tn={d.get('tension_capacity_kN', 0.0):.3f} kN, "
+            f"Bn={d.get('bearing_capacity_kN', 0.0):.3f} kN"
+            + ("" if d.get("slip_capacity_kN") is None else f", Sn={d.get('slip_capacity_kN'):.3f} kN")
         )
         lines.append(
-            f"    Util: shear={d.shear_util:.4f}, tension={d.tension_util:.4f}, "
-            f"bearing={d.bearing_util:.4f}{slip_part} "
-            f"-> {d.governing_limit_state} ({d.governing_util:.4f})"
+            f"    Util: shear={d.get('shear_util', 0.0):.4f}, tension={d.get('tension_util', 0.0):.4f}, "
+            f"bearing={d.get('bearing_util', 0.0):.4f}{slip_part} "
+            f"-> {d.get('governing_limit_state')} ({d.get('governing_util', 0.0):.4f})"
         )
 
         # Show input values for this bolt
-        calc = getattr(d, "calc", {})
+        calc = d.get("calc", {})
         if calc:
             lines.append("    Inputs:")
             

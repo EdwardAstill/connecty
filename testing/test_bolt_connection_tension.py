@@ -83,3 +83,24 @@ def test_shear_planes_reduce_shear_stress():
     b1 = r1.to_bolt_forces()[0]
     b2 = r2.to_bolt_forces()[0]
     assert b1.shear_stress == pytest.approx(b2.shear_stress * 2.0)
+
+
+def test_bolt_result_bolt_forces_dict_matches_bolt_indexing():
+    layout = BoltLayout.from_pattern(rows=2, cols=3, spacing_y=100.0, spacing_z=50.0)
+    bolt = BoltParams(diameter=20.0, grade="A325")
+    plate = Plate(corner_a=(-60.0, -60.0), corner_b=(60.0, 60.0), thickness=10.0, fu=450.0, fy=350.0)
+    conn = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
+
+    f = Load(Fy=10000.0, Fz=5000.0, location=(0.0, 0.0, 0.0))
+    r = conn.analyze(f, shear_method="elastic", tension_method="conservative")
+
+    forces = r.bolt_forces
+    assert sorted(list(forces.keys())) == ["Fx", "Fy", "Fz"]
+    assert len(forces["Fx"]) == layout.n
+    assert len(forces["Fy"]) == layout.n
+    assert len(forces["Fz"]) == layout.n
+
+    bf_list = r.to_bolt_forces()
+    assert forces["Fx"] == [bf.Fx for bf in bf_list]
+    assert forces["Fy"] == [bf.Fy for bf in bf_list]
+    assert forces["Fz"] == [bf.Fz for bf in bf_list]

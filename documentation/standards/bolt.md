@@ -27,10 +27,10 @@ print(check.info)  # includes method + per-bolt details + intermediate calc term
 
 - Bolt grades supported by the AISC implementation: **A325**, **A490**
 - Per-bolt demands come from bolt-group analysis:
-  - $V_u = \sqrt{F_y^2 + F_z^2}$
-  - $T_u = \max(F_x, 0)$ (**compression is ignored** for bolt tension rupture checks)
+  - Shear force $V_u = \sqrt{F_y^2 + F_z^2}$
+  - Tension force $T_u = \max(F_x, 0)$ (**compression is ignored** for bolt tension rupture checks)
 - $n_s$ = **number of shear planes** (and, for slip-critical joints, **number of slip planes**)
-  - In `connecty`, if `n_s` is not provided, it defaults to `BoltConnection.n_shear_planes`.
+  - In `connecty`, `n_s` must be provided otherwise an error is raised.
 
 ## Tables used by `connecty` (AISC excerpt)
 
@@ -63,53 +63,111 @@ print(check.info)  # includes method + per-bolt details + intermediate calc term
 | M27 | 30 | 35 | 30 | 30 |
 | M30 | 33 | 38 | 33 | 33 |
 
-## Strength checks implemented
+## Bolt strength checks (done for each bolt)
+Note that $V_u$ is the bolt shear force and $T_u$ is the bolt tension force. (these are calculated for each bolt)
 
-### 1) Shear rupture — J3.6
+$$
+V_u,i = \sqrt{F_y,i^2 + F_z,i^2}
+$$
+$$
+T_u,i = F_x,i
+$$
+### Shear strength — J3.1
 
 - $\phi = 0.75$
 - $A_b = \pi d^2/4$
 - Nominal: $R_{n,V} = F_{nv} A_b n_s$
 - Design: $\phi R_{n,V}$
-
-### 2) Tension rupture (with shear interaction) — J3.6 / J3.7
+- Utilisation: $U_\text{shear} = \dfrac{V_u}{\phi R_{n,V}}$
+- $V_u$ is the bolt shear force
+### Tension strength  — J3.1
 
 - $\phi = 0.75$
-- Base nominal: $R_{n,T} = F_{nt} A_b$
-- If combined shear–tension applies, `connecty` uses:
+- $A_b = \pi d^2/4$
+- Nominal: $R_{n,T} = F_{nt} A_b$
+- Design: $\phi R_{n,T}$
+- Utilisation: $U_\text{tension} = \dfrac{T_u}{\phi R_{n,T}}$
+- $T_u$ is the bolt tension force
 
-$$
-F'_{nt} = \min\!\left(F_{nt},\ 1.3F_{nt} - \frac{F_{nt}}{\phi F_{nv}} f_{rv}\right),\quad F'_{nt}\ge 0
-$$
 
-where the **per-plane** bolt shear stress is:
-
+### Combined shear + tension interaction — J3.2
+- $\phi = 0.75$
+- Nominal: $R_{n,T} = F'_{nt} A_b$
 $$
-f_{rv} = \frac{V_u}{A_b n_s}
-$$
-
-and then:
-
-$$
-\phi R'_{n,T} = \phi F'_{nt} A_b
+F'_{nt} = \min\!\left(F_{nt},\ 1.3F_{nt} - \frac{F_{nt}}{\phi F_{nv}} f_{rv}\right) \quad \text{(J3-3a)}
 $$
 
-### 3) Bearing / tearout of connected material — J3.10
+- Required shear stress: $ \displaystyle f_{rv} = \frac{V_u}{A_b n_s}$
+- Nominal stresses: $F_{nt} \ \text{and}  \ F_{nv}$ from Table J3.2
+- Design: $\phi R_{n,T} = \phi F'_{nt} A_b $
+- Utilisation: $U_\text{combined} = \dfrac{T_u}{\phi R'_{n,T}}$
+- $V_u$ is the bolt shear force
+- $T_u$ is the bolt tension force
+
+## Plate strength checks (done as group)
+
+$V_{u,total}$ is the applied in plane force (totalshear force) it is caluculated like this
+$$
+V_{u,total} = \sqrt{(\sum F_y,i)^2 + (\sum F_z,i)^2}
+$$
+### Slip critical connection (not required for bearing connections)
+Note that when there is a slip critical connection type a $\mu$ factor is required.
+
+- Nominal: $R_{n,slip,i} = \mu D_u h_f T_b n_s k_{sc,i}$
+- R_{n,slip} = \sum R_{n,slip,i}$
+
+**Safety factors:**
+- Standard/short-slotted holes (perpendicular to force): $\phi = 1.00$
+- Oversize/short-slotted holes (parallel to force): $\phi = 0.85$
+- Long-slotted holes: $\phi = 0.70$
+
+**Surface factor:**
+- Class A surface (unpainted clean mill scale steel surfaces or 
+surfaces with Class A coatings on blast-cleaned steel or hot-dipped galvanized steel whether as-galvanized or hand roughened) : $\mu = 0.30$
+- Class B surfaces (unpainted blast-cleaned steel surfaces or surfaces with Class B coatings on blast-cleaned steel): $\mu = 0.50$
+
+**Tension reduction factor (calculated for each bolt):**
+$k_{sc} = \max\left(0,\ 1 - \frac{T_u}{D_u T_b}\right)$
+
+**Filler factor:**
+- 1 filler: $h_f = 1.0$
+- $\ge 2$ fillers: $h_f = 0.85$
+
+
+$D_u = 1.13$
+
+- Utilisation: $U_\text{slip} = \dfrac{V_{u,total}}{\phi R_{n,\text{slip}}}$
+- $V_{u,total}$ is the applied in plane force (totalshear force)
+### Bearing of connected material — J3.6a
 
 - $\phi = 0.75$
 - Standard hole bearing / tearout (deformation at bolt hole considered):
 
-$$
-R_{n,\text{bearing}} = 2.4 d t F_u,\quad
-R_{n,\text{tearout}} = 1.2 l_c t F_u,\quad
-R_n = \min(R_{n,\text{bearing}}, R_{n,\text{tearout}})
-$$
+$ R_{n,\text{bearing}} = \sum 2.4 d t F_u $
 
-`connecty` computes $l_c$ as the **minimum clear edge distance** from the **hole edge** to any plate edge (conservative):
+- Utilisation: $U_\text{bearing} = \dfrac{V_{u,total}}{\phi R_{n,\text{bearing}}}$
+
+- $V_{u,total}$ is the applied in plane force (totalshear force)
+
+
+### Tearout of connected material — J3.6b
+- $\phi = 0.75$
+- Nominal: $R_{n,\text{tearout}} = \sum 1.2 l_c t F_u$
+
+$l_c$ = clear distance, in the direction of the force, between the edge of the hole and the edge of the adjacent hole or edge of the material (conservatively I will take this as the minimum clear distance to any plate edge)
 
 $$
 l_c = \min\left(|y-y_\text{edge}| - d_h/2,\ |z-z_\text{edge}| - d_h/2\right)
 $$
+
+- Utilisation: $U_\text{tearout} = \dfrac{V_{u,total}}{\phi R_{n,\text{tearout}}}$
+
+- $V_{u,total}$ is the applied in plane force (totalshear force)
+
+
+## Extra notes
+
+I will just be assuming standard holes for now.
 
 **Note on edge distance definition**
 

@@ -24,7 +24,7 @@ from .elastic import solve_elastic_shear
 
 def solve_icr_shear(
     *, layout: BoltLayout, bolt_diameter: float, load: Load
-) -> tuple[list[BoltForce], Point2D | None]:
+) -> tuple[list[float], list[float], Point2D | None]:
     """Return per-bolt in-plane shear forces using the ICR method."""
     props = layout._calculate_properties()
     Cy = props.Cy
@@ -117,20 +117,14 @@ def solve_icr_shear(
     dir_y_arr = best_data["dir_y"]
     dir_z_arr = best_data["dir_z"]
 
-    bolt_results: list[BoltForce] = []
+    Fys = []
+    Fzs = []
     for idx, (y, z) in enumerate(layout.points):
         R = float(R_arr[idx])
-        bolt_results.append(
-            BoltForce(
-                point=(y, z),
-                Fy=R * float(dir_y_arr[idx]),
-                Fz=R * float(dir_z_arr[idx]),
-                Fx=0.0,
-                diameter=float(bolt_diameter),
-            )
-        )
+        Fys.append(R * float(dir_y_arr[idx]))
+        Fzs.append(R * float(dir_z_arr[idx]))
 
     icr_point: Point2D = (float(best_data["icr_y"]), float(best_data["icr_z"]))
-    return bolt_results, icr_point
+    return Fys, Fzs, icr_point
 
 

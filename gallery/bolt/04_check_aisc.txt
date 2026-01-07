@@ -1,7 +1,7 @@
 AISC 360-22 CHECK (bearing)
 ================================================================================
 connection_type=bearing, method=elastic
-governing_bolt_index=5
+governing_bolt_index=4
 governing_limit_state=shear
 governing_utilization=0.4429
 
@@ -21,6 +21,7 @@ Meta:
   phi: 0.75
   phi_slip: 1.0
   pretension_kN: 142.0
+  prying_allowance: 0.25
   slip_class: A
   slip_mu: 0.3
   standard: aisc
@@ -37,50 +38,50 @@ Capacity Equations (AISC 360-22):
 
 Per-bolt:
   bolt #1 @ (y=-65.00, z=-35.00)
-    Demand: V=17.053 kN, T=13.811 kN
-    Capacity: Vn=87.179 kN, Tn=146.084 kN, Bn=165.240 kN
-    Util: shear=0.1956, tension=0.0945, bearing=0.1032 -> shear (0.1956)
+    Demand: V=30.169 kN, T=17.264 kN
+    Capacity: Vn=87.179 kN, Tn=139.356 kN, Bn=165.240 kN
+    Util: shear=0.3461, tension=0.1239, bearing=0.1826 -> shear (0.3461)
     Inputs:
-      Vu=17.053 kN, Tu=13.811 kN
-      f_rv=54.3 MPa → Fnt'=620.0 MPa
+      Vu=30.169 kN, Tu=13.811 kN
+      f_rv=96.0 MPa → Fnt'=591.4 MPa
       lc=34.0 mm → R_bearing=259.2 kN, R_tearout=220.3 kN
   bolt #2 @ (y=-65.00, z=25.00)
-    Demand: V=30.169 kN, T=24.088 kN
-    Capacity: Vn=87.179 kN, Tn=139.356 kN, Bn=194.400 kN
-    Util: shear=0.3461, tension=0.1728, bearing=0.1552 -> shear (0.3461)
+    Demand: V=17.053 kN, T=30.109 kN
+    Capacity: Vn=87.179 kN, Tn=146.084 kN, Bn=194.400 kN
+    Util: shear=0.1956, tension=0.2061, bearing=0.0877 -> tension (0.2061)
     Inputs:
-      Vu=30.169 kN, Tu=24.088 kN
-      f_rv=96.0 MPa → Fnt'=591.4 MPa
+      Vu=17.053 kN, Tu=24.088 kN
+      f_rv=54.3 MPa → Fnt'=620.0 MPa
       lc=44.0 mm → R_bearing=259.2 kN, R_tearout=285.1 kN
   bolt #3 @ (y=10.00, z=-35.00)
-    Demand: V=14.370 kN, T=10.944 kN
-    Capacity: Vn=87.179 kN, Tn=146.084 kN, Bn=165.240 kN
-    Util: shear=0.1648, tension=0.0749, bearing=0.0870 -> shear (0.1648)
+    Demand: V=28.738 kN, T=13.680 kN
+    Capacity: Vn=87.179 kN, Tn=141.754 kN, Bn=165.240 kN
+    Util: shear=0.3296, tension=0.0965, bearing=0.1739 -> shear (0.3296)
     Inputs:
-      Vu=14.370 kN, Tu=10.944 kN
-      f_rv=45.7 MPa → Fnt'=620.0 MPa
+      Vu=28.738 kN, Tu=10.944 kN
+      f_rv=91.5 MPa → Fnt'=601.6 MPa
       lc=34.0 mm → R_bearing=259.2 kN, R_tearout=220.3 kN
   bolt #4 @ (y=10.00, z=25.00)
-    Demand: V=28.738 kN, T=21.220 kN
-    Capacity: Vn=87.179 kN, Tn=141.754 kN, Bn=194.400 kN
-    Util: shear=0.3296, tension=0.1497, bearing=0.1478 -> shear (0.3296)
+    Demand: V=14.370 kN, T=26.525 kN
+    Capacity: Vn=87.179 kN, Tn=146.084 kN, Bn=194.400 kN
+    Util: shear=0.1648, tension=0.1816, bearing=0.0739 -> tension (0.1816)
     Inputs:
-      Vu=28.738 kN, Tu=21.220 kN
-      f_rv=91.5 MPa → Fnt'=601.6 MPa
+      Vu=14.370 kN, Tu=21.220 kN
+      f_rv=45.7 MPa → Fnt'=620.0 MPa
       lc=44.0 mm → R_bearing=259.2 kN, R_tearout=285.1 kN
   bolt #5 @ (y=85.00, z=-35.00)
-    Demand: V=29.520 kN, T=8.076 kN
-    Capacity: Vn=87.179 kN, Tn=140.443 kN, Bn=140.940 kN
-    Util: shear=0.3386, tension=0.0575, bearing=0.2095 -> shear (0.3386)
+    Demand: V=38.611 kN, T=10.095 kN
+    Capacity: Vn=87.179 kN, Tn=125.210 kN, Bn=140.940 kN
+    Util: shear=0.4429, tension=0.0806, bearing=0.2740 -> shear (0.4429)
     Inputs:
-      Vu=29.520 kN, Tu=8.076 kN
-      f_rv=94.0 MPa → Fnt'=596.1 MPa
+      Vu=38.611 kN, Tu=8.076 kN
+      f_rv=122.9 MPa → Fnt'=531.4 MPa
       lc=29.0 mm → R_bearing=259.2 kN, R_tearout=187.9 kN
   bolt #6 @ (y=85.00, z=25.00)
-    Demand: V=38.611 kN, T=18.352 kN
-    Capacity: Vn=87.179 kN, Tn=125.210 kN, Bn=140.940 kN
-    Util: shear=0.4429, tension=0.1466, bearing=0.2740 -> shear (0.4429)
+    Demand: V=29.520 kN, T=22.941 kN
+    Capacity: Vn=87.179 kN, Tn=140.443 kN, Bn=140.940 kN
+    Util: shear=0.3386, tension=0.1633, bearing=0.2095 -> shear (0.3386)
     Inputs:
-      Vu=38.611 kN, Tu=18.352 kN
-      f_rv=122.9 MPa → Fnt'=531.4 MPa
+      Vu=29.520 kN, Tu=18.352 kN
+      f_rv=94.0 MPa → Fnt'=596.1 MPa
       lc=29.0 mm → R_bearing=259.2 kN, R_tearout=187.9 kN

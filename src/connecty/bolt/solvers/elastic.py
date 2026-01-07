@@ -16,13 +16,17 @@ def solve_elastic_shear(*, layout: BoltLayout, bolt_diameter: float, load: Load)
     Cz = props.Cz
     Ip = props.Ip
 
-    Mx_total, _, _ = load.get_moments_about(0.0, Cy, Cz)
+    # 3) Transfer loads to centroid
+    # Note: Implementing formula from documentation/theory/bolt.md directly
+    # M_total = Mx - Fz * (y_loc - Cy) + Fy * (z_loc - Cz)
+    Mx_total = load.Mx - load.Fz * (load.y_loc - Cy) + load.Fy * (load.z_loc - Cz)
 
     Fy = load.Fy
     Fz = load.Fz
     Mx = float(Mx_total)
 
-    bolt_results: list[BoltForce] = []
+    Fys = []
+    Fzs = []
     for (y, z) in layout.points:
         dy = y - Cy
         dz = z - Cz
@@ -33,19 +37,15 @@ def solve_elastic_shear(*, layout: BoltLayout, bolt_diameter: float, load: Load)
         R_moment_y = 0.0
         R_moment_z = 0.0
         if Ip > ZERO_TOLERANCE:
+            # Matches documentation formulas:
+            # Fy_m = -Mx_total * dz / Ip
+            # Fz_m = -Mx_total * dy / Ip
             R_moment_y = -Mx * dz / Ip
-            R_moment_z = Mx * dy / Ip
+            R_moment_z = -Mx * dy / Ip
 
-        bolt_results.append(
-            BoltForce(
-                point=(y, z),
-                Fy=R_direct_y + R_moment_y,
-                Fz=R_direct_z + R_moment_z,
-                Fx=0.0,
-                diameter=float(bolt_diameter),
-            )
-        )
+        Fys.append(R_direct_y + R_moment_y)
+        Fzs.append(R_direct_z + R_moment_z)
 
-    return bolt_results
+    return Fys, Fzs
 
 

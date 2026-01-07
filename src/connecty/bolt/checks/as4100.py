@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from ..geometry import Plate
-from .models import BoltCheckDetail, BoltCheckResult, get_governing
 
 
 AS4100_GRADE_PROPERTIES: dict[str, dict] = {
@@ -56,7 +56,7 @@ def check_as4100(
     pretension_override: float | None,
     require_explicit_tension: bool,
     assume_uniform_tension_if_missing: bool,
-) -> BoltCheckResult:
+) -> dict[str, Any]:
     if connection_type not in ("bearing", "friction"):
         raise ValueError("AS 4100 connection_type must be 'bearing' or 'friction'")
 
@@ -150,7 +150,7 @@ def check_as4100(
         "tension_mode": tension_mode,
     }
 
-    details: list[BoltCheckDetail] = []
+    details: list[dict[str, Any]] = []
     for idx, bf in enumerate(bolt_results):
         Vu = math.hypot(bf.Fy, bf.Fz) / 1000.0
 
@@ -220,31 +220,42 @@ def check_as4100(
             "term_t": float(term_t) if term_t < math.inf else math.inf,
         }
 
-        details.append(
-            BoltCheckDetail(
-                bolt_index=idx,
-                point=bf.point,
-                shear_demand=Vu,
-                tension_demand=Tu,
-                shear_capacity=shear_capacity,
-                tension_capacity=tension_capacity,
-                bearing_capacity=bearing_capacity,
-                slip_capacity=slip_capacity,
-                shear_util=shear_util,
-                tension_util=tension_util,
-                bearing_util=bearing_util,
-                slip_util=slip_util,
-                governing_util=governing_util,
-                governing_limit_state=governing_state,
-                interaction_util=interaction_util,
-                calc=calc,
-            )
-        )
+        details.append({
+            "bolt_index": idx,
+            "point": bf.point,
+            "shear_demand_kN": Vu,
+            "tension_demand_kN": Tu,
+            "shear_capacity_kN": shear_capacity,
+            "tension_capacity_kN": tension_capacity,
+            "bearing_capacity_kN": bearing_capacity,
+            "slip_capacity_kN": slip_capacity,
+            "shear_util": shear_util,
+            "tension_util": tension_util,
+            "bearing_util": bearing_util,
+            "slip_util": slip_util,
+            "governing_util": governing_util,
+            "governing_limit_state": governing_state,
+            "interaction_util": interaction_util,
+            "calc": calc,
+        })
 
-    gov_idx, gov_state, gov_util = get_governing(details)
-    return BoltCheckResult(connection_type, result.method, details, gov_idx, gov_state, gov_util, meta=meta)
+    if not details:
+        gov_idx, gov_state, gov_util = None, None, 0.0
+    else:
+        idx_in_list, detail = max(enumerate(details), key=lambda item: item[1]["governing_util"])
+        gov_idx = detail["bolt_index"]
+        gov_state = detail["governing_limit_state"]
+        gov_util = detail["governing_util"]
+
+    return {
+        "connection_type": connection_type,
+        "method": result.method,
+        "governing_bolt_index": gov_idx,
+        "governing_limit_state": gov_state,
+        "governing_utilization": gov_util,
+        "meta": meta,
+        "details": details,
+    }
 
 
 __all__ = ["AS4100_GRADE_PROPERTIES", "AS4100_PRETENSION_KN", "check_as4100"]
-
-
