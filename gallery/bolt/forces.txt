@@ -1,0 +1,26 @@
+BOLT CONNECTION ANALYSIS TEST
+=============================
+
+INPUTS
+------
+Bolt: 20.0mm dia, Grade A325
+Layout: 4 bolts
+Plate: 300.0mm (width) x 300.0mm (height) x 10.0mm thick
+Load Location: (0.0, 0.0, 0.0)
+Applied Loads:
+  Fx (Axial):   100000.00
+  Fy (Shear Y): 50000.00
+  Fz (Shear Z): 20000.00
+  Mx (Torsion): 5000000.00
+  My (Moment Y): 1000000.00
+  Mz (Moment Z): 1000000.00
+
+RESULTS
+-------
+Forces per Bolt:
+ID    Y (mm)     Z (mm)     Fx (Ten)     Fy (ShrY)    Fz (ShrZ)    Resultant Shear
+------------------------------------------------------------------------------------------
+0     50.00      50.00      29285.71     25000.00     -7500.00     26100.77       
+1     50.00      -50.00     27857.14     0.00         -7500.00     7500.00        
+2     -50.00     50.00      27857.14     25000.00     17500.00     30516.39       
+3     -50.00     -50.00     26428.57     0.00         17500.00     17500.00       

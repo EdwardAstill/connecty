@@ -1,6 +1,6 @@
 This document defines the bolt design checks implemented in `connecty` and the assumptions used to map analysis outputs (per-bolt forces) into code-based utilisations.
 
-All checks are **unit agnostic**: use any consistent set of units (e.g. mm, N, N·mm).
+
 
 ## Current API
 

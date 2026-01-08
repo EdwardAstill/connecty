@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from ..geometry import Plate
+from ..plate import Plate
 
 
 AS4100_GRADE_PROPERTIES: dict[str, dict] = {

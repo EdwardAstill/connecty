@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from ..bolt import BoltGroup
-from ..load import Load
+from ..group import BoltLayout
+from ..results import BoltForce
+from ...common.icr_solver import ZERO_TOLERANCE
+from ...common.load import Load
 
 
-ZERO_TOLERANCE = 1e-12
-
-
-def solve_elastic_shear(*, layout: BoltGroup, bolt_diameter: float, load: Load) -> tuple[list[float], list[float]]:
+def solve_elastic_shear(*, layout: BoltLayout, bolt_diameter: float, load: Load) -> list[BoltForce]:
     """Return per-bolt in-plane shear forces using the elastic method."""
     props = layout._calculate_properties()
     n = props.n
@@ -20,9 +19,8 @@ def solve_elastic_shear(*, layout: BoltGroup, bolt_diameter: float, load: Load) 
     # 3) Transfer loads to centroid
     # Note: Implementing formula from documentation/theory/bolt.md directly
     # M_total = Mx - Fz * (y_loc - Cy) + Fy * (z_loc - Cz)
-    # Using Load class method for consistency
-    _, _, _, Mx_total, _, _ = load.at(x=0.0, y=Cy, z=Cz)
-    
+    Mx_total = load.Mx - load.Fz * (load.y_loc - Cy) + load.Fy * (load.z_loc - Cz)
+
     Fy = load.Fy
     Fz = load.Fz
     Mx = float(Mx_total)
@@ -40,9 +38,9 @@ def solve_elastic_shear(*, layout: BoltGroup, bolt_diameter: float, load: Load) 
         R_moment_z = 0.0
         if Ip > ZERO_TOLERANCE:
             # Matches documentation formulas:
-            # Fy_m = Mx_total * dz / Ip
+            # Fy_m = -Mx_total * dz / Ip
             # Fz_m = -Mx_total * dy / Ip
-            R_moment_y = Mx * dz / Ip
+            R_moment_y = -Mx * dz / Ip
             R_moment_z = -Mx * dy / Ip
 
         Fys.append(R_direct_y + R_moment_y)

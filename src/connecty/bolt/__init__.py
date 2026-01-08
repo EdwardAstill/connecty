@@ -1,18 +1,13 @@
-"""Bolts public API (new surface)."""
-
-from .analysis import BoltResult
-from .geometry import BoltConnection, BoltLayout, BoltParams, BoltProperties, Plate
-from .plotting import plot_bolt_pattern, plot_bolt_result
-from .results import BoltForce
+from .bolt import BoltConnection, BoltGroup, BoltParams, Bolt
+from .analysis import LoadedBoltConnection
+from .plate import Plate
 
 __all__ = [
-    "BoltLayout",
-    "BoltParams",
-    "BoltProperties",
     "BoltConnection",
+    "BoltGroup",
+    "BoltParams",
+    "Bolt",
+    "LoadedBoltConnection",
     "Plate",
-    "BoltForce",
-    "BoltResult",
-    "plot_bolt_result",
-    "plot_bolt_pattern",
 ]
+

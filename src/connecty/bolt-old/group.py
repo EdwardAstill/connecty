@@ -9,56 +9,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import math
-from typing import Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from ..common.load import Load
+from .types import Point2D, TensionMethod, ShearMethod, HoleType, SurfaceClass
 
 if TYPE_CHECKING:
     from .analysis import BoltResult
-
-Point2D = tuple[float, float]  # (y, z)
-
-
-_BOLT_GRADE_PROPERTIES: dict[str, dict[str, float]] = {
-    # Typical values used for general connection design.
-    # Units are user-defined; connecty is unit-agnostic.
-    "A325": {"fy": 660.0, "fu": 830.0},
-    "A490": {"fy": 940.0, "fu": 1040.0},
-    "8.8": {"fy": 640.0, "fu": 800.0},
-    "10.9": {"fy": 900.0, "fu": 1000.0},
-}
-
-
-@dataclass(frozen=True)
-class BoltParams:
-    """Bolt properties + size (unit-agnostic)."""
-
-    diameter: float
-    grade: str | None = None
-    fy: float | None = None
-    fu: float | None = None
-
-    def __post_init__(self) -> None:
-        if self.diameter <= 0.0:
-            raise ValueError("Bolt diameter must be positive")
-
-        if self.grade is None and (self.fy is None or self.fu is None):
-            raise ValueError("Provide either grade or both fy and fu")
-
-        if self.grade is not None and self.grade not in _BOLT_GRADE_PROPERTIES:
-            raise ValueError(f"Unsupported bolt grade: {self.grade}")
-
-        if self.fy is None and self.grade is not None:
-            object.__setattr__(self, "fy", float(_BOLT_GRADE_PROPERTIES[self.grade]["fy"]))
-        if self.fu is None and self.grade is not None:
-            object.__setattr__(self, "fu", float(_BOLT_GRADE_PROPERTIES[self.grade]["fu"]))
-
-        if self.fy is not None and self.fy <= 0.0:
-            raise ValueError("Bolt fy must be positive")
-        if self.fu is not None and self.fu <= 0.0:
-            raise ValueError("Bolt fu must be positive")
+    from .plate import Plate
+    from .bolt import BoltParams
 
 
 @dataclass(frozen=True)
@@ -199,120 +160,6 @@ class BoltLayout:
 
 
 @dataclass(frozen=True)
-class Plate:
-    """Axis-aligned rectangular plate in the bolt-group y-z plane."""
-
-    corner_a: Point2D
-    corner_b: Point2D
-    thickness: float
-    fu: float
-    fy: float | None = None
-    hole_type: HoleType = "standard"
-    hole_orientation: float | None = None
-    surface_class: SurfaceClass | None = None
-    slip_coefficient: float | None = None
-
-    @classmethod
-    def from_dimensions(
-        cls,
-        *,
-        width: float,
-        height: float,
-        thickness: float,
-        fu: float,
-        fy: float | None = None,
-        center: Point2D = (0.0, 0.0),
-        hole_type: HoleType = "standard",
-        hole_orientation: float | None = None,
-        surface_class: SurfaceClass | None = None,
-        slip_coefficient: float | None = None,
-    ) -> "Plate":
-        """Create a rectangular plate from width/height (z/y) and an optional center point.
-
-        Notes:
-        - `width` is the plate size in the **z** direction.
-        - `height` is the plate size in the **y** direction.
-        """
-        if width <= 0.0:
-            raise ValueError("Plate width must be positive")
-        if height <= 0.0:
-            raise ValueError("Plate height must be positive")
-
-        cy, cz = center
-        half_w = width / 2.0
-        half_h = height / 2.0
-
-        return cls(
-            corner_a=(cy - half_h, cz - half_w),
-            corner_b=(cy + half_h, cz + half_w),
-            thickness=thickness,
-            fu=fu,
-            fy=fy,
-            hole_type=hole_type,
-            hole_orientation=hole_orientation,
-            surface_class=surface_class,
-            slip_coefficient=slip_coefficient,
-        )
-
-    def __post_init__(self) -> None:
-        if self.thickness <= 0.0:
-            raise ValueError("Plate thickness must be positive")
-        if self.fu <= 0.0:
-            raise ValueError("Plate fu (ultimate strength) must be positive")
-        
-        if self.slip_coefficient is None:
-            if self.surface_class == "A":
-                object.__setattr__(self, "slip_coefficient", 0.30)
-            elif self.surface_class == "B":
-                object.__setattr__(self, "slip_coefficient", 0.50)
-
-    @property
-    def y_min(self) -> float:
-        return float(min(self.corner_a[0], self.corner_b[0]))
-
-    @property
-    def y_max(self) -> float:
-        return float(max(self.corner_a[0], self.corner_b[0]))
-
-    @property
-    def z_min(self) -> float:
-        return float(min(self.corner_a[1], self.corner_b[1]))
-
-    @property
-    def z_max(self) -> float:
-        return float(max(self.corner_a[1], self.corner_b[1]))
-
-    @property
-    def depth_y(self) -> float:
-        return self.y_max - self.y_min
-
-    @property
-    def depth_z(self) -> float:
-        return self.z_max - self.z_min
-
-    @property
-    def width(self) -> float:
-        """Alias for plate size in y-direction."""
-        return self.depth_y
-
-    @property
-    def height(self) -> float:
-        """Alias for plate size in z-direction."""
-        return self.depth_z
-
-    @property
-    def center(self) -> Point2D:
-        """Plate center (y, z)."""
-        return ((self.y_min + self.y_max) / 2.0, (self.z_min + self.z_max) / 2.0)
-
-
-TensionMethod = Literal["conservative", "accurate"]
-ShearMethod = Literal["elastic", "icr"]
-HoleType = Literal["standard", "oversize", "short-slot", "long-slot"]
-SurfaceClass = Literal["A", "B"]
-
-
-@dataclass(frozen=True)
 class BoltConnection:
     """Bolt group + plate definition for connection geometry."""
 
@@ -361,15 +208,3 @@ class BoltConnection:
             shear_method=shear_method,
             tension_method=tension_method,
         )
-__all__ = [
-    "BoltParams",
-    "BoltProperties",
-    "BoltLayout",
-    "Plate",
-    "BoltConnection",
-    "TensionMethod",
-    "ShearMethod",
-    "HoleType",
-]
-
-

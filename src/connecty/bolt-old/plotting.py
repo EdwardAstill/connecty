@@ -17,7 +17,8 @@ from matplotlib.patches import Circle
 from matplotlib.lines import Line2D
 
 from ..common.load import Load
-from .geometry import BoltLayout, Plate
+from .group import BoltLayout
+from .plate import Plate
 
 if TYPE_CHECKING:
     from .analysis import BoltResult

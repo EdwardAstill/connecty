@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from typing import Dict, Literal
 
-from ..load import Load
-from ..bolt import BoltGroup
+from ...common.load import Load
+from ..group import BoltLayout
 from ..plate import Plate
 
 TensionMethod = Literal["conservative", "accurate"]
 
 
-def solve_tension(
+def calculate_plate_bolt_tensions(
     *,
-    layout: BoltGroup,
+    layout: BoltLayout,
     plate: Plate,
     load: Load,
     tension_method: TensionMethod,
@@ -57,7 +57,7 @@ def solve_tension(
 
 def _tension_from_moment_about_axis(
     *,
-    layout: BoltGroup,
+    layout: BoltLayout,
     plate: Plate,
     moment: float,
     axis: Literal["y", "z"],

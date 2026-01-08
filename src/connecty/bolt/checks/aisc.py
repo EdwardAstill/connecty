@@ -3,27 +3,11 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from ..analysis import BoltResult as _BoltResult
-from ..geometry import Plate
+if TYPE_CHECKING:
+    from ..analysis import LoadedBoltConnection
 
-
-AISC_GRADE_STRESS: dict[str, dict[str, float]] = {
-    "A325": {"Fnt": 620.0, "Fnv_N": 370.0, "Fnv_X": 470.0},
-    "A490": {"Fnt": 780.0, "Fnv_N": 470.0, "Fnv_X": 580.0},
-}
-
-AISC_PRETENSION_KN: dict[int, dict[str, float]] = {
-    12: {"A325": 49.0, "A490": 72.0},
-    16: {"A325": 91.0, "A490": 114.0},
-    20: {"A325": 142.0, "A490": 179.0},
-    22: {"A325": 176.0, "A490": 221.0},
-    24: {"A325": 205.0, "A490": 257.0},
-    27: {"A325": 267.0, "A490": 334.0},
-    30: {"A325": 326.0, "A490": 408.0},
-    36: {"A325": 475.0, "A490": 595.0},
-}
 
 AISC_HOLE_DIAMETERS: dict[int, dict[str, float]] = {
     12: {"standard": 14.0, "oversize": 16.0, "short_slotted": 14.0, "long_slotted": 14.0},
@@ -37,127 +21,112 @@ AISC_HOLE_DIAMETERS: dict[int, dict[str, float]] = {
 
 AISC_SLIP_COEFFICIENT: dict[str, float] = {"A": 0.30, "B": 0.50}
 
-class BoltResult(_BoltResult):
-    def check_aisc(
-    self, *,
-    n_s: int,
-    threads_in_shear_plane: bool,
-    bolt_diameter: float,
+
+def check_aisc(
+    connection: LoadedBoltConnection,
+    *,
     connection_type: str,
-    fillers: int, #for slip critical connection
-    apply_prying_factor: bool,
-    prying_factor: float,
-    ) -> dict[str, Any]:
+    fillers: int = 0,  # for slip critical connection
+) -> dict[str, Any]:
 
-        # Raise errors for invalid inputs
-        if connection_type not in ("bearing", "slip-critical"):
-            raise ValueError("AISC connection_type must be 'bearing' or 'slip-critical'")
-        if n_s < 1:
-            raise ValueError("AISC n_s (number of shear/slip planes) must be at least 1")
-        if self.connection.plate.hole_type != "standard":
-            raise ValueError("AISC hole type must be 'standard' for now")
+    # gather useful inputs
+    n_s = connection.bolt_connection.n_shear_planes
+    plate = connection.bolt_connection.plate
+    bolts = connection.bolt_connection.bolt_group.bolts
 
-        # gather useful inputs
-        # bolt properties from grade table
-        stresses = AISC_GRADE_STRESS[grade]
-        Fnv = stresses["Fnv_N" if threads_in_shear_plane else "Fnv_X"]
-        Fnt = stresses["Fnt"]
+    fxs = []
+    fys = []
+    fzs = []
+    for bolt in bolts:
+        fxs.append(bolt.forces[0])
+        fys.append(bolt.forces[1])
+        fzs.append(bolt.forces[2])
 
-        # plate object
-        plate = self.connection.plate
+    # initialise results
+    results = {}
 
-        grade = self.connection.bolt.grade
-        if grade is None:
-            raise ValueError("BoltParams.grade is required for bolt code checks.")
+    # apply prying factor if applicable to get tension force prying factor should already have been applied
+    T_u = fxs
+    # calculate shear force magnitude
+    V_u = [np.sqrt(x**2 + y**2) for x, y in zip(fys, fzs)]
 
-        A_b = np.pi * (bolt_diameter**2) / 4.0
-        # initialise results
-        results = {}
+    # Applied forces (Resultant)
+    V_u_total = np.sqrt((sum(fys))**2 + (sum(fzs))**2)
 
-        # apply prying factor if applicable to get tension force
-        prying_factor = prying_factor if apply_prying_factor else 0.0
-        T_u = [prying_factor * x for x in self.bolt_forces["Fx"]]
-
-        # calculate shear force
-        V_u = [np.sqrt(x**2 + y**2) for x, y in zip(self.bolt_forces["Fy"], self.bolt_forces["Fz"])]
-
-        # Applied forces
-        V_u_total = np.sqrt((sum(self.bolt_forces["Fy"]))**2 + (sum(self.bolt_forces["Fz"]))**2)
-
-        # perform checks
-
+    # perform checks
+    # per bolt checks
+    U_tension = []
+    U_shear = []
+    U_combined = []
+    U_bearing = []
+    U_tearout = []
+    
+    phi_tension = 0.75
+    phi_shear = 0.75
+    phi_bearing = 0.75
+    
+    for i, bolt in enumerate(bolts):
         # tension check
-        results["tension"] = check_tension(Fnt, A_b, T_u)
+        R_n_T = bolt.params.Fnt * bolt.params.area
+        R_d_T = phi_tension * R_n_T
+        U_tension.append(T_u[i] / R_d_T if R_d_T > 0 else 0.0) 
 
         # shear check
-        results["shear"] = check_shear(Fnv, A_b, V_u, n_s)
-        
-        # shear + tension interaction check
-        results["combined"] = check_combined(Fnt, Fnv, A_b, T_u, V_u, n_s)
+        R_n_V = bolt.params.Fnv * bolt.params.area * n_s
+        R_d_V = phi_shear * R_n_V
+        U_shear.append(V_u[i] / R_d_V if R_d_V > 0 else 0.0)
 
-        if connection_type == "slip-critical":
-        # slip critical connection check
-            T_b = AISC_PRETENSION_KN[int((bolt_diameter))][grade]
-            results["slip"] = check_slip(fillers,T_b,plate,V_u_total, n_s, T_u)
+        # combined check
+        # f_rv for THIS bolt
+        f_rv = V_u[i] / (bolt.params.area * n_s) if bolt.params.area > 0 else 0.0
         
-        # bearing check
-        results["bearing"] = check_bearing(plate,V_u_total, bolt_diameter, )
+        # Modification for combined tension and shear
+        term = (bolt.params.Fnt / (phi_shear * bolt.params.Fnv)) * f_rv
+        F_nt_prime = 1.3 * bolt.params.Fnt - term
+        F_nt_prime = min(bolt.params.Fnt, max(0, F_nt_prime))
+        
+        R_n_combined = F_nt_prime * bolt.params.area
+        R_d_combined = phi_tension * R_n_combined
+        U_combined.append(T_u[i] / R_d_combined if R_d_combined > 0 else 0.0)
+
+        # bearing check (per bolt)
+        # AISC J3.10 uses Fu
+        strength = plate.fu
+        
+        R_n_bearing = 2.4 * bolt.params.diameter * plate.thickness * strength
+        R_d_bearing = phi_bearing * R_n_bearing
+        U_bearing.append(V_u[i] / R_d_bearing if R_d_bearing > 0 else 0.0)
 
         # tearout check
-        results["tearout"] = check_tearout(plate,V_u_total, bolt_diameter, self.connection.layout.points)
-
-        return results
-
-
-def check_tension(Fnt, A_b, T_u):
-    phi = 0.75
-    R_n_T = Fnt * A_b
-    R_d_T = phi * R_n_T
-    U_tension = [x / R_d_T for x in T_u]
-    return U_tension
+        # Approximate check assuming lc = d (conservative for edge distance > 2d, non-conservative for small edge)
+        # The previous code used 1.2 * d * t * fy (which I changed to fu).
+        R_n_tearout = 1.2 * bolt.params.diameter * plate.thickness * strength
+        R_d_tearout = phi_bearing * R_n_tearout
+        U_tearout.append(V_u[i] / R_d_tearout if R_d_tearout > 0 else 0.0)
 
 
-def check_shear(Fnv, A_b, V_u, n_s):
-    phi = 0.75
-    R_n_V = Fnv * A_b * n_s
-    R_d_V = phi * R_n_V
-    U_shear = [x / R_d_V for x in V_u]
-    return U_shear
-
-def check_combined(Fnt, Fnv, A_b, T_u, V_u, n_s):
-    phi = 0.75
-    F_nt_prime = min(Fnt, Fnt * (1.3 - Fnt / phi / Fnv * f_rv))
-    R_n_T = F_nt_prime * A_b
-    f_rv = [x / (A_b * n_s) for x in V_u]
-    U_combined = [x / (phi * R_n_T) for x in T_u]
-    return U_combined
-
-def check_slip(fillers,T_b,plate:Plate,V_u_total, n_s, T_u):
-    phi = 1.00# when other holes are supported conditions should be used to find phi
+    # group checks
+    # slip check
+    U_slip = []
+    slip_phi = 1.00 # LRFD standard holes
     D_u = 1.13
     h_f = 1.0 if fillers == 1 else 0.85
-    mu = plate.slip_coefficient
-    k_sc = R_n_slip_i = [0] * len(T_u)
-    for i in range(len(T_u)):
-        k_sc[i] = max(0, 1 - T_u[i] / (D_u * T_b))
-        R_n_slip_i[i] = mu * D_u * h_f * T_b * n_s * k_sc[i]
-    R_n_slip = sum(R_n_slip_i)
-    R_d_slip = phi * R_n_slip
-    U_slip = [x / R_d_slip for x in V_u_total]
-    return U_slip
+    mu = plate.slip_coefficient if plate.slip_coefficient is not None else 0.30 
     
+    R_n_slip_total = 0.0
+    for i, bolt in enumerate(bolts):
+        k_sc_i = max(0.0, 1.0 - T_u[i] / (D_u * bolt.params.T_b))
+        R_n_slip_i = mu * D_u * h_f * bolt.params.T_b * n_s * k_sc_i
+        R_n_slip_total += R_n_slip_i
+        
+    R_d_slip = slip_phi * R_n_slip_total
+    U_slip.append(V_u_total / R_d_slip if R_d_slip > 0 else 0.0)
 
-def check_bearing(plate:Plate,V_u_total, bolt_diameter, points):
-    phi = 0.75
-    R_n_bearing = 2.4 * bolt_diameter * plate.thickness * plate.material.yield_strength
-    R_d_bearing = phi * R_n_bearing
-    U_bearing = [x / R_d_bearing for x in V_u_total]
-    return U_bearing
+    results["tension"] = U_tension
+    results["shear"] = U_shear
+    results["combined"] = U_combined
+    results["slip"] = U_slip
+    results["bearing"] = U_bearing
+    results["tearout"] = U_tearout
 
-def check_tearout(plate:Plate,V_u_total, bolt_diameter, points):
-    phi = 0.75
-    R_n_tearout = 1.2 * bolt_diameter * plate.thickness * plate.material.yield_strength
-    R_d_tearout = phi * R_n_tearout
-    U_tearout = [x / R_d_tearout for x in V_u_total]
-    return U_tearout
-    pass
+    return results
