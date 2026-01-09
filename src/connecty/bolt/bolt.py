@@ -112,11 +112,11 @@ class BoltGroup:
         return [b.position for b in self.bolts]
 
     @property
-    def Cy(self) -> float:
+    def Cx(self) -> float:
         return self.centroid[0]
 
     @property
-    def Cz(self) -> float:
+    def Cy(self) -> float:
         return self.centroid[1]
 
     def _calculate_properties(self) -> "BoltGroup":
@@ -125,15 +125,16 @@ class BoltGroup:
 
     @property
     def Ip(self) -> float:
-        y_arr = np.array([b.position[0] for b in self.bolts], dtype=float)
-        z_arr = np.array([b.position[1] for b in self.bolts], dtype=float)
+        # Assuming x, y coordinates
+        x_arr = np.array([b.position[0] for b in self.bolts], dtype=float)
+        y_arr = np.array([b.position[1] for b in self.bolts], dtype=float)
         
+        dx_arr = x_arr - self.Cx
         dy_arr = y_arr - self.Cy
-        dz_arr = z_arr - self.Cz
         
-        Iy = np.sum(dz_arr**2)
-        Iz = np.sum(dy_arr**2)
-        return float(Iy + Iz)
+        Ix = np.sum(dy_arr**2) # Moment of inertia about x-axis (uses y-dist)
+        Iy = np.sum(dx_arr**2) # Moment of inertia about y-axis (uses x-dist)
+        return float(Ix + Iy)
 
     @classmethod
     def create(

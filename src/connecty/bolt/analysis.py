@@ -5,7 +5,7 @@ from typing import Literal, Any
 import numpy as np
 from .solvers.elastic import solve_bolt_elastic
 from .solvers.icr import solve_bolt_icr
-from .solvers.tension import solve_bolt_tension_simple
+from .solvers.tension import solve_bolt_tension
 
 @dataclass(slots=True)
 class LoadedBoltConnection:
@@ -22,38 +22,39 @@ class LoadedBoltConnection:
             bolt.forces.fill(0.0)
 
         # Prepare data for solvers
+        # Bolts are in x-y plane
         bolt_coords = np.array(self.bolt_connection.bolt_group.points)
         
-        # 1. Shear Distribution
+        # 1. Shear Distribution (In-Plane: x, y)
         if self.shear_method == "elastic":
-            fys, fzs = solve_bolt_elastic(
+            fxs, fys = solve_bolt_elastic(
                 bolt_coords=bolt_coords,
+                Fx=self.load.Fx,
                 Fy=self.load.Fy,
-                Fz=self.load.Fz,
-                Mx=self.load.Mx,
-                y_loc=self.load.y_loc,
-                z_loc=self.load.z_loc
+                Mz=self.load.Mz,
+                x_loc=self.load.x_loc,
+                y_loc=self.load.y_loc
             )
         elif self.shear_method == "icr":
-            fys, fzs, icr = solve_bolt_icr(
+            fxs, fys, icr = solve_bolt_icr(
                 bolt_coords=bolt_coords,
+                Fx=self.load.Fx,
                 Fy=self.load.Fy,
-                Fz=self.load.Fz,
-                Mx=self.load.Mx,
-                y_loc=self.load.y_loc,
-                z_loc=self.load.z_loc
+                Mz=self.load.Mz,
+                x_loc=self.load.x_loc,
+                y_loc=self.load.y_loc
             )
             self.icr_point = (float(icr[0]), float(icr[1]))
         else:
             raise ValueError(f"Unknown shear method: {self.shear_method}")
 
-        # 2. Tension Distribution
-        fxs = solve_bolt_tension_simple(
+        # 2. Tension Distribution (Out-of-Plane: z)
+        fzs = solve_bolt_tension(
             bolt_coords=bolt_coords,
             plate=self.bolt_connection.plate,
-            Fx=self.load.Fx,
+            Fz=self.load.Fz,
+            Mx=self.load.Mx,
             My=self.load.My,
-            Mz=self.load.Mz,
             tension_method=self.tension_method
         )
 
@@ -64,16 +65,17 @@ class LoadedBoltConnection:
     
     def equivalent_load(self, position: tuple[float, float]) -> Load:
         """
-        Calculate the equivalent load exerted BY the bolts at a given (y, z) position.
+        Calculate the equivalent load exerted BY the bolts at a given (x, y) position.
         This represents the total reaction force provided by the bolt group.
         
         Args:
-            position: (y, z) coordinates of the point to calculate moments about.
+            position: (x, y) coordinates of the point to calculate moments about.
             
         Returns:
             Load object containing total forces and moments.
         """
-        py, pz = position
+        px, py = position
+        pz = 0.0 # Bolts are in z=0 plane
         
         Fx_tot = 0.0
         Fy_tot = 0.0
@@ -84,8 +86,10 @@ class LoadedBoltConnection:
         
         for bolt in self.bolt_connection.bolt_group.bolts:
             fx, fy, fz = bolt.forces
-            by, bz = bolt.position
+            bx, by = bolt.position
+            bz = 0.0
             
+            dx = bx - px
             dy = by - py
             dz = bz - pz
             
@@ -93,15 +97,15 @@ class LoadedBoltConnection:
             Fy_tot += fy
             Fz_tot += fz
             
-            # Moments (see Load docstring for sign conventions)
-            # Mx (Torsion, CCW): y*Fz - z*Fy
+            # Moments (M = r x F)
+            # Mx: dy*fz - dz*fy
             Mx_tot += dy * fz - dz * fy
             
-            # My (Bending about Y, Tension on +Z): z*Fx
-            My_tot += dz * fx
+            # My: dz*fx - dx*fz
+            My_tot += dz * fx - dx * fz
             
-            # Mz (Bending about Z, Tension on +Y): y*Fx
-            Mz_tot += dy * fx
+            # Mz: dx*fy - dy*fx
+            Mz_tot += dx * fy - dy * fx
             
         return Load(
             Fx=Fx_tot,
@@ -110,7 +114,7 @@ class LoadedBoltConnection:
             Mx=Mx_tot,
             My=My_tot,
             Mz=Mz_tot,
-            location=(0.0, py, pz)
+            location=(px, py, 0.0)
         )
 
     def check(self, standard: str, **kwargs) -> dict[str, Any]:

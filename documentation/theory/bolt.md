@@ -4,9 +4,17 @@
 
 To ensure consistency between shear and tension solvers, `connecty` uses a standard 3D member coordinate system where the -axis is the longitudinal axis of the member.
 
-x into the page
+x is right
 y is up
-z is right
+z is out of page
+
+positive moments are counter-clockwise (right handed rule).
+
+i want to chagne the coordinates so that this is how it is
+
+z is out of page
+y is up
+x is right
 
 positive moments are counter-clockwise (right handed rule).
 

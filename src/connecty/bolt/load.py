@@ -18,26 +18,26 @@ class Load:
     Applied force and moment at a specific location.
     
     The load is defined in the section's local coordinate system:
-    - x-axis: Along the member (perpendicular to cross-section, out of page)
-    - y-axis: Vertical in section plane (up positive)
-    - z-axis: Horizontal in section plane (right positive)
+    - x-axis: Horizontal (right positive)
+    - y-axis: Vertical (up positive)
+    - z-axis: Along the member (out of page positive)
     
     Attributes:
-        Fx: Axial force (out-of-plane, positive = tension)
+        Fx: Shear force in x-direction (horizontal)
         Fy: Shear force in y-direction (vertical)
-        Fz: Shear force in z-direction (horizontal)
-        Mx: Torsional moment about x-axis
+        Fz: Axial force (out-of-plane, positive = tension)
+        Mx: Bending moment about x-axis
         My: Bending moment about y-axis
-        Mz: Bending moment about z-axis
+        Mz: Torsional moment about z-axis
         location: (x, y, z) point of load application
         
     Sign Conventions:
-        Fx: + = tension
+        Fx: + = right
         Fy: + = up
-        Fz: + = right
-        Mx: + = CCW when viewed from +x
-        My: + = tension on +z side
-        Mz: + = tension on +y side
+        Fz: + = tension (out of page)
+        Mx: + = CCW when viewed from +x (Right Hand Rule)
+        My: + = CCW when viewed from +y (Right Hand Rule)
+        Mz: + = CCW when viewed from +z (Right Hand Rule)
     """
     Fx: float = 0.0
     Fy: float = 0.0
@@ -65,7 +65,7 @@ class Load:
     @property
     def shear_magnitude(self) -> float:
         """Magnitude of in-plane shear force."""
-        return math.sqrt(self.Fy**2 + self.Fz**2)
+        return math.sqrt(self.Fx**2 + self.Fy**2)
     
     @property
     def total_force_magnitude(self) -> float:
@@ -87,20 +87,20 @@ class Load:
         Returns:
             Tuple of (Fx, Fy, Fz, Mx_total, My_total, Mz_total)
         """
-        # Distance from point to load location
+        # Distance vector r from point (new origin) to load location
         dx = self.x_loc - x
         dy = self.y_loc - y
         dz = self.z_loc - z
         
-        # Moment from force eccentricity:
-        # Mx (torsion): Fz × dy - Fy × dz (in-plane moment)
-        Mx_eccentric = self.Fz * dy - self.Fy * dz
+        # Moment from force eccentricity (M = r x F):
+        # Mx: dy*Fz - dz*Fy
+        Mx_eccentric = dy * self.Fz - dz * self.Fy
         
-        # My (bending about y): Fz × dx - Fx × dz
-        My_eccentric = self.Fz * dx - self.Fx * dz
+        # My: dz*Fx - dx*Fz
+        My_eccentric = dz * self.Fx - dx * self.Fz
         
-        # Mz (bending about z): Fx × dy - Fy × dx
-        Mz_eccentric = self.Fx * dy - self.Fy * dx
+        # Mz: dx*Fy - dy*Fx
+        Mz_eccentric = dx * self.Fy - dy * self.Fx
         
         return (
             self.Fx,
@@ -150,35 +150,34 @@ class Load:
     def from_components(
         cls,
         axial: float = 0.0,
+        shear_x: float = 0.0,
         shear_y: float = 0.0,
-        shear_z: float = 0.0,
         torsion: float = 0.0,
+        moment_x: float = 0.0,
         moment_y: float = 0.0,
-        moment_z: float = 0.0,
         at: Point = (0.0, 0.0, 0.0)
     ) -> Load:
         """
         Alternative constructor with descriptive parameter names.
         
         Args:
-            axial: Axial force (tension positive)
-            shear_y: Vertical shear force
-            shear_z: Horizontal shear force
-            torsion: Torsional moment
-            moment_y: Bending moment about y-axis
-            moment_z: Bending moment about z-axis
+            axial: Axial force (tension positive) - Fz
+            shear_x: Horizontal shear force - Fx
+            shear_y: Vertical shear force - Fy
+            torsion: Torsional moment - Mz
+            moment_x: Bending moment about x-axis - Mx
+            moment_y: Bending moment about y-axis - My
             at: Location of load application (x, y, z)
             
         Returns:
             Load instance
         """
         return cls(
-            Fx=axial,
+            Fx=shear_x,
             Fy=shear_y,
-            Fz=shear_z,
-            Mx=torsion,
+            Fz=axial,
+            Mx=moment_x,
             My=moment_y,
-            Mz=moment_z,
+            Mz=torsion,
             location=at
         )
-
