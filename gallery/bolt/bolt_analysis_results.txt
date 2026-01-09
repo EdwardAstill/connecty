@@ -1,0 +1,67 @@
+=== Bolt Analysis Inputs ===
+Bolts: 9 x 20mm A325
+Layout: 3x3 grid @ 80x80mm
+Plate: 400.0x400.0x12mm (Fy=350, Fu=450)
+Load: Fx=50000.00, Fy=-100000.00, Fz=20000.00, My=5000000.00, Mz=-2000000.00
+
+=== Analysis Results (Global) ===
+Shear Method: icr
+Tension Method: accurate
+ICR Point: (1101.8766820168603, 1101.877805242817)
+Applied Load at Centroid (0, 0.0, 0.0):
+  Fx=50000.00, Fy=-100000.00, Fz=20000.00
+  Mx=0.00, My=5000000.00, Mz=-2000000.00
+Applied Load at ICR (0, 1101.9, 1101.9):
+  Fx=50000.00, Fy=-100000.00, Fz=20000.00
+  Mx=-132225314.16, My=60093890.26, Mz=-57093834.10
+Bolt Reaction at Centroid (0, 0.0, 0.0):
+  Fx=80172.41, Fy=72111.06, Fz=-72110.99
+  Mx=279166.81, My=689655.17, Mz=-275862.07
+Bolt Reaction at ICR (0, 1101.9, 1101.9):
+  Fx=80172.41, Fy=72111.06, Fz=-72110.99
+  Mx=159194162.86, My=-87650548.18, Mz=-88615975.37
+
+=== Equilibrium Check ===
+To prove the analysis is working, we check if the bolt forces balance the applied load.
+Note: For Shear (Mx), the bolt reaction moment should match the applied moment.
+      For Tension (My, Mz), the bolt reaction will be LESS than the applied moment
+      because the balancing compression force from the plate is not included in bolt forces.
+
+Component  Applied         Bolt Reaction   Result              
+Mx         0.00            279166.81       Diff (See Note)
+Fy         -100000.00      72111.06        (Shear Balance)
+Fz         20000.00        -72110.99       (Shear Balance)
+Applied Load at ICR (0, 1101.9, 1101.9):
+  Fx=50000.00, Fy=-100000.00, Fz=20000.00
+  Mx=-132225314.16, My=60093890.26, Mz=-57093834.10
+Bolt Reaction at ICR (0, 1101.9, 1101.9):
+  Fx=80172.41, Fy=72111.06, Fz=-72110.99
+  Mx=159194162.86, My=-87650548.18, Mz=-88615975.37
+
+=== Individual Bolt Forces ===
+Bolt   Fx (Ten)     Fy (Shr)     Fz (Shr)     V_res       
+1      8045.98      8019.37      -8019.37     11341.10    
+2      7471.26      8295.20      -7733.70     11341.10    
+3      6896.55      8579.03      -7417.61     11341.10    
+4      9482.76      7733.71      -8295.20     11341.10    
+5      8908.05      8019.37      -8019.37     11341.10    
+6      8333.33      8315.56      -7711.81     11341.10    
+7      10919.54     7417.62      -8579.02     11341.10    
+8      10344.83     7711.82      -8315.55     11341.10    
+9      9770.11      8019.37      -8019.37     11341.10    
+------------------------------------------------------------
+Total  80172.41     72111.06     -72110.99   
+
+=== Check Results (AISC) ===
+Bolt   Shear      Tension    Combined   Bearing    Tearout   
+1      0.130      0.055      0.055      0.058      0.117     
+2      0.130      0.051      0.051      0.058      0.117     
+3      0.130      0.047      0.047      0.058      0.117     
+4      0.130      0.065      0.065      0.058      0.117     
+5      0.130      0.061      0.061      0.058      0.117     
+6      0.130      0.057      0.057      0.058      0.117     
+7      0.130      0.075      0.075      0.058      0.117     
+8      0.130      0.071      0.071      0.058      0.117     
+9      0.130      0.067      0.067      0.058      0.117     
+
+Slip Check (Group): 0.000

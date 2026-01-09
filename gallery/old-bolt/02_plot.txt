@@ -1,6 +1,0 @@
-BOLT PLOT
-================================================================================
-Saved image (shear): C:\Users\Ed\Desktop\eng scripts\connecty\gallery\bolt\bolt_plot_shear.svg
-Saved image (axial): C:\Users\Ed\Desktop\eng scripts\connecty\gallery\bolt\bolt_plot_axial.svg
-Shear plot: plate outline + bolt layout + per-bolt shear magnitudes (color) + shear arrows.
-Axial plot: plate outline + bolt layout + per-bolt axial force (color, +tension/-compression).

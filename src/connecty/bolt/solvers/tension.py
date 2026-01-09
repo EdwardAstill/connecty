@@ -1,170 +1,157 @@
-"""Plate-based bolt tension distribution (neutral-axis method)."""
-
-from __future__ import annotations
-
-from typing import Dict, Literal
-
-from ..load import Load
-from ..bolt import BoltGroup
+import numpy as np
+from dataclasses import dataclass
+from typing import Literal, Tuple
 from ..plate import Plate
 
-TensionMethod = Literal["conservative", "accurate"]
-
-
-def solve_tension(
-    *,
-    layout: BoltGroup,
+def solve_bolt_tension_simple(
+    bolt_coords: np.ndarray,
     plate: Plate,
-    load: Load,
-    tension_method: TensionMethod,
-) -> list[float]:
-    """Return per-bolt tension (Fx) from the plate neutral-axis method."""
-    n = layout.n
-    if n < 1:
-        return []
-
-    Cy = layout.Cy
-    Cz = layout.Cz
-    _, My_total, Mz_total = load.get_moments_about(0.0, Cy, Cz)
-    My = float(My_total)
-    Mz = float(Mz_total)
-
-    Fx_direct = max(0.0, float(load.Fx))
-    per_bolt = [Fx_direct / n for _ in range(n)]
-
-    add_my = _tension_from_moment_about_axis(
-        layout=layout,
-        plate=plate,
-        moment=My,
-        axis="y",
-        tension_method=tension_method,
-    )
-    add_mz = _tension_from_moment_about_axis(
-        layout=layout,
-        plate=plate,
-        moment=Mz,
-        axis="z",
-        tension_method=tension_method,
-    )
-
-    for i in range(n):
-        per_bolt[i] += add_my[i] + add_mz[i]
-        if per_bolt[i] < 0.0:
-            per_bolt[i] = 0.0
-
-    return per_bolt
-
-
-def _tension_from_moment_about_axis(
-    *,
-    layout: BoltGroup,
-    plate: Plate,
-    moment: float,
-    axis: Literal["y", "z"],
-    tension_method: TensionMethod,
-) -> list[float]:
-    """Calculate bolt tension from moment about an axis.
-    
-    Returns tension values for all bolts, including negative values for bolts
-    in the compression zone. The calling function should sum all components
-    before applying the compression rule (negative total → 0).
+    Fx: float,
+    My: float,
+    Mz: float,
+    tension_method: Literal["accurate", "conservative"] = "accurate"
+) -> np.ndarray:
     """
-    n = layout.n
-    out = [0.0 for _ in range(n)]
-    if abs(moment) < 1e-12:
-        return out
-
-    if axis == "y":
-        u_vals = [p[1] for p in layout.points]  # z
-        u_min = plate.z_min
-        u_max = plate.z_max
-        u_centroid = float(layout.Cz)
-    elif axis == "z":
-        u_vals = [p[0] for p in layout.points]  # y
-        u_min = plate.y_min
-        u_max = plate.y_max
-        u_centroid = float(layout.Cy)
-    else:
-        raise ValueError("axis must be 'y' or 'z'")
-
-    d = float(u_max - u_min)
-    if d <= 0.0:
-        raise ValueError("Plate depth must be positive (check corner coordinates)")
-
-    comp_edge = float(u_min) if moment > 0.0 else float(u_max)
-
-    if tension_method == "conservative":
-        # Per documentation/theory/bolt.md: conservative NA at the bolt-group centroid line.
-        na = u_centroid
-    elif tension_method == "accurate":
-        if comp_edge == u_min:
-            na = u_min + d / 6.0
-        else:
-            na = u_max - d / 6.0
-    else:
-        raise ValueError("tension_method must be 'conservative' or 'accurate'")
-
-    # Guard against degenerate/invalid NA locations.
-    if not (u_min <= na <= u_max):
-        raise ValueError("Neutral axis (NA) lies outside the plate; check bolt group vs plate geometry")
-
-    y_c = -abs(comp_edge - na)
-
-    # Group bolts by position coordinate (rows)
-    rows: Dict[float, list[int]] = {}
-    for idx, u in enumerate(u_vals):
-        rows.setdefault(float(u), []).append(idx)
-
-    tension_sign = 1.0 if moment > 0.0 else -1.0
-
-    # Separate tension and compression side rows
-    tension_rows: list[tuple[float, int, list[int]]] = []
-    compression_rows: list[tuple[float, int, list[int]]] = []
+    Calculates bolt tension per bolt.md.
+    My distribution varies with z-coordinates; Mz distribution varies with y-coordinates.
     
-    for u_key, indices in rows.items():
-        rel = float(u_key) - na
-        y_i = abs(rel)
+    Parameters:
+    bolt_coords : np.ndarray -> Nx2 array of [y, z] coordinates.
+    plate       : Plate      -> Object with centroid and dimensions.
+    Fx          : float      -> Applied axial tension.
+    My, Mz      : float      -> Moments about the Y and Z axes.
+    tension_method : str     -> "accurate" (d/6 from edge) or "conservative" (at mid-plane).
+    
+    Returns:
+    np.ndarray: Tension in each bolt (compression bolts have negative values, clamped to 0).
+    """
+    bolt_coords = np.array(bolt_coords)  # [y, z]
+    n = len(bolt_coords)
+    f_direct = max(0.0, Fx / n)
+    tensions = np.full(n, f_direct)
+
+    # Bending around Y-axis (Affected by Z coordinates)
+    if abs(My) > 1e-12:
+        plate_cy, plate_cz = plate.center
+        z_min = plate_cz - (plate.height / 2)
+        z_max = plate_cz + (plate.height / 2)
+        u_comp = z_min if My > 0 else z_max
         
-        if tension_sign * rel > 0.0:
-            # Tension side
-            tension_rows.append((y_i, len(indices), indices))
+        if tension_method == "accurate":
+            # d/6 from compression edge
+            u_na = u_comp + (plate.height / 6.0) if u_comp == z_min else u_comp - (plate.height / 6.0)
+        else:  # conservative
+            u_na = (z_min + z_max) / 2
+            
+        tensions += _distribute_moment(bolt_coords[:, 1], My, u_na, u_comp)
+
+    # Bending around Z-axis (Affected by Y coordinates)
+    if abs(Mz) > 1e-12:
+        plate_cy, plate_cz = plate.center
+        y_min = plate_cy - (plate.width / 2)
+        y_max = plate_cy + (plate.width / 2)
+        u_comp = y_min if Mz > 0 else y_max
+        
+        if tension_method == "accurate":
+            u_na = u_comp + (plate.width / 6.0) if u_comp == y_min else u_comp - (plate.width / 6.0)
         else:
-            # Compression side (will get negative values)
-            compression_rows.append((y_i, len(indices), indices))
+            u_na = (y_min + y_max) / 2
+            
+        tensions += _distribute_moment(bolt_coords[:, 0], Mz, u_na, u_comp)
 
-    # If no bolts on tension side, no moment to distribute
-    if not tension_rows:
-        return out
+    return np.maximum(0.0, tensions)
 
-    y_1 = max(y_i for (y_i, _, _) in tension_rows)
-    if y_1 <= 0.0:
-        return out
+def _distribute_moment(
+    u_coords: np.ndarray,
+    M: float,
+    u_na: float,
+    u_comp: float
+) -> np.ndarray:
+    """
+    Refined to match the T1 = |M| / sum(yi * (yi/y1 - yc/y1)) formula.
+    
+    Parameters:
+    u_coords : np.ndarray -> Bolt coordinates along the axis of interest.
+    M        : float      -> Applied moment.
+    u_na     : float      -> Neutral axis position.
+    u_comp   : float      -> Compression edge position.
+    
+    Returns:
+    np.ndarray: Moment-induced tensions along the coordinate axis.
+    """
+    rel_dist = u_coords - u_na
+    # Tension side is opposite to the compression edge relative to NA
+    is_tension = (rel_dist > 0) if (u_na > u_comp) else (rel_dist < 0)
+    
+    y_i = np.abs(rel_dist)
+    y_c = -np.abs(u_comp - u_na)
+    
+    if not np.any(is_tension):
+        return np.zeros_like(u_coords)
+    
+    y_1 = np.max(y_i[is_tension])
+    # Denominator from bolt.md: sum(yi * (yi/y1 - yc/y1))
+    denom = np.sum(y_i[is_tension] * (y_i[is_tension] / y_1 - y_c / y_1))
+    
+    T1 = np.abs(M) / denom if denom > 1e-9 else 0.0
+    
+    # Linear distribution; compression side gets negative values
+    final_forces = T1 * (y_i / y_1)
+    final_forces[~is_tension] *= -1.0
+    return final_forces
 
-    # Solve for T1 using only tension-side bolts (per handbook method)
-    denom = 0.0
-    for (y_i, _, _) in tension_rows:
-        denom += y_i * ((y_i / y_1) - (y_c / y_1))
+def apply_prying_forces(
+    tensions: np.ndarray,
+    t_plate: float,
+    a: float,
+    b: float,
+    bolt_diameter: float,
+    fy_plate: float
+) -> np.ndarray:
+    """
+    Calculates design tension (T'u) including prying action.
+    Following simplified AISC/industry logic.
+    
+    Parameters:
+    tensions      : np.ndarray -> Static tension per bolt (Tu) from solve_bolt_tension_simple.
+    t_plate       : float      -> Thickness of the plate.
+    a             : float      -> Distance from bolt centerline to plate edge.
+    b             : float      -> Distance from bolt centerline to face of support.
+    bolt_diameter : float      -> Diameter of the bolt.
+    fy_plate      : float      -> Yield strength of the plate material.
+    
+    Returns:
+    np.ndarray: Total tension demand per bolt (Tu + Q).
+    """
+    # 1. Effective width per bolt (simplified)
+    # Usually taken as the tributary width or prying strip width
+    p: float = 2 * bolt_diameter 
+    
+    # 2. Parametric ratios
+    rho: float = b / a if a > 0 else 1.0
+    delta: float = 1.0 - (bolt_diameter / p)  # Ratio of net area at bolt line
+    
+    # 3. Calculate Tc (Bolt capacity required to eliminate prying)
+    # This is a simplified check for plate stiffness
+    t_req: np.ndarray = np.sqrt((4.44 * tensions * b) / (p * fy_plate * (1 + delta)))
+    
+    # 4. Prying force calculation (Q)
+    # If the plate is thick enough (t_plate > t_req), prying is negligible.
+    prying_ratio: np.ndarray = np.where(
+        t_plate < t_req,
+        (1 / delta) * ((t_req / t_plate)**2 - 1) * (rho / (1 + rho)),
+        0.0
+    )
+    
+    # Ensure prying ratio doesn't exceed 1.0 (theoretical limit)
+    prying_ratio = np.clip(prying_ratio, 0.0, 1.0)
+    
+    return tensions * (1 + prying_ratio)
 
-    if abs(denom) < 1e-12:
-        raise ValueError("Cannot solve tension distribution (denominator ~ 0); check NA and plate geometry")
-
-    T1 = abs(float(moment)) / denom
-
-    # Distribute tension to tension-side bolts (positive values)
-    for (y_i, n_i, indices) in tension_rows:
-        T_row = T1 * (y_i / y_1)
-        T_per_bolt = T_row / n_i
-        for idx in indices:
-            out[idx] = T_per_bolt
-
-    # Distribute compression to compression-side bolts (negative values)
-    # Use linear distribution from NA, maintaining the same slope as tension side
-    for (y_i, n_i, indices) in compression_rows:
-        T_row = -T1 * (y_i / y_1)  # Negative for compression
-        T_per_bolt = T_row / n_i
-        for idx in indices:
-            out[idx] = T_per_bolt
-
-    return out
-
-
+if __name__ == "__main__":
+    # --- Example Usage ---
+    # my_plate = Plate(Cy=0, Cz=0, height=12.0, width=8.0)
+    # bolts = np.array([[-2, -4], [2, -4], [-2, 4], [2, 4]])  # 4 bolts in [y, z]
+    # results = solve_bolt_tension_simple(bolts, my_plate, Fx=10, My=150, Mz=0)
+    # print(f"Bolt Tensions: {results}")
+    pass
