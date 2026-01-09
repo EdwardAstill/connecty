@@ -4,12 +4,11 @@
 
 To ensure consistency between shear and tension solvers, `connecty` uses a standard 3D member coordinate system where the -axis is the longitudinal axis of the member.
 
-* ** (Axial):** Out-of-plane.  indicates tension;  indicates compression.
-* ** (Vertical):** In-plane vertical.  is upward.
-* ** (Horizontal):** In-plane horizontal.  is to the right.
-* ** (Torsion):** Counter-clockwise (CCW) when looking toward the origin from .
-* ** (Bending):** Causes tension on the  side of the plate.
-* ** (Bending):** Causes tension on the  side of the plate.
+x into the page
+y is up
+z is right
+
+positive moments are counter-clockwise (right handed rule).
 
 ---
 

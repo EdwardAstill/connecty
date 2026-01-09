@@ -17,27 +17,28 @@ BOLT_THREADED_IN_SHEAR = True
 # Bolt Layout (Grid)
 GRID_ROWS = 3
 GRID_COLS = 3
-GRID_SPACING_Y = 80
-GRID_SPACING_Z = 80
+GRID_SPACING_Y = 80 #mm
+GRID_SPACING_Z = 80 #mm
 
 # Plate Parameters
 PLATE_WIDTH = 400   # Dimension in Z
 PLATE_HEIGHT = 400  # Dimension in Y
 PLATE_THICKNESS = 12
-PLATE_FU = 450
-PLATE_FY = 350
+PLATE_FU = 450 # (MPa)
+PLATE_FY = 350 # (MPa)
 PLATE_CENTER = (0, 0)
 
 # Connection Details
 N_SHEAR_PLANES = 1
 
 # Applied Loads
-LOAD_FX = 50_000   # Tension
-LOAD_FY = -100_000 # Shear Y
-LOAD_FZ = 20_000   # Shear Z
-LOAD_MY = 5_000_000
-LOAD_MZ = -2_000_000
-LOAD_LOCATION = (0, 0, 0)
+LOAD_FX = 0   # Tension (N)
+LOAD_FY = 0 # Shear Y (N)
+LOAD_FZ = 10_000   # Shear Z (N)
+LOAD_MY = 0 # (Nmm)
+LOAD_MZ = 0 # (Nmm)
+LOAD_MX = 1_000_000 # (Nmm)
+LOAD_LOCATION = (0, 0, 0) # (mm)
 
 # Analysis Settings
 SHEAR_METHOD = "icr"      # "elastic" or "icr"
@@ -93,7 +94,8 @@ def main():
         Fy=LOAD_FY, 
         Fz=LOAD_FZ, 
         My=LOAD_MY, 
-        Mz=LOAD_MZ, 
+        Mz=LOAD_MZ,
+        Mx=LOAD_MX,
         location=LOAD_LOCATION
     )
     

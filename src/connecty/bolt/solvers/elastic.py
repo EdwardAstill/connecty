@@ -36,8 +36,8 @@ def solve_bolt_elastic(
     Ip = np.sum(rel_coords**2)
     
     # 3. Transfer loads to Centroid (Mx_total)
-    # Matches: Mx - Fz*(y_loc - Cy) + Fy*(z_loc - Cz)
-    Mx_total = Mx - Fz * (y_loc - Cy) + Fy * (z_loc - Cz)
+    # Matches: Mx + Fz*(y_loc - Cy) - Fy*(z_loc - Cz)
+    Mx_total = Mx + Fz * (y_loc - Cy) - Fy * (z_loc - Cz)
     
     # 4. Direct Shear components
     Fy_p = Fy / n

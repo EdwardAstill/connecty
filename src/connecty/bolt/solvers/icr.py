@@ -1,4 +1,35 @@
+import math
 import numpy as np
+
+def golden_search(a, b, residual_fn, tolerance=1e-6, max_iter=1000):
+    phi = (1 + math.sqrt(5)) / 2
+    inv_phi = 1 / phi
+
+    c = b - (b - a) * inv_phi
+    d = a + (b - a) * inv_phi
+
+    fc = residual_fn(c)
+    fd = residual_fn(d)
+
+    for _ in range(max_iter):
+        if abs(b - a) < tolerance:
+            break
+
+        if fc < fd:
+            b = d
+            d = c
+            fd = fc
+            c = b - (b - a) * inv_phi
+            fc = residual_fn(c)
+        else:
+            a = c
+            c = d
+            fc = fd
+            d = a + (b - a) * inv_phi
+            fd = residual_fn(d)
+
+    return (a + b) / 2
+
 
 def solve_bolt_icr(
     bolt_coords: np.ndarray,
@@ -10,84 +41,175 @@ def solve_bolt_icr(
     mu: float = 10.0,
     lam: float = 0.55,
     delta_max: float = 8.64,
-    max_iterations: int = 5000
+    tolerance: float = 1e-6
 ) -> tuple[np.ndarray, np.ndarray, tuple[float, float, int]]:
     """
-    Solves for the ICR and individual bolt forces by minimizing 
-    translation and rotation residuals simultaneously.
+    Solves for the ICR using a 1D search along the perpendicular axis 
+    to the applied load vector.
+
+    Positive moments about an axis are counter-clockwise (right handed rule).
+
+
     """
-    bolt_coords = np.array(bolt_coords) # [y, z]
-    
-    # 1. Centroid and Moment Transfer
+    bolt_coords = np.array(bolt_coords)
     centroid = np.mean(bolt_coords, axis=0)
+    print(f"Centroid: {centroid}")
     Cy, Cz = centroid[0], centroid[1]
-    Mx_total = Mx - Fz * (y_loc - Cy) + Fy * (z_loc - Cz) #
+    print(f"Cy: {Cy}, Cz: {Cz}")
 
-    def get_residuals(icr_pos: np.ndarray):
-        """Calculates Fx, Fy, and Mx residuals for the current ICR."""
-        y_ic, z_ic = icr_pos
-        
-        # 2. Kinematics
-        r_vecs = bolt_coords - np.array([y_ic, z_ic])
-        c_i = np.linalg.norm(r_vecs, axis=1)
-        c_i = np.where(c_i < 1e-9, 1e-9, c_i)
-        
-        # 3. Crawford-Kulak Nonlinear Forces
-        c_max = np.max(c_i)
-        # Forces are relative to the most highly deformed bolt reaching capacity
-        # We don't scale by applied shear; we let ICR position dictate magnitude
-        rho_i = (c_i / c_max) 
-        Ri_normalized = (1 - np.exp(-mu * rho_i * (c_max/delta_max)))**lam
-        
-        # 4. Force Vectors (Perpendicular to radius)
-        ty = -(bolt_coords[:, 1] - z_ic) / c_i
-        tz =  (bolt_coords[:, 0] - y_ic) / c_i
-        
-        # 5. Internal Summation
-        # We need an ultimate strength R_ult for the bolts to get real force units
-        # For a solver, we minimize the ratio of internal to external loads
-        Fy_int = np.sum(Ri_normalized * ty)
-        Fz_int = np.sum(Ri_normalized * tz)
-        # Resisting moment relative to bolt centroid
-        M_int = np.sum((Ri_normalized * ty) * bolt_coords[:, 1] - 
-                       (Ri_normalized * tz) * bolt_coords[:, 0])
-        
-        # 6. Return vector of residuals
-        # We normalize by external loads to keep gradients stable
-        res_y = Fy_int / abs(Fy) - (Fy / abs(Fy)) if Fy != 0 else Fy_int
-        res_z = Fz_int / abs(Fz) - (Fz / abs(Fz)) if Fz != 0 else Fz_int
-        res_m = M_int / abs(Mx_total) - (Mx_total / abs(Mx_total)) if Mx_total != 0 else M_int
-        
-        return np.array([res_y, res_z, res_m]), Ri_normalized, ty, tz
+    # 1. Moment Transfer to Centroid
+    Mx_centroid = Mx + Fz * (y_loc - Cy) - Fy * (z_loc - Cz)
+    print(f"Moment at centroid: {Mx_centroid}")
+    # need a moment at the centroid otherwise icr will not work
+    if Mx_centroid == 0:
+        raise ValueError("Moment at centroid is 0, ICR will not work")
+    
+    # find the line that the icr exists on can you even do this using a non linear deformation equation?
 
-    # --- Iterative Solver (Minimizing Sum of Squared Residuals) ---
-    icr = np.mean(bolt_coords, axis=0) + 1.0 
-    learning_rate = 0.1
-    
-    final_iterations = 0
-    for i in range(max_iterations):
-        final_iterations = i
-        res, Ri, ty, tz = get_residuals(icr)
-        cost = np.sum(res**2) # Goal is cost -> 0
-        
-        if cost < 1e-8:
-            break
-            
-        # Numerical Gradients
-        eps = 1e-7
-        grad_y = (np.sum(get_residuals(icr + [eps, 0])[0]**2) - cost) / eps
-        grad_z = (np.sum(get_residuals(icr + [0, eps])[0]**2) - cost) / eps
-        
-        icr -= np.array([grad_y, grad_z]) * learning_rate
+    P = math.hypot(Fy, Fz)
 
-    # Final Force Calculation
-    res, Ri, ty, tz = get_residuals(icr)
-    # Re-scale normalized Ri to actual force units based on applied loads
-    applied_shear = np.sqrt(Fy**2 + Fz**2)
-    internal_shear_mag = np.sqrt(np.sum(Ri*ty)**2 + np.sum(Ri*tz)**2)
-    final_scale = applied_shear / internal_shear_mag
+    if P < 1e-9:
+        # Pure torsion case: ICR is at the centroid
+        return _calculate_final_state(bolt_coords, Cy, Cz, Fy, Fz, Mx_centroid, mu, lam, delta_max)
+
+    # 2. Define Perpendicular Search Direction
+    # Unit vector of load: (Fy/P, Fz/P). 
+    # Perpendicular (90 deg CCW): (-Fz/P, Fy/P)
+    # We choose the sign based on the sign of the moment
+    moment_sign = 1.0 if Mx_centroid >= 0 else -1.0
+    perp_y = -moment_sign * (Fz / P)
+    perp_z =  moment_sign * (Fy / P)
+
+    print("icr exists on this vector passing through the centroid:")
+    print(f"({perp_y}, {perp_z})")
+
+    # 3. Define the Residual Function for 1D distance 'r'
+    def get_moment_residual(r):
+        #assume the icr is a distance r from the centroid in the direction of the perpendicular vector
+        icr_y = Cy + r * perp_y
+        icr_z = Cz + r * perp_z
+        
+        # calculate the distance from the icr to each bolt
+        r_vecs = bolt_coords - np.array([icr_y, icr_z])
+        dist_i = np.linalg.norm(r_vecs, axis=1)
+        dist_i = np.where(dist_i < 1e-9, 1e-9, dist_i)
+        
+        # find the maximum distance from the icr to a bolt
+        c_max = np.max(dist_i)
+        # find the normalized resistance of each bolt (relative to the furthest bolt)
+        # this returns a value between 0 and 1 for each bolt
+        Ri = (1 - np.exp(-mu * (dist_i / c_max) * (c_max / delta_max)))**lam
+        
+        # determine the forces on each bolt in a direction perpendicular (counter-clockwise) to the icr
+        ty = (bolt_coords[:, 1] - icr_z) / dist_i
+        tz = -(bolt_coords[:, 0] - icr_y) / dist_i
+
+        
+        # find the moment generated by the bolts
+        M_int = np.sum((Ri * ty) * (bolt_coords[:, 1] - Cz) - 
+                       (Ri * tz) * (bolt_coords[:, 0] - Cy))
+        
+        # 1. How much do we need to scale the current normalized Ri to match the LOAD?
+        V_int_raw = math.hypot(np.sum(Ri * ty), np.sum(Ri * tz))
+        V_app = math.hypot(Fy, Fz)
+        virtual_scale = V_app / V_int_raw if V_int_raw > 0 else 0
+
+        # 2. Scale the moment and compare to the actual load
+        M_int_scaled = M_int * virtual_scale
+        return abs(M_int_scaled - Mx_centroid)
     
-    bolt_fy = Ri * ty * final_scale
-    bolt_fz = Ri * tz * final_scale
+
+
+    r = golden_search(0.01, 1e7, get_moment_residual, tolerance, max_iter=10000)
+    print(f"r: {r}")
+
+
+    final_y_ic = Cy + r * perp_y
+    final_z_ic = Cz + r * perp_z
+
+    return _calculate_final_state(
+        bolt_coords, final_y_ic, final_z_ic, Fy, Fz, Mx_centroid, mu, lam, delta_max, iterations=1000
+    )
+
+def _calculate_final_state(bolt_coords, y_ic, z_ic, Fy, Fz, Mx_total, mu, lam, delta_max, iterations=0):
+    r_vecs = bolt_coords - np.array([y_ic, z_ic])
+    dist_i = np.linalg.norm(r_vecs, axis=1)
+    dist_i = np.where(dist_i < 1e-9, 1e-9, dist_i)
+    c_max = np.max(dist_i)
     
-    return bolt_fy, bolt_fz, (float(icr[0]), float(icr[1]), final_iterations)
+    Ri = (1 - np.exp(-mu * (dist_i / c_max) * (c_max / delta_max)))**lam
+    ty = -(bolt_coords[:, 1] - z_ic) / dist_i
+    tz =  (bolt_coords[:, 0] - y_ic) / dist_i
+    
+    app_v = math.hypot(Fy, Fz)
+    int_v = math.hypot(np.sum(Ri * ty), np.sum(Ri * tz))
+    scale = app_v / int_v if int_v > 1e-9 else 0.0
+
+    bolt_forces_y = Ri * ty * scale
+    bolt_forces_z = Ri * tz * scale
+    
+    return bolt_forces_y, bolt_forces_z, (float(y_ic), float(z_ic))
+
+def check_icr(bolt_forces_y, bolt_forces_z, icr_point, bolt_coords, Fy, Fz, Mx_centroid) -> None:
+    """
+    Verifies that the calculated bolt forces satisfy equilibrium with the 
+    applied loads at the centroid.
+    """
+    # 1. Calculate Resultant Reactions
+    total_Ry = np.sum(bolt_forces_y)
+    total_Rz = np.sum(bolt_forces_z)
+    
+    # 2. Calculate Internal Moment about Centroid (0,0)
+    # Using the X-into-the-page convention: M = Fz*y - Fy*z
+    # Centroid is assumed (0,0) based on your print outputs
+    centroid_y, centroid_z = 0.0, 0.0 
+    
+    # Moment components
+    # Positive Fz at +y lever arm = CCW (+)
+    # Positive Fy at +z lever arm = CW (-)
+    moments = (bolt_forces_z * (bolt_coords[:, 0] - centroid_y)) - \
+              (bolt_forces_y * (bolt_coords[:, 1] - centroid_z))
+    total_Mx = np.sum(moments)
+
+    print("\n=== Equilibrium Verification ===")
+    print(f"{'Component':<12} | {'Applied':<12} | {'Reaction':<12} | {'Error':<12}")
+    print("-" * 60)
+    print(f"{'Fy (Shear)':<12} | {Fy:<12.4f} | {total_Ry:<12.4f} | {abs(Fy - total_Ry):<12.4e}")
+    print(f"{'Fz (Shear)':<12} | {Fz:<12.4f} | {total_Rz:<12.4f} | {abs(Fz - total_Rz):<12.4e}")
+    print(f"{'Mx (Moment)':<12} | {Mx_centroid:<12.4f} | {total_Mx:<12.4f} | {abs(Mx_centroid - total_Mx):<12.4e}")
+    
+    # 3. Geometric Check: Perpendicularity
+    # Bolt force vectors should be perpendicular to the radius from ICR
+    icr_y, icr_z = icr_point
+    r_vecs = bolt_coords - np.array([icr_y, icr_z])
+    
+    dot_products = []
+    for i in range(len(bolt_coords)):
+        force_vec = np.array([bolt_forces_y[i], bolt_forces_z[i]])
+        # Dot product of radius vector and force vector should be ~0
+        dot = np.dot(r_vecs[i], force_vec)
+        dot_products.append(dot)
+    
+    max_dot = np.max(np.abs(dot_products))
+    print(f"{'Max Perp Err':<12} | {'0.0':<12} | {max_dot:<12.4e} | (Radial Dot Product)")
+
+def main():
+    bolt_coords = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1]])
+    Fy = 0
+    Fz = 1
+    Mx = 1
+    y_loc = 1
+    z_loc = 0
+    
+    # We need to know the centroid-moment for the check
+    centroid = np.mean(bolt_coords, axis=0)
+    Mx_centroid = Mx + Fz * (y_loc - centroid[0]) - Fy * (z_loc - centroid[1])
+
+    bolt_forces_y, bolt_forces_z, icr_point = solve_bolt_icr(
+        bolt_coords, Fy, Fz, Mx, y_loc, z_loc
+    )
+    
+    check_icr(bolt_forces_y, bolt_forces_z, icr_point, bolt_coords, Fy, Fz, Mx_centroid)
+
+if __name__ == "__main__":
+    main()
