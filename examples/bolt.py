@@ -17,11 +17,11 @@ BOLT_THREADED_IN_SHEAR = True
 # Bolt Layout (Grid)
 GRID_ROWS = 3
 GRID_COLS = 3
+GRID_SPACING_X = 80 #mm
 GRID_SPACING_Y = 80 #mm
-GRID_SPACING_Z = 80 #mm
 
 # Plate Parameters
-PLATE_WIDTH = 400   # Dimension in Z
+PLATE_WIDTH = 400   # Dimension in X
 PLATE_HEIGHT = 400  # Dimension in Y
 PLATE_THICKNESS = 12
 PLATE_FU = 450 # (MPa)
@@ -32,12 +32,13 @@ PLATE_CENTER = (0, 0)
 N_SHEAR_PLANES = 1
 
 # Applied Loads
-LOAD_FX = 0   # Tension (N)
-LOAD_FY = 0 # Shear Y (N)
-LOAD_FZ = 10_000   # Shear Z (N)
-LOAD_MY = 0 # (Nmm)
-LOAD_MZ = 0 # (Nmm)
-LOAD_MX = 1_000_000 # (Nmm)
+# System: X-Y Plane (Shear), Z (Axial/Tension)
+LOAD_FX = 10_000   # Shear X (N)
+LOAD_FY = 0        # Shear Y (N)
+LOAD_FZ = 1000        # Tension (N)
+LOAD_MX = 10000000 # Torsion (Moment around Z) (Nmm)
+LOAD_MZ = 200000        # Moment X (Nmm)
+LOAD_MY = 5000000        # Moment Y (Nmm)
 LOAD_LOCATION = (0, 0, 0) # (mm)
 
 # Analysis Settings
@@ -68,8 +69,8 @@ def main():
     bolt_coords = layout.grid_layout(
         rows=GRID_ROWS, 
         cols=GRID_COLS, 
-        spacing_y=GRID_SPACING_Y, 
-        spacing_z=GRID_SPACING_Z
+        spacing_x=GRID_SPACING_X, 
+        spacing_y=GRID_SPACING_Y
     )
     
     bg = BoltGroup.create(layout=bolt_coords, params=bolt_params)
@@ -86,7 +87,8 @@ def main():
     conn = BoltConnection(
         bolt_group=bg, 
         plate=plate, 
-        n_shear_planes=N_SHEAR_PLANES
+        n_shear_planes=N_SHEAR_PLANES,
+        L_grip=PLATE_THICKNESS
     )
     
     load = Load(
@@ -114,9 +116,9 @@ def main():
     with open(output_file, "w") as f:
         f.write("=== Bolt Analysis Inputs ===\n")
         f.write(f"Bolts: {len(bolt_coords)} x {bolt_params.diameter}mm {bolt_params.grade}\n")
-        f.write(f"Layout: {GRID_ROWS}x{GRID_COLS} grid @ {GRID_SPACING_Y}x{GRID_SPACING_Z}mm\n")
-        f.write(f"Plate: {plate.depth_z}x{plate.depth_y}x{plate.thickness}mm (Fy={plate.fy}, Fu={plate.fu})\n")
-        f.write(f"Load: Fx={load.Fx:.2f}, Fy={load.Fy:.2f}, Fz={load.Fz:.2f}, My={load.My:.2f}, Mz={load.Mz:.2f}\n")
+        f.write(f"Layout: {GRID_ROWS}x{GRID_COLS} grid @ {GRID_SPACING_X}x{GRID_SPACING_Y}mm\n")
+        f.write(f"Plate: {plate.depth_x}x{plate.depth_y}x{plate.thickness}mm (Fy={plate.fy}, Fu={plate.fu})\n")
+        f.write(f"Load: Fx={load.Fx:.2f}, Fy={load.Fy:.2f}, Fz={load.Fz:.2f}, Mx={load.Mx:.2f}, My={load.My:.2f}, Mz={load.Mz:.2f}\n")
         
         f.write("\n=== Analysis Results (Global) ===\n")
         f.write(f"Shear Method: {res.shear_method}\n")
@@ -125,93 +127,16 @@ def main():
             f.write(f"ICR Point: {res.icr_point}\n")
         
         # Equivalent load at centroid
-        # The plate/bolt group is in the Y-Z plane at X=0 (implied by Load(location=(0,0,0)))
-        # Centroid is at (0, Cy, Cz)
-        
-        # 1. Applied Load transformed to Centroid
-        applied_at_c = load.equivalent_at((0, bg.Cy, bg.Cz))
-        f.write(f"Applied Load at Centroid (0, {bg.Cy:.1f}, {bg.Cz:.1f}):\n")
+        applied_at_c = load.equivalent_at((bg.Cx, bg.Cy, 0))
+        f.write(f"Applied Load at Centroid ({bg.Cx:.1f}, {bg.Cy:.1f}, 0):\n")
         f.write(f"  Fx={applied_at_c.Fx:.2f}, Fy={applied_at_c.Fy:.2f}, Fz={applied_at_c.Fz:.2f}\n")
         f.write(f"  Mx={applied_at_c.Mx:.2f}, My={applied_at_c.My:.2f}, Mz={applied_at_c.Mz:.2f}\n")
 
-        if res.icr_point:
-
-        # Appllied Load transformed to ICR
-            applied_at_icr = load.equivalent_at((0, res.icr_point[0], res.icr_point[1]))
-            f.write(f"Applied Load at ICR (0, {res.icr_point[0]:.1f}, {res.icr_point[1]:.1f}):\n")
-            f.write(f"  Fx={applied_at_icr.Fx:.2f}, Fy={applied_at_icr.Fy:.2f}, Fz={applied_at_icr.Fz:.2f}\n")
-            f.write(f"  Mx={applied_at_icr.Mx:.2f}, My={applied_at_icr.My:.2f}, Mz={applied_at_icr.Mz:.2f}\n")
-
-        # 2. Reaction Load from Bolts at Centroid
-        reaction_at_c = res.equivalent_load((bg.Cy, bg.Cz))
-        f.write(f"Bolt Reaction at Centroid (0, {bg.Cy:.1f}, {bg.Cz:.1f}):\n")
-        f.write(f"  Fx={reaction_at_c.Fx:.2f}, Fy={reaction_at_c.Fy:.2f}, Fz={reaction_at_c.Fz:.2f}\n")
-        f.write(f"  Mx={reaction_at_c.Mx:.2f}, My={reaction_at_c.My:.2f}, Mz={reaction_at_c.Mz:.2f}\n")
-
-        if res.icr_point:
-
-        # Reaction Load from Bolts at ICR
-            reaction_at_icr = res.equivalent_load((res.icr_point[0], res.icr_point[1]))
-            f.write(f"Bolt Reaction at ICR (0, {res.icr_point[0]:.1f}, {res.icr_point[1]:.1f}):\n")
-            f.write(f"  Fx={reaction_at_icr.Fx:.2f}, Fy={reaction_at_icr.Fy:.2f}, Fz={reaction_at_icr.Fz:.2f}\n")
-            f.write(f"  Mx={reaction_at_icr.Mx:.2f}, My={reaction_at_icr.My:.2f}, Mz={reaction_at_icr.Mz:.2f}\n")
-            
-            f.write("\n=== Equilibrium Check ===\n")
-            f.write("To prove the analysis is working, we check if the bolt forces balance the applied load.\n")
-            f.write("Note: For Shear (Mx), the bolt reaction moment should match the applied moment.\n")
-            f.write("      For Tension (My, Mz), the bolt reaction will be LESS than the applied moment\n")
-            f.write("      because the balancing compression force from the plate is not included in bolt forces.\n\n")
-        
-        diff_fx = applied_at_c.Fx + reaction_at_c.Fx # Reaction forces should be opposite? 
-        # Wait, equivalent_load returns the FORCE exerted BY the bolts.
-        # If applied load is F, bolts must provide -F. 
-        # So sum should be zero? Or do we compare magnitudes?
-        # Usually Analysis returns forces ON the bolts.
-        # If Load is Force ON connection.
-        # Bolt Force is Force ON bolt (resisting).
-        # So Applied + Reaction should be ~0.
-        
-        # Let's check the signs in the results.
-        # Applied Fy = -100,000.
-        # Bolt Reaction Fy = -72,111.
-        # This implies Bolt Forces are in the same direction?
-        # If Applied is Down (-Y), Bolts should push Up (+Y).
-        # The result shows Bolts having negative Fy sum.
-        # This suggests Bolt.forces stores the force EXERTED BY THE PLATE ON THE BOLT (which equals load).
-        # OR it stores the force EXERTED BY THE BOLT ON THE PLATE.
-        
-        # Let's verify the solver sign convention.
-        # In icr.py: ty = -(y - z_ic). Directions.
-        # Fy_i = Fy_raw * scale.
-        # If Fy_raw opposes load...
-        
-        f.write(f"{'Component':<10} {'Applied':<15} {'Bolt Reaction':<15} {'Result':<20}\n")
-        f.write(f"{'Mx':<10} {applied_at_c.Mx:<15.2f} {reaction_at_c.Mx:<15.2f} {'OK' if abs(applied_at_c.Mx - reaction_at_c.Mx) < 1.0 else 'Diff (See Note)'}\n")
-        
-        # Shear Force Check
-        # The ICR method ensures moment equilibrium. Shear force equilibrium depends on the center of rotation.
-        # If ICR is far away, it's mostly shear.
-        f.write(f"{'Fy':<10} {applied_at_c.Fy:<15.2f} {reaction_at_c.Fy:<15.2f} {'(Shear Balance)'}\n")
-        f.write(f"{'Fz':<10} {applied_at_c.Fz:<15.2f} {reaction_at_c.Fz:<15.2f} {'(Shear Balance)'}\n")
-
-        # 3. Loads at ICR (if applicable)
-        if res.icr_point:
-            icr_y, icr_z = res.icr_point
-            
-            # Applied Load transformed to ICR
-            applied_at_icr = load.equivalent_at((0, icr_y, icr_z))
-            f.write(f"Applied Load at ICR (0, {icr_y:.1f}, {icr_z:.1f}):\n")
-            f.write(f"  Fx={applied_at_icr.Fx:.2f}, Fy={applied_at_icr.Fy:.2f}, Fz={applied_at_icr.Fz:.2f}\n")
-            f.write(f"  Mx={applied_at_icr.Mx:.2f}, My={applied_at_icr.My:.2f}, Mz={applied_at_icr.Mz:.2f}\n")
-
-            # Reaction Load from Bolts at ICR
-            reaction_at_icr = res.equivalent_load((icr_y, icr_z))
-            f.write(f"Bolt Reaction at ICR (0, {icr_y:.1f}, {icr_z:.1f}):\n")
-            f.write(f"  Fx={reaction_at_icr.Fx:.2f}, Fy={reaction_at_icr.Fy:.2f}, Fz={reaction_at_icr.Fz:.2f}\n")
-            f.write(f"  Mx={reaction_at_icr.Mx:.2f}, My={reaction_at_icr.My:.2f}, Mz={reaction_at_icr.Mz:.2f}\n")
+        # Note: equivalent_load on result (reaction) is not currently implemented in LoadedBoltConnection
+        # so we skip the equilibrium check printout here.
         
         f.write("\n=== Individual Bolt Forces ===\n")
-        f.write(f"{'Bolt':<6} {'Fx (Ten)':<12} {'Fy (Shr)':<12} {'Fz (Shr)':<12} {'V_res':<12}\n")
+        f.write(f"{'Bolt':<6} {'Fx (Shr)':<12} {'Fy (Shr)':<12} {'Fz (Ten)':<12} {'V_res':<12}\n")
         
         sum_fx = 0.0
         sum_fy = 0.0
@@ -223,7 +148,7 @@ def main():
             sum_fy += fy
             sum_fz += fz
             
-            v_res = (fy**2 + fz**2)**0.5
+            v_res = (fx**2 + fy**2)**0.5
             f.write(f"{i+1:<6} {fx:<12.2f} {fy:<12.2f} {fz:<12.2f} {v_res:<12.2f}\n")
             
         f.write(f"{'-'*60}\n")
@@ -250,17 +175,13 @@ def main():
     tension_plot_file = output_path / "bolt_analysis_plot_tension.svg"
     
     print(f"Generating shear plot to {shear_plot_file}...")
-    plotting.plot_bolt_result(
-        res,
-        mode="shear",
+    res.plot_shear(
         save_path=shear_plot_file,
         show=False
     )
     
     print(f"Generating tension plot to {tension_plot_file}...")
-    plotting.plot_bolt_result(
-        res,
-        mode="axial",
+    res.plot_tension(
         save_path=tension_plot_file,
         show=False
     )

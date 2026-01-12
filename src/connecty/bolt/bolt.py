@@ -36,11 +36,14 @@ AISC_PRETENSION_KN: dict[int, dict[str, float]] = {
 }
 
 
+
+
 @dataclass(slots=True)
 class BoltParams:
     diameter: float
     grade: str | None = None
     threaded_in_shear_plane: bool = True
+    E: float = 210000.0  # Modulus of elasticity (default steel) [N/mm^2] if using mm
 
     fy: float = field(init=False)
     fu: float = field(init=False)
@@ -48,8 +51,9 @@ class BoltParams:
     Fnv: float = field(init=False)
     Fnv_N: float = field(init=False)
     Fnv_X: float = field(init=False)
-    T_b: float = field(init=False)
+    T_b: float = field(init=False) # pretension force
     area: float = field(init=False)
+    stiffness: float = field(init=False)
 
     def __post_init__(self) -> None:
         self.recalculate()
@@ -73,6 +77,8 @@ class BoltParams:
         
         self.Fnv = float(self.Fnv_N if self.threaded_in_shear_plane else self.Fnv_X)
         self.T_b = float(AISC_PRETENSION_KN[self.diameter][self.grade])
+        # Stiffness depends on grip length, so it is assigned by BoltConnection.
+        self.stiffness = float("nan")
 
     def update_shear_plane_threads(self, included: bool) -> None:
         self.threaded_in_shear_plane = included
@@ -85,6 +91,11 @@ class Bolt:
     position: tuple[float, float]
     forces: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=float))
     index: Optional[int] = field(default=None)
+    k: float = field(init=False)
+
+    def __post_init__(self) -> None:
+        # Assigned by BoltConnection based on grip length.
+        self.k = float("nan")
 
     def apply_force(self, fx: float, fy: float, fz: float) -> None:
         self.forces += np.array([fx, fy, fz], dtype=float)
@@ -157,12 +168,23 @@ class BoltConnection:
     bolt_group: BoltGroup
     plate: Plate
     n_shear_planes: int # this can be used when both shear interfaces are identical
+    L_grip: float # grip length (lenght of the bolt that is in contact with the plate, it is equivalently total plate(s) thickness)
     threaded_in_shear_plane: Optional[bool] = None #this overrides the bolt params
     
     def __post_init__(self) -> None:
         if self.threaded_in_shear_plane is not None:
             for bolt in self.bolt_group.bolts:
                 bolt.params.update_shear_plane_threads(self.threaded_in_shear_plane)
+
+        if self.L_grip <= 0.0:
+            raise ValueError("L_grip must be > 0 to compute bolt stiffness")
+
+        # Axial stiffness per bolt (linear spring): k = E*A/L_grip
+        # Note: We ignore thread pitch per your instruction.
+        for bolt in self.bolt_group.bolts:
+            k = float(bolt.params.E * bolt.params.area / self.L_grip)
+            bolt.params.stiffness = k
+            bolt.k = k
 
     def analyze(self, load: "Load", shear_method: str = "elastic", tension_method: str = "conservative") -> "LoadedBoltConnection":
         from .analysis import LoadedBoltConnection

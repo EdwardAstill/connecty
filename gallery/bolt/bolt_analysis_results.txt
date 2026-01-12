@@ -2,67 +2,40 @@
 Bolts: 9 x 20mm A325
 Layout: 3x3 grid @ 80x80mm
 Plate: 400.0x400.0x12mm (Fy=350, Fu=450)
-Load: Fx=0.00, Fy=0.00, Fz=10000.00, My=0.00, Mz=0.00
+Load: Fx=10000.00, Fy=0.00, Fz=1000.00, Mx=10000000.00, My=5000000.00, Mz=200000.00
 
 === Analysis Results (Global) ===
 Shear Method: icr
 Tension Method: accurate
-ICR Point: (-1000000.0, 0.0)
-Applied Load at Centroid (0, 0.0, 0.0):
-  Fx=0.00, Fy=0.00, Fz=10000.00
-  Mx=1000000.00, My=0.00, Mz=0.00
-  
-Applied Load at ICR (0, -1000000.0, 0.0):
-  Fx=0.00, Fy=0.00, Fz=10000.00
-  Mx=10001000000.00, My=0.00, Mz=0.00
-Bolt Reaction at Centroid (0, 0.0, 0.0):
-  Fx=0.00, Fy=0.00, Fz=10000.00
-  Mx=42.67, My=0.00, Mz=0.00
-Bolt Reaction at ICR (0, -1000000.0, 0.0):
-  Fx=0.00, Fy=0.00, Fz=10000.00
-  Mx=10000000042.67, My=0.00, Mz=0.00
-
-=== Equilibrium Check ===
-To prove the analysis is working, we check if the bolt forces balance the applied load.
-Note: For Shear (Mx), the bolt reaction moment should match the applied moment.
-      For Tension (My, Mz), the bolt reaction will be LESS than the applied moment
-      because the balancing compression force from the plate is not included in bolt forces.
-
-Component  Applied         Bolt Reaction   Result              
-Mx         1000000.00      42.67           Diff (See Note)
-Fy         0.00            0.00            (Shear Balance)
-Fz         10000.00        10000.00        (Shear Balance)
-Applied Load at ICR (0, -1000000.0, 0.0):
-  Fx=0.00, Fy=0.00, Fz=10000.00
-  Mx=10001000000.00, My=0.00, Mz=0.00
-Bolt Reaction at ICR (0, -1000000.0, 0.0):
-  Fx=0.00, Fy=0.00, Fz=10000.00
-  Mx=10000000042.67, My=0.00, Mz=0.00
+ICR Point: (0.0, 84.215531318478)
+Applied Load at Centroid (0.0, 0.0, 0):
+  Fx=10000.00, Fy=0.00, Fz=1000.00
+  Mx=10000000.00, My=5000000.00, Mz=200000.00
 
 === Individual Bolt Forces ===
-Bolt   Fx (Ten)     Fy (Shr)     Fz (Shr)     V_res       
-1      0.00         0.09         1111.11      1111.11     
-2      0.00         0.09         1111.11      1111.11     
-3      0.00         0.09         1111.11      1111.11     
-4      0.00         0.00         1111.11      1111.11     
-5      0.00         0.00         1111.11      1111.11     
-6      0.00         0.00         1111.11      1111.11     
-7      0.00         -0.09        1111.11      1111.11     
-8      0.00         -0.09        1111.11      1111.11     
-9      0.00         -0.09        1111.11      1111.11     
+Bolt   Fx (Shr)     Fy (Shr)     Fz (Ten)     V_res       
+1      1415.94      -689.80      2931.27      1575.03     
+2      1575.03      0.00         2555.01      1575.03     
+3      1415.94      689.80       2178.76      1575.03     
+4      1141.93      -1084.77     5608.49      1575.03     
+5      1575.03      0.00         5232.23      1575.03     
+6      1141.93      1084.77      4855.97      1575.03     
+7      82.88        -1572.85     8285.70      1575.03     
+8      1568.43      0.00         7909.45      1568.43     
+9      82.88        1572.85      7533.19      1575.03     
 ------------------------------------------------------------
-Total  0.00         0.00         10000.00    
+Total  10000.00     0.00         47090.07    
 
 === Check Results (AISC) ===
 Bolt   Shear      Tension    Combined   Bearing    Tearout   
-1      0.013      0.000      0.000      0.006      0.011     
-2      0.013      0.000      0.000      0.006      0.011     
-3      0.013      0.000      0.000      0.006      0.011     
-4      0.013      0.000      0.000      0.006      0.011     
-5      0.013      0.000      0.000      0.006      0.011     
-6      0.013      0.000      0.000      0.006      0.011     
-7      0.013      0.000      0.000      0.006      0.011     
-8      0.013      0.000      0.000      0.006      0.011     
-9      0.013      0.000      0.000      0.006      0.011     
+1      0.018      0.020      0.020      0.008      0.016     
+2      0.018      0.017      0.017      0.008      0.016     
+3      0.018      0.015      0.015      0.008      0.016     
+4      0.018      0.038      0.038      0.008      0.016     
+5      0.018      0.036      0.036      0.008      0.016     
+6      0.018      0.033      0.033      0.008      0.016     
+7      0.018      0.057      0.057      0.008      0.016     
+8      0.018      0.054      0.054      0.008      0.016     
+9      0.018      0.052      0.052      0.008      0.016     
 
-Slip Check (Group): 27.155
+Slip Check (Group): 0.000

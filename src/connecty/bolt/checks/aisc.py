@@ -46,12 +46,12 @@ def check_aisc(
     results = {}
 
     # apply prying factor if applicable to get tension force prying factor should already have been applied
-    T_u = fxs
+    T_u = fzs
     # calculate shear force magnitude
-    V_u = [np.sqrt(x**2 + y**2) for x, y in zip(fys, fzs)]
+    V_u = [np.sqrt(x**2 + y**2) for x, y in zip(fxs, fys)]
 
     # Applied forces (Resultant)
-    V_u_total = np.sqrt((sum(fys))**2 + (sum(fzs))**2)
+    V_u_total = np.sqrt((sum(fxs))**2 + (sum(fys))**2)
 
     # perform checks
     # per bolt checks
