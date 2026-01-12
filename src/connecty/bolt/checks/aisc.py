@@ -60,6 +60,11 @@ def check_aisc(
     U_combined = []
     U_bearing = []
     U_tearout = []
+    f_rv = []
+    fp_nt = []
+    l_c = []
+    R_bear = []
+    R_tear = []
     
     phi_tension = 0.75
     phi_shear = 0.75
@@ -79,12 +84,12 @@ def check_aisc(
         # combined check
         # f_rv for THIS bolt
         f_rv = V_u[i] / (bolt.params.area * n_s) if bolt.params.area > 0 else 0.0
-        
+        f_rv.append(f_rv)
         # Modification for combined tension and shear
         term = (bolt.params.Fnt / (phi_shear * bolt.params.Fnv)) * f_rv
         F_nt_prime = 1.3 * bolt.params.Fnt - term
         F_nt_prime = min(bolt.params.Fnt, max(0, F_nt_prime))
-        
+        fp_nt.append(F_nt_prime)
         R_n_combined = F_nt_prime * bolt.params.area
         R_d_combined = phi_tension * R_n_combined
         U_combined.append(T_u[i] / R_d_combined if R_d_combined > 0 else 0.0)
@@ -94,15 +99,20 @@ def check_aisc(
         strength = plate.fu
         
         R_n_bearing = 2.4 * bolt.params.diameter * plate.thickness * strength
+        R_bear.append(R_n_bearing)
         R_d_bearing = phi_bearing * R_n_bearing
         U_bearing.append(V_u[i] / R_d_bearing if R_d_bearing > 0 else 0.0)
 
         # tearout check
-        # Approximate check assuming lc = d (conservative for edge distance > 2d, non-conservative for small edge)
-        # The previous code used 1.2 * d * t * fy (which I changed to fu).
+        # Approximate check assuming lc = closest distance to edge of plate from center subtract the radius of the bolt hole
+        lc = min(abs(bolt.position[0] - plate.x_min), abs(bolt.position[0] - plate.x_max), abs(bolt.position[1] - plate.y_min), abs(bolt.position[1] - plate.y_max)) - bolt.params.diameter / 2
         R_n_tearout = 1.2 * bolt.params.diameter * plate.thickness * strength
+        R_tear.append(R_n_tearout)
         R_d_tearout = phi_bearing * R_n_tearout
         U_tearout.append(V_u[i] / R_d_tearout if R_d_tearout > 0 else 0.0)
+
+        # l_c for THIS bolt
+        l_c.append(lc)
 
 
     # group checks
