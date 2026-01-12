@@ -138,5 +138,12 @@ def check_aisc(
     results["slip"] = U_slip
     results["bearing"] = U_bearing
     results["tearout"] = U_tearout
+    results["governing"] = [max([("Tension", U_tension[i]), ("Shear", U_shear[i]), ("Combined", U_combined[i]), ("Bearing", U_bearing[i]), ("Tearout", U_tearout[i])], key=lambda x: x[1])[0] for i in range(len(bolts))]
+
+    results["f_rv"] = f_rv
+    results["fp_nt"] = fp_nt
+    results["l_c"] = l_c
+    results["R_bear"] = R_bear
+    results["R_tear"] = R_tear
 
     return results
