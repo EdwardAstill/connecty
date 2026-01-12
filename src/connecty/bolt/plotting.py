@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.patches import Circle, Rectangle
 from matplotlib.lines import Line2D
+from matplotlib.legend import Legend
 
 from .load import Load
 from .bolt import BoltGroup
@@ -148,9 +149,17 @@ def _plot_distribution(
         bolt_diameter * 4.0,
     )
 
+    # Arrow scaling (shear only)
+    #
+    # IMPORTANT: keep arrow math in the same units as `b.forces` (N).
+    # The color values above are converted to kN, but the arrow vectors are not.
     arrow_scale = 1.0
     if mode == "shear":
-        arrow_scale = 0.3 * extent / force_max if force_max > 1e-12 else 1.0
+        shear_mags_n = [float(np.hypot(b.forces[0], b.forces[1])) for b in bolts]
+        shear_max_n = max(shear_mags_n) if shear_mags_n else 0.0
+        # Make the *longest* arrow about 25% of the plot extent.
+        arrow_target_len = 0.25 * extent
+        arrow_scale = arrow_target_len / shear_max_n if shear_max_n > 1e-12 else 1.0
 
     for i, b in enumerate(bolts):
         value = vals[i]
@@ -254,7 +263,7 @@ def _plot_distribution(
     ax.set_xlim(plate.x_min - margin, plate.x_max + margin)
     ax.set_ylim(plate.y_min - margin, plate.y_max + margin)
 
-    _plot_applied_force(
+    applied_legend = _plot_applied_force(
         ax=ax,
         load=result.load,
         bolt_group=bolt_group,
@@ -263,6 +272,25 @@ def _plot_distribution(
         mode=mode,
         force_scale=force_scale,
     )
+
+    if mode == "shear" and result.icr_point is not None:
+        icr_x, icr_y = result.icr_point
+        icr_handle = Line2D(
+            [0],
+            [0],
+            marker="o",
+            linestyle="None",
+            markerfacecolor="none",
+            markeredgecolor="black",
+            markeredgewidth=2,
+            color="black",
+        )
+        icr_text = f"x={icr_x:.2f}, y={icr_y:.2f} {length_unit}"
+
+        # Keep Applied Load legend (top-left) and add ICR legend (top-right).
+        if applied_legend is not None:
+            ax.add_artist(applied_legend)
+        ax.legend([icr_handle], [icr_text], loc="upper right", title="ICR", framealpha=0.9)
 
     title = f"Bolt Connection Analysis ({mode.title()})\n"
     title += f"{bolt_group.n} × {bolt_diameter:.1f}{length_unit} bolts"
@@ -373,83 +401,13 @@ def _plot_applied_force(
     mode: Literal["shear", "tension"],
     extent: float | None = None, # kept for backward compatibility if needed, but unused in logic below if we use ax limits
     force_scale: float = 1.0,
-) -> None:
+) -> Legend | None:
     """Plot applied load location and annotate key components."""
     x_loc, y_loc, _ = load.location
     ax.plot(x_loc, y_loc, "kx", markersize=10, markeredgewidth=2, label="Load Location", zorder=5)
 
-    # Plot moment vectors if extent is provided and moments exist
-    if mode != "shear" and (abs(load.Mx) > 1e-6 or abs(load.My) > 1e-6):
-        # Get plot limits to determine scaling
-        xmin, xmax = ax.get_xlim()
-        ymin, ymax = ax.get_ylim()
-        
-        plot_dx = abs(xmax - xmin)
-        plot_dy = abs(ymax - ymin)
-        max_dim = max(plot_dx, plot_dy)
-
-        # Determine scale based on max dimension
-        max_m = max(abs(load.Mx), abs(load.My))
-        if max_m > 1e-9:
-            scale = (0.15 * max_dim) / max_m
-            head_width = max_dim * 0.02
-            head_length = max_dim * 0.03
-
-            if abs(load.Mx) > 1e-6:
-                dx = load.Mx * scale
-                # Mx is vector along X axis
-                ax.arrow(
-                    x_loc,
-                    y_loc,
-                    dx,
-                    0,
-                    head_width=head_width,
-                    head_length=head_length,
-                    fc="purple",
-                    ec="purple",
-                    linewidth=2,
-                    zorder=6,
-                    length_includes_head=True,
-                    alpha=0.8,
-                )
-                ax.text(
-                    x_loc + dx,
-                    y_loc,
-                    "Mx",
-                    color="purple",
-                    fontsize=9,
-                    fontweight="bold",
-                    ha="left" if dx > 0 else "right",
-                    va="center",
-                )
-
-            if abs(load.My) > 1e-6:
-                dy = load.My * scale
-                # My is vector along Y axis
-                ax.arrow(
-                    x_loc,
-                    y_loc,
-                    0,
-                    dy,
-                    head_width=head_width,
-                    head_length=head_length,
-                    fc="orange",
-                    ec="orange",
-                    linewidth=2,
-                    zorder=6,
-                    length_includes_head=True,
-                    alpha=0.8,
-                )
-                ax.text(
-                    x_loc,
-                    y_loc + dy,
-                    "My",
-                    color="orange",
-                    fontsize=9,
-                    fontweight="bold",
-                    ha="center",
-                    va="bottom" if dy > 0 else "top",
-                )
+    # Intentionally do not draw Mx/My vectors on the tension plot.
+    # The tension figure already contains NA/pressure visuals; adding moment arrows tends to clutter it.
 
     labels: list[str] = []
     
@@ -469,9 +427,10 @@ def _plot_applied_force(
         if abs(load.Fz) > 1e-6:
             labels.append(f"Fz (axial) = {load.Fz * force_scale:.2f} {force_unit}")
 
+        # Keep Mx/My in the legend for reporting, but do not draw them graphically.
         Cx, Cy = bolt_group.Cx, bolt_group.Cy
         load_at_centroid = load.equivalent_at((Cx, Cy, 0.0))
-        
+
         if abs(load_at_centroid.Mx) > 1e-6:
             labels.append(f"Mx = {load_at_centroid.Mx * force_scale:.2f} {force_unit}·{length_unit}")
         if abs(load_at_centroid.My) > 1e-6:
@@ -480,7 +439,9 @@ def _plot_applied_force(
     if labels:
         text = "\n".join(labels)
         dummy_lines = [Line2D([0], [0], color="black", linestyle="None", marker="x")]
-        ax.legend(dummy_lines, [text], loc="upper left", title="Applied Load", framealpha=0.9)
+        return ax.legend(dummy_lines, [text], loc="upper left", title="Applied Load", framealpha=0.9)
+
+    return None
 
 
 def _plot_plate(ax: plt.Axes, plate: Plate) -> None:
@@ -567,7 +528,7 @@ def _plot_neutral_axes(*, ax: plt.Axes, result: "LoadedBoltConnection", bolt_gro
             # Simple approximation for visualization if solver didn't return NA
             comp_edge_x = plate.x_min if My > 0.0 else plate.x_max
             na_x = (float(bolt_group.Cx) + comp_edge_x) / 2.0 # Rough guess
-        ax.axvline(na_x, color="blue", linestyle="--", linewidth=1.5, alpha=0.7, label="NA (My)", zorder=2)
+        ax.axvline(na_x, color="blue", linestyle="--", linewidth=1.5, alpha=0.7, label="Neutral Axis (approx)", zorder=2)
 
     if abs(Mx) > 1e-6:
         # Bending around X axis -> varies with Y (sigma = M*y/I)
@@ -577,4 +538,4 @@ def _plot_neutral_axes(*, ax: plt.Axes, result: "LoadedBoltConnection", bolt_gro
         else:
             comp_edge_y = plate.y_min if Mx < 0.0 else plate.y_max # Check sign convention
             na_y = (float(bolt_group.Cy) + comp_edge_y) / 2.0
-        ax.axhline(na_y, color="green", linestyle="--", linewidth=1.5, alpha=0.7, label="NA (Mx)", zorder=2)
+        ax.axhline(na_y, color="green", linestyle="--", linewidth=1.5, alpha=0.7, label="Neutral Axis (approx)", zorder=2)

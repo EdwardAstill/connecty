@@ -12,7 +12,6 @@ class LoadedBoltConnection:
     bolt_connection: BoltConnection
     load: Load
     shear_method: Literal["elastic", "icr"]
-    tension_method: str = "strain_compatibility"
     icr_point: tuple[float, float] | None = None
     neutral_axis: tuple[float, float] | None = None
     plate_pressure: np.ndarray | None = None

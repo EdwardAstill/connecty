@@ -1,6 +1,11 @@
-"""Tension (out-of-plane) solver using a strain-compatibility / fiber method.
+"""Not sure what to call this method.
 
-This implements the method described in `documentation/theory/stain compatabilty method.md`.
+Assumes compression is from plate only
+Pretension neglected
+Linear elastic assumption (bolt and plate are elastic their deforemation and force is proportional to distance from neutral axis)
+plate is rigid
+Bolts cannot provide compression
+Plate cannot provide tension
 
 Conventions (consistent with `analysis.py`):
 - Bolt axial forces are positive in tension (+Fz).
@@ -13,8 +18,6 @@ Conventions (consistent with `analysis.py`):
 from __future__ import annotations
 
 import numpy as np
-
-
 
 def cells_from_rectangle(
     *,

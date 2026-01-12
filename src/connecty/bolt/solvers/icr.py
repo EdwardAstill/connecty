@@ -1,18 +1,20 @@
 import math
 import numpy as np
-
-
-
-import math
-import numpy as np
+from typing import Callable, Sequence
 
 # ----------------------------
 # NEW: small 2D Nelder–Mead
 # ----------------------------
-def nelder_mead_2d(f, x0, step=1.0, tol=1e-8, max_iter=500):
+def nelder_mead_2d(
+    f: Callable[[np.ndarray], float],
+    x0: Sequence[float] | np.ndarray,
+    step: float = 1.0,
+    tol: float = 1e-8,
+    max_iter: int = 500,
+) -> tuple[np.ndarray, float]:
     """
     Very small Nelder–Mead for 2D (no scipy).
-    Minimizes scalar f(xy) where xy is shape (2,).
+    Minimizes scalar f(x,y) where x,y are floats.
     """
     x0 = np.asarray(x0, dtype=float)
 
@@ -85,22 +87,18 @@ def nelder_mead_2d(f, x0, step=1.0, tol=1e-8, max_iter=500):
 # PATCH: replace _calculate_final_state
 # ----------------------------
 def _calculate_final_state(
-    bolt_coords,
-    x_ic,
-    y_ic,
-    Fx,
-    Fy,
-    Mz_total,
-    mu,
-    lam,
-    delta_max,
-    scale_mode="magnitude",
-):
+    bolt_coords: np.ndarray,
+    x_ic: float,
+    y_ic: float,
+    Fx: float,
+    Fy: float,
+    Mz_total: float,
+    mu: float,
+    lam: float,
+    delta_max: float,
+) -> tuple[np.ndarray, np.ndarray, tuple[float, float]]:
     """
     Computes bolt forces for a given ICR.
-    scale_mode:
-      - "magnitude": scale to match |P| (your prior behavior, requires direction to be right)
-      - "projection": least-squares scalar scale to best match (Fx,Fy) even if small misalignment
     Handles pure torsion (P ~ 0) by scaling to match moment instead of shear.
     """
     bolt_coords = np.asarray(bolt_coords, dtype=float)
@@ -110,7 +108,18 @@ def _calculate_final_state(
     dist_i = np.where(dist_i < 1e-9, 1e-9, dist_i)
     c_max = float(np.max(dist_i))
 
-    Ri = (1.0 - np.exp(-mu * (dist_i / c_max) * (c_max / delta_max))) ** lam
+    # IMPORTANT:
+    # `delta_max` must be in the same length units as `bolt_coords`.
+    #
+    # Many reference values for ICR methods use `delta_max = 8.64` (inches).
+    # If the geometry is in mm, that small delta can saturate the model
+    # (Ri ~ 1.0 everywhere), which breaks the moment matching and can lead to
+    # a "no shear" solution in symmetric layouts.
+    #
+    # To keep the solver unit-agnostic, we clamp `delta_max` to at least `c_max`
+    # (same units as coordinates).
+    delta_eff = float(max(delta_max, c_max))
+    Ri = (1.0 - np.exp(-mu * (dist_i / delta_eff))) ** lam
 
     # CCW tangential unit vectors
     tx = -r_vecs[:, 1] / dist_i
@@ -140,30 +149,19 @@ def _calculate_final_state(
     if V_int_mag < 1e-12:
         return np.zeros(len(bolt_coords)), np.zeros(len(bolt_coords)), (float(x_ic), float(y_ic))
 
-    if scale_mode == "projection":
-        # least squares scalar: minimize || scale*V_int - P_applied ||^2
-        scale = (Fx * V_int_x + Fy * V_int_y) / max(V_int_sq, 1e-30)
-        # fold sign into rot_sign (keep scale >= 0)
-        rot_sign = 1.0
-        if scale < 0.0:
-            scale = -scale
-            rot_sign = -1.0
-    else:
-        # match magnitude, then choose sign to align with applied
-        scale = P / V_int_mag
-        rot_sign = 1.0
-        dot = (V_int_x * Fx + V_int_y * Fy) / (V_int_mag * P)
-        if dot < 0.0:
-            rot_sign = -1.0
+
+    # match magnitude, then choose sign to align with applied
+    scale = P / V_int_mag
+    rot_sign = 1.0
+    dot = (V_int_x * Fx + V_int_y * Fy) / (V_int_mag * P)
+    if dot < 0.0:
+        rot_sign = -1.0
 
     bolt_forces_x = Ri * tx * scale * rot_sign
     bolt_forces_y = Ri * ty * scale * rot_sign
     return bolt_forces_x, bolt_forces_y, (float(x_ic), float(y_ic))
 
 
-# ----------------------------
-# PATCH: replace solve_bolt_icr (adds 2D solver)
-# ----------------------------
 def solve_bolt_icr(
     bolt_coords: np.ndarray,
     Fx: float,
@@ -175,7 +173,6 @@ def solve_bolt_icr(
     lam: float = 0.55,
     delta_max: float = 8.64,
     tolerance: float = 1e-6,
-    method: str = "auto",   # "1d", "2d", or "auto"
 ) -> tuple[np.ndarray, np.ndarray, tuple[float, float, int]]:
     bolt_coords = np.array(bolt_coords, dtype=float)
     centroid = np.mean(bolt_coords, axis=0)
@@ -194,13 +191,16 @@ def solve_bolt_icr(
     moment_scale = max(abs(Mz_centroid), 1.0)
 
     def moment_about_centroid(bfx, bfy):
-        r = bolt_coords - np.array([Cx, Cy], dtype=float)
-        return float(np.sum(r[:, 0] * bfy - r[:, 1] * bfx))
+        r = bolt_coords - np.array([Cx, Cy], dtype=float) # relative to centroid
+        return float(np.sum(r[:, 0] * bfy - r[:, 1] * bfx)) # moment about centroid (sum of all bolt moments)
 
     def objective_xy(xy):
+        """
+        Objective function to minimize. Returns a residual value.
+        """
         x_ic, y_ic = float(xy[0]), float(xy[1])
         bfx, bfy, _ = _calculate_final_state(
-            bolt_coords, x_ic, y_ic, Fx, Fy, Mz_centroid, mu, lam, delta_max, scale_mode="projection"
+            bolt_coords, x_ic, y_ic, Fx, Fy, Mz_centroid, mu, lam, delta_max
         )
         dFx = float(np.sum(bfx) - Fx)
         dFy = float(np.sum(bfy) - Fy)
@@ -209,45 +209,20 @@ def solve_bolt_icr(
         # nondimensional weighted SSE
         return (dFx / force_scale) ** 2 + (dFy / force_scale) ** 2 + (dMz / (moment_scale / max(L_char, 1e-9))) ** 2
 
-    # ----------------------------
-    # 1D solve (your current approach), unchanged logic
-    # ----------------------------
-    def solve_1d():
-        if P < 1e-12:
-            # pure torsion: ICR at centroid
-            return _calculate_final_state(bolt_coords, Cx, Cy, Fx, Fy, Mz_centroid, mu, lam, delta_max, scale_mode="magnitude")
 
-        moment_sign = 1.0 if Mz_centroid >= 0 else -1.0
-        perp_x = -Fy / P
-        perp_y =  Fx / P
-        search_dir_x = moment_sign * perp_x
-        search_dir_y = moment_sign * perp_y
-
-        def get_residual_r(r):
-            icr_x = Cx + r * search_dir_x
-            icr_y = Cy + r * search_dir_y
-            # Evaluate objective but on the 1D line; use projection scaling so force residual is meaningful
-            return objective_xy([icr_x, icr_y])
-
-        r = golden_search(0.01, 1e7, get_residual_r, tolerance=tolerance, max_iter=10000)
-        x_ic = Cx + r * search_dir_x
-        y_ic = Cy + r * search_dir_y
-        return _calculate_final_state(bolt_coords, x_ic, y_ic, Fx, Fy, Mz_centroid, mu, lam, delta_max, scale_mode="projection")
-
-    # ----------------------------
-    # 2D solve
-    # ----------------------------
-    def solve_2d(seed_xy=None):
-        # Seed: 1D result if available; otherwise centroid
-        if seed_xy is None:
-            seed_xy = np.array([Cx, Cy], dtype=float)
-
+    def solve_2d():
+        """
+        Solve for the ICR using
+        1. A rough search around the controid
+        2. Refined search 2D Nelder–Mead solver.
+        """
         # Coarse multi-start around centroid to avoid bad simplex starts
+
         # Search radius based on required lever arm ~ |Mz|/P (clamped)
         r_req = abs(Mz_centroid) / max(P, 1e-9)
         R = max(0.5 * L_char, min(5.0 * L_char, r_req if np.isfinite(r_req) else 2.0 * L_char))
 
-        candidates = [seed_xy]
+        candidates = [np.array([Cx, Cy], dtype=float)]
         # add a small ring of candidates
         for ang in np.linspace(0.0, 2.0 * math.pi, 12, endpoint=False):
             candidates.append(np.array([Cx + R * math.cos(ang), Cy + R * math.sin(ang)], dtype=float))
@@ -267,37 +242,12 @@ def solve_bolt_icr(
         return _calculate_final_state(
             bolt_coords, float(xy_star[0]), float(xy_star[1]),
             Fx, Fy, Mz_centroid, mu, lam, delta_max,
-            scale_mode="projection"
         )
 
-    # ----------------------------
-    # Select method
-    # ----------------------------
-    method = method.lower().strip()
-    if method not in ("1d", "2d", "auto"):
-        raise ValueError("method must be '1d', '2d', or 'auto'")
-
-    if method == "1d":
-        return solve_1d()
-
-    if method == "2d":
-        return solve_2d()
-
     # auto: run 1D, check residual, then 2D if needed
-    bfx1, bfy1, icr1 = solve_1d()
-    dFx1 = float(np.sum(bfx1) - Fx)
-    dFy1 = float(np.sum(bfy1) - Fy)
-    dMz1 = float(moment_about_centroid(bfx1, bfy1) - Mz_centroid)
-    f1 = objective_xy([icr1[0], icr1[1]])
+    bfx, bfy, icr = solve_2d()
 
-    # Trigger 2D if force or moment residual is meaningfully nonzero
-    if abs(dFx1) > 1e-3 or abs(dFy1) > 1e-3 or abs(dMz1) > 1e-3:
-        bfx2, bfy2, icr2 = solve_2d(seed_xy=np.array([icr1[0], icr1[1]], dtype=float))
-        f2 = objective_xy([icr2[0], icr2[1]])
-        if f2 < f1:
-            return bfx2, bfy2, icr2
-
-    return bfx1, bfy1, icr1
+    return bfx, bfy, icr
 
 
 def check_icr(bolt_forces_x, bolt_forces_y, icr_point, bolt_coords, Fx, Fy, Mz_centroid) -> None:

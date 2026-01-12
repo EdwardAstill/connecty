@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 from connecty.bolt import BoltConnection, BoltGroup, Plate, Load, BoltParams, layout, plotting
 
@@ -33,17 +34,19 @@ N_SHEAR_PLANES = 1
 
 # Applied Loads
 # System: X-Y Plane (Shear), Z (Axial/Tension)
-LOAD_FX = 10_000   # Shear X (N)
+LOAD_FX = 100_000   # Shear X (N)
 LOAD_FY = 0        # Shear Y (N)
 LOAD_FZ = 1000        # Tension (N)
-LOAD_MX = 10000000 # Torsion (Moment around Z) (Nmm)
-LOAD_MZ = 200000        # Moment X (Nmm)
-LOAD_MY = 5000000        # Moment Y (Nmm)
+# NOTE:
+# In `connecty.bolt.load.Load`, torsion about the bolt-group plane is **Mz**.
+# Mx/My are bending moments about the x/y axes (used by the tension solver).
+LOAD_MZ = 10_000_000  # Torsion (moment about Z) (Nmm)
+LOAD_MX = 200_000     # Moment about X (Nmm)
+LOAD_MY = 5_000_000   # Moment about Y (Nmm)
 LOAD_LOCATION = (0, 0, 0) # (mm)
 
 # Analysis Settings
 SHEAR_METHOD = "icr"      # "elastic" or "icr"
-TENSION_METHOD = "accurate" # "conservative" or "accurate"
 
 # Check Settings
 CHECK_STANDARD = "aisc"
@@ -53,7 +56,7 @@ CHECK_TYPE = "bearing"
 # MAIN SCRIPT
 # ==========================================
 
-def main():
+def main() -> None:
     # 1. Setup
     print("Setting up inputs...")
     output_path = Path(OUTPUT_DIR)
@@ -102,8 +105,8 @@ def main():
     )
     
     # 2. Perform Analysis
-    print(f"Running analysis (Shear: {SHEAR_METHOD}, Tension: {TENSION_METHOD})...")
-    res = conn.analyze(load, shear_method=SHEAR_METHOD, tension_method=TENSION_METHOD)
+    print(f"Running analysis (Shear: {SHEAR_METHOD})")
+    res = conn.analyze(load, shear_method=SHEAR_METHOD)
     
     # 3. Perform Checks
     print(f"Running checks ({CHECK_STANDARD})...")
@@ -122,9 +125,10 @@ def main():
         
         f.write("\n=== Analysis Results (Global) ===\n")
         f.write(f"Shear Method: {res.shear_method}\n")
-        f.write(f"Tension Method: {res.tension_method}\n")
-        if res.icr_point:
-            f.write(f"ICR Point: {res.icr_point}\n")
+        icr_point: tuple[float, float] | None = None
+        if res.icr_point is not None:
+            icr_point = (float(res.icr_point[0]), float(res.icr_point[1]))
+            f.write(f"ICR Point: {icr_point}\n")
         
         # Equivalent load at centroid
         applied_at_c = load.equivalent_at((bg.Cx, bg.Cy, 0))
@@ -136,7 +140,7 @@ def main():
         # so we skip the equilibrium check printout here.
         
         f.write("\n=== Individual Bolt Forces ===\n")
-        f.write(f"{'Bolt':<6} {'Fx (Shr)':<12} {'Fy (Shr)':<12} {'Fz (Ten)':<12} {'V_res':<12}\n")
+        f.write(f"{'Bolt':<6} {'Fx (Shr)':<12} {'Fy (Shr)':<12} {'Fz (Ten)':<12} {'V_res':<12} {'r_to_ICR':<12}\n")
         
         sum_fx = 0.0
         sum_fy = 0.0
@@ -149,13 +153,23 @@ def main():
             sum_fz += fz
             
             v_res = (fx**2 + fy**2)**0.5
-            f.write(f"{i+1:<6} {fx:<12.2f} {fy:<12.2f} {fz:<12.2f} {v_res:<12.2f}\n")
+
+            if icr_point is None:
+                r_to_icr_str = "n/a"
+            else:
+                bx, by = bolt.position
+                r_to_icr = math.hypot(float(bx) - icr_point[0], float(by) - icr_point[1])
+                r_to_icr_str = f"{r_to_icr:.2f}"
+
+            f.write(f"{i+1:<6} {fx:<12.2f} {fy:<12.2f} {fz:<12.2f} {v_res:<12.2f} {r_to_icr_str:<12}\n")
             
         f.write(f"{'-'*60}\n")
         f.write(f"{'Total':<6} {sum_fx:<12.2f} {sum_fy:<12.2f} {sum_fz:<12.2f}\n")
 
         f.write("\n=== Check Results (AISC) ===\n")
-        f.write(f"{'Bolt':<6} {'Shear':<10} {'Tension':<10} {'Combined':<10} {'Bearing':<10} {'Tearout':<10}\n")
+        f.write(
+            f"{'Bolt':<6} {'Shear':<10} {'Tension':<10} {'Combined':<10} {'Bearing':<10} {'Tearout':<10} {'Governing':<10}\n"
+        )
         
         n_bolts = len(bg.bolts)
         for i in range(n_bolts):
@@ -165,7 +179,18 @@ def main():
             bearing_u = check_results["bearing"][i] if "bearing" in check_results else 0.0
             tearout_u = check_results["tearout"][i] if "tearout" in check_results else 0.0
             
-            f.write(f"{i+1:<6} {shear_u:<10.3f} {tension_u:<10.3f} {combined_u:<10.3f} {bearing_u:<10.3f} {tearout_u:<10.3f}\n")
+            utilizations = [
+                ("Shear", float(shear_u)),
+                ("Tension", float(tension_u)),
+                ("Combined", float(combined_u)),
+                ("Bearing", float(bearing_u)),
+                ("Tearout", float(tearout_u)),
+            ]
+            governing = max(utilizations, key=lambda x: x[1])[0] if utilizations else "n/a"
+
+            f.write(
+                f"{i+1:<6} {shear_u:<10.3f} {tension_u:<10.3f} {combined_u:<10.3f} {bearing_u:<10.3f} {tearout_u:<10.3f} {governing:<10}\n"
+            )
 
         if "slip" in check_results and check_results["slip"]:
              f.write(f"\nSlip Check (Group): {check_results['slip'][0]:.3f}\n")
