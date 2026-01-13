@@ -97,6 +97,38 @@ class Bolt:
         # Assigned by BoltConnection based on grip length.
         self.k = float("nan")
 
+    @property
+    def x(self) -> float:
+        return self.position[0]
+
+    @property
+    def y(self) -> float:
+        return self.position[1]
+
+    @property
+    def z(self) -> float:
+        return 0.0
+
+    @property
+    def Fx(self) -> float:
+        return self.forces[0]
+
+    @property
+    def Fy(self) -> float:
+        return self.forces[1]
+
+    @property
+    def Fz(self) -> float:
+        return self.forces[2]
+
+    @property
+    def shear(self) -> float:
+        return float(np.sqrt(self.Fx**2 + self.Fy**2))
+
+    @property
+    def resultant(self) -> float:
+        return float(np.sqrt(self.Fx**2 + self.Fy**2 + self.Fz**2))
+
     def apply_force(self, fx: float, fy: float, fz: float) -> None:
         self.forces += np.array([fx, fy, fz], dtype=float)
 
