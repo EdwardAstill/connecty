@@ -37,7 +37,7 @@ Example usage (Bolts):
 """
 
 from .common import Load
-from .bolt import BoltConnection, BoltGroup, BoltParams, LoadedBoltConnection, Plate
+from .bolt import BoltConnection, BoltGroup, BoltParams, LoadedBoltConnection, Plate, layout
 # from .bolt.checks import BoltCheckDetail, BoltCheckResult
 from .weld import WeldBaseMetal, WeldConnection, WeldParams, WeldResult
 from .weld.checks import WeldCheckDetail, WeldCheckResult
@@ -45,7 +45,9 @@ from .weld.checks import WeldCheckDetail, WeldCheckResult
 __all__ = [
     "Load",
     # Bolts
+    "layout",
     "BoltGroup",
+    "BoltLayout",
     "BoltParams",
     "LoadedBoltConnection",
     "BoltConnection",
