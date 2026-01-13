@@ -83,10 +83,9 @@ def check_aisc(
 
         # combined check
         # f_rv for THIS bolt
-        f_rv = V_u[i] / (bolt.params.area * n_s) if bolt.params.area > 0 else 0.0
-        f_rv.append(f_rv)
+        f_rv.append( V_u[i] / (bolt.params.area * n_s) if bolt.params.area > 0 else 0.0)
         # Modification for combined tension and shear
-        term = (bolt.params.Fnt / (phi_shear * bolt.params.Fnv)) * f_rv
+        term = (bolt.params.Fnt / (phi_shear * bolt.params.Fnv)) * f_rv[i]
         F_nt_prime = 1.3 * bolt.params.Fnt - term
         F_nt_prime = min(bolt.params.Fnt, max(0, F_nt_prime))
         fp_nt.append(F_nt_prime)
