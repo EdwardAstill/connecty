@@ -1,7 +1,6 @@
-import json
 import math
 from pathlib import Path
-from connecty.bolt import BoltConnection, BoltGroup, Plate, Load, BoltParams, layout, plotting
+from connecty.bolt import BoltConnection, BoltGroup, Plate, Load, BoltParams, layout
 
 # ==========================================
 # INPUTS
@@ -91,7 +90,7 @@ def main() -> None:
         bolt_group=bg, 
         plate=plate, 
         n_shear_planes=N_SHEAR_PLANES,
-        L_grip=PLATE_THICKNESS
+        total_thickness=PLATE_THICKNESS
     )
     
     load = Load(

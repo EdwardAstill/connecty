@@ -68,7 +68,7 @@ class LoadedBoltConnection:
             y_max=plate.y_max,
             n_cells_x=50,
             n_cells_y=50,
-            L_grip=self.bolt_connection.L_grip,
+            total_thickness=self.bolt_connection.total_thickness,
         )
         
         # Handle pure axial tension optimization (if desired for speed/stability)

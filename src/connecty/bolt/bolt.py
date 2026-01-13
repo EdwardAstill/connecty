@@ -168,7 +168,9 @@ class BoltConnection:
     bolt_group: BoltGroup
     plate: Plate
     n_shear_planes: int # this can be used when both shear interfaces are identical
-    L_grip: float # grip length (lenght of the bolt that is in contact with the plate, it is equivalently total plate(s) thickness)
+    total_thickness: float  # effective compression length for the plate contact “cells” (k = E*A/t).
+    # Larger total_thickness => softer plate compression response => typically higher bolt tensions (conservative for bolt tension).
+    # If the backing/support is effectively rigid and only the plate is assumed to compress, use the plate thickness.
     threaded_in_shear_plane: Optional[bool] = None #this overrides the bolt params
     
     def __post_init__(self) -> None:
@@ -176,13 +178,13 @@ class BoltConnection:
             for bolt in self.bolt_group.bolts:
                 bolt.params.update_shear_plane_threads(self.threaded_in_shear_plane)
 
-        if self.L_grip <= 0.0:
-            raise ValueError("L_grip must be > 0 to compute bolt stiffness")
+        if self.total_thickness <= 0.0:
+            raise ValueError("total_thickness must be > 0 to compute bolt stiffness")
 
-        # Axial stiffness per bolt (linear spring): k = E*A/L_grip
+        # Axial stiffness per bolt (linear spring): k = E*A/total_thickness
         # Note: We ignore thread pitch per your instruction.
         for bolt in self.bolt_group.bolts:
-            k = float(bolt.params.E * bolt.params.area / self.L_grip)
+            k = float(bolt.params.E * bolt.params.area / self.total_thickness)
             bolt.params.stiffness = k
             bolt.k = k
 

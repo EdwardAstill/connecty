@@ -27,20 +27,20 @@ def cells_from_rectangle(
     y_max: float,
     n_cells_x: int,
     n_cells_y: int,
-    L_grip: float,
+    total_thickness: float,
 ) -> tuple[np.ndarray, float]:
     if n_cells_x <= 0 or n_cells_y <= 0:
         raise ValueError("n_cells_x and n_cells_y must be > 0")
     if x_max <= x_min or y_max <= y_min:
         raise ValueError("invalid bounds")
-    if L_grip <= 0:
-        raise ValueError("L_grip must be > 0")
+    if total_thickness <= 0:
+        raise ValueError("total_thickness must be > 0")
 
     E = 210000.0  # N/mm^2 (MPa)
     dx = (x_max - x_min) / n_cells_x
     dy = (y_max - y_min) / n_cells_y
     A_cell = dx * dy
-    k_cell = E * A_cell / L_grip  # N/mm
+    k_cell = E * A_cell / total_thickness  # N/mm
 
     xs = np.linspace(x_min + dx/2, x_max - dx/2, n_cells_x)
     ys = np.linspace(y_min + dy/2, y_max - dy/2, n_cells_y)
@@ -310,7 +310,7 @@ def solve_bolt_tension(
     margin: float = 10.0,
     n_cells_x: int | None = 50,
     n_cells_y: int | None = 50,
-    L_grip: float | None = None,
+    total_thickness: float | None = None,
     tiny: float = 1e-9,
 ) -> np.ndarray:
     """
@@ -343,7 +343,7 @@ def solve_bolt_tension(
         y_max=float(y_max),
         n_cells_x=n_cells_x,
         n_cells_y=n_cells_y,
-        L_grip=L_grip,
+        total_thickness=total_thickness,
     )
 
     if abs(Mx) < 1e-6 and abs(My) < 1e-6 and Fz > 0:
@@ -394,7 +394,7 @@ def main() -> None:
         n_cells_y=25,
         margin=10.0,
         tiny=1e-9,
-        L_grip=50.0, #mm
+        total_thickness=50.0, #mm
     )
 
     def run_case(name: str, Fz: float, Mx: float, My: float) -> None:
@@ -425,7 +425,7 @@ def main() -> None:
             y_max=float(y_max),
             n_cells_x=int(common_kwargs["n_cells_x"]),
             n_cells_y=int(common_kwargs["n_cells_y"]),
-            L_grip=float(common_kwargs["L_grip"]),
+            total_thickness=float(common_kwargs["total_thickness"]),
         )
 
         theta, c, s, b_f1, c_f1 = solve_neutral_axis(
