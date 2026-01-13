@@ -115,21 +115,6 @@ def check_aisc(
 
 
     # group checks
-    # slip check
-    U_slip = []
-    slip_phi = 1.00 # LRFD standard holes
-    D_u = 1.13
-    h_f = 1.0 if fillers == 1 else 0.85
-    mu = plate.slip_coefficient if plate.slip_coefficient is not None else 0.30 
-    
-    R_n_slip_total = 0.0
-    for i, bolt in enumerate(bolts):
-        k_sc_i = max(0.0, 1.0 - T_u[i] / (D_u * bolt.params.T_b))
-        R_n_slip_i = mu * D_u * h_f * bolt.params.T_b * n_s * k_sc_i
-        R_n_slip_total += R_n_slip_i
-        
-    R_d_slip = slip_phi * R_n_slip_total
-    U_slip.append(V_u_total / R_d_slip if R_d_slip > 0 else 0.0)
 
     results["tension"] = U_tension
     results["shear"] = U_shear
@@ -137,7 +122,6 @@ def check_aisc(
     results["slip"] = U_slip
     results["bearing"] = U_bearing
     results["tearout"] = U_tearout
-    results["governing"] = [max([("Tension", U_tension[i]), ("Shear", U_shear[i]), ("Combined", U_combined[i]), ("Bearing", U_bearing[i]), ("Tearout", U_tearout[i])], key=lambda x: x[1])[0] for i in range(len(bolts))]
 
     results["f_rv"] = f_rv
     results["fp_nt"] = fp_nt
@@ -145,4 +129,26 @@ def check_aisc(
     results["R_bear"] = R_bear
     results["R_tear"] = R_tear
 
+    if connection_type == "slip_critical":
+    # slip check
+        U_slip = []
+        slip_phi = 1.00 # LRFD standard holes
+        D_u = 1.13
+        h_f = 1.0 if fillers == 1 else 0.85
+        mu = plate.slip_coefficient if plate.slip_coefficient is not None else 0.30 
+        
+        R_n_slip_total = 0.0
+        for i, bolt in enumerate(bolts):
+            k_sc_i = max(0.0, 1.0 - T_u[i] / (D_u * bolt.params.T_b))
+            R_n_slip_i = mu * D_u * h_f * bolt.params.T_b * n_s * k_sc_i
+            R_n_slip_total += R_n_slip_i
+            
+        R_d_slip = slip_phi * R_n_slip_total
+        U_slip.append(V_u_total / R_d_slip if R_d_slip > 0 else 0.0)
+        results["slip"] = U_slip
+
+    if connection_type == "slip_critical":
+        results["governing"] = [max([("Tension", U_tension[i]), ("Shear", U_shear[i]), ("Combined", U_combined[i]), ("Bearing", U_bearing[i]), ("Tearout", U_tearout[i]), ("Slip", U_slip[i])], key=lambda x: x[1])[0] for i in range(len(bolts))]
+    else:
+        results["governing"] = [max([("Tension", U_tension[i]), ("Shear", U_shear[i]), ("Combined", U_combined[i]), ("Bearing", U_bearing[i]), ("Tearout", U_tearout[i])], key=lambda x: x[1])[0] for i in range(len(bolts))]
     return results
