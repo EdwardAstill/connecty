@@ -11,7 +11,7 @@ from .solvers.tension import solve_neutral_axis, cells_from_rectangle
 class LoadedBoltConnection:
     bolt_connection: BoltConnection
     load: Load
-    shear_method: Literal["elastic", "icr"]
+    shear_method: Literal["elastic", "icr"] = "icr"
     icr_point: tuple[float, float] | None = None
     neutral_axis: tuple[float, float] | None = None
     plate_pressure: np.ndarray | None = None
