@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import copy
 from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING
 
@@ -6,6 +9,7 @@ if TYPE_CHECKING:
     from .analysis import LoadedBoltConnection
 
 from .plate import Plate
+from .layout import BoltLayout
 import numpy as np
 
 
@@ -63,18 +67,18 @@ class BoltParams:
              raise ValueError("Bolt grade is required")
         if self.grade not in _BOLT_GRADE_PROPERTIES:
              raise ValueError(f"Unknown bolt grade: {self.grade}")
-        
+
         props = _BOLT_GRADE_PROPERTIES[self.grade]
         self.fy = float(props["fy"])
         self.fu = float(props["fu"])
-        
+
         self.area = float(np.pi * (self.diameter**2) / 4.0)
-        
+
         stresses = AISC_GRADE_STRESS[self.grade]
         self.Fnt = float(stresses["Fnt"])
         self.Fnv_N = float(stresses["Fnv_N"])
         self.Fnv_X = float(stresses["Fnv_X"])
-        
+
         self.Fnv = float(self.Fnv_N if self.threaded_in_shear_plane else self.Fnv_X)
         self.T_b = float(AISC_PRETENSION_KN[self.diameter][self.grade])
         # Stiffness depends on grip length, so it is assigned by BoltConnection.
@@ -87,9 +91,16 @@ class BoltParams:
 
 @dataclass(slots=True)
 class Bolt:
+    """A single bolt in the y-z plane.
+
+    Forces convention:
+    - forces[0] = Fx (tension, out-of-plane)
+    - forces[1] = Fy (shear, vertical in section plane)
+    - forces[2] = Fz (shear, horizontal in section plane)
+    """
+
     params: BoltParams
-    position: tuple[float, float]
-    forces: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=float))
+    position: tuple[float, float]  # (y, z)
     index: Optional[int] = field(default=None)
     k: float = field(init=False)
 
@@ -98,43 +109,18 @@ class Bolt:
         self.k = float("nan")
 
     @property
-    def x(self) -> float:
+    def y(self) -> float:
         return self.position[0]
 
     @property
-    def y(self) -> float:
+    def z(self) -> float:
         return self.position[1]
 
-    @property
-    def z(self) -> float:
-        return 0.0
 
-    @property
-    def Fx(self) -> float:
-        return self.forces[0]
-
-    @property
-    def Fy(self) -> float:
-        return self.forces[1]
-
-    @property
-    def Fz(self) -> float:
-        return self.forces[2]
-
-    @property
-    def shear(self) -> float:
-        return float(np.sqrt(self.Fx**2 + self.Fy**2))
-
-    @property
-    def resultant(self) -> float:
-        return float(np.sqrt(self.Fx**2 + self.Fy**2 + self.Fz**2))
-
-    def apply_force(self, fx: float, fy: float, fz: float) -> None:
-        self.forces += np.array([fx, fy, fz], dtype=float)
-
-
-@dataclass(slots=True) # if params are none you should still eb able to find forces on the bolts
+@dataclass(slots=True)
 class BoltGroup:
+    """Internal grouping of Bolt objects in the y-z plane."""
+
     bolts: list[Bolt]
     centroid: tuple[float, float] = field(init=False)
 
@@ -142,9 +128,9 @@ class BoltGroup:
         if not self.bolts:
             raise ValueError("BoltGroup must contain at least one bolt")
 
-        cx = sum(b.position[0] for b in self.bolts) / len(self.bolts)
-        cy = sum(b.position[1] for b in self.bolts) / len(self.bolts)
-        self.centroid = (cx, cy)
+        cy = sum(b.position[0] for b in self.bolts) / len(self.bolts)
+        cz = sum(b.position[1] for b in self.bolts) / len(self.bolts)
+        self.centroid = (cy, cz)
 
     @property
     def n(self) -> int:
@@ -155,72 +141,84 @@ class BoltGroup:
         return [b.position for b in self.bolts]
 
     @property
-    def Cx(self) -> float:
+    def Cy(self) -> float:
         return self.centroid[0]
 
     @property
-    def Cy(self) -> float:
+    def Cz(self) -> float:
         return self.centroid[1]
-
-    def _calculate_properties(self) -> "BoltGroup":
-        """Helper for solvers expecting this method."""
-        return self
 
     @property
     def Ip(self) -> float:
-        # Assuming x, y coordinates
-        x_arr = np.array([b.position[0] for b in self.bolts], dtype=float)
-        y_arr = np.array([b.position[1] for b in self.bolts], dtype=float)
-        
-        dx_arr = x_arr - self.Cx
+        y_arr = np.array([b.position[0] for b in self.bolts], dtype=float)
+        z_arr = np.array([b.position[1] for b in self.bolts], dtype=float)
+
         dy_arr = y_arr - self.Cy
-        
-        Ix = np.sum(dy_arr**2) # Moment of inertia about x-axis (uses y-dist)
-        Iy = np.sum(dx_arr**2) # Moment of inertia about y-axis (uses x-dist)
-        return float(Ix + Iy)
+        dz_arr = z_arr - self.Cz
+
+        Iy = np.sum(dz_arr**2)
+        Iz = np.sum(dy_arr**2)
+        return float(Iy + Iz)
 
     @classmethod
     def create(
         cls,
-        layout: list[tuple[float, float]],
+        layout: BoltLayout,
         params: BoltParams,
     ) -> "BoltGroup":
         bolts = [
-            Bolt(
-                params=params,
-                position=pos,
-            )
-            for pos in layout
+            Bolt(params=copy.copy(params), position=pos)
+            for pos in layout.points
         ]
         return cls(bolts)
 
 
 @dataclass(slots=True)
 class BoltConnection:
-    bolt_group: BoltGroup
+    """A bolt connection in the y-z cross-section plane.
+
+    Args:
+        layout: Bolt positions (y, z).
+        bolt: Bolt parameters (diameter, grade, etc.).
+        plate: Plate geometry and material.
+        n_shear_planes: Number of shear planes.
+        threaded_in_shear_plane: Override bolt params thread setting.
+    """
+
+    layout: BoltLayout
+    bolt: BoltParams
     plate: Plate
-    n_shear_planes: int # this can be used when both shear interfaces are identical
-    total_thickness: float  # effective compression length for the plate contact “cells” (k = E*A/t).
-    # Larger total_thickness => softer plate compression response => typically higher bolt tensions (conservative for bolt tension).
-    # If the backing/support is effectively rigid and only the plate is assumed to compress, use the plate thickness.
-    threaded_in_shear_plane: Optional[bool] = None #this overrides the bolt params
-    
+    n_shear_planes: int
+    threaded_in_shear_plane: Optional[bool] = None
+
+    bolt_group: BoltGroup = field(init=False)
+
     def __post_init__(self) -> None:
+        self.bolt_group = BoltGroup.create(self.layout, self.bolt)
+
         if self.threaded_in_shear_plane is not None:
-            for bolt in self.bolt_group.bolts:
-                bolt.params.update_shear_plane_threads(self.threaded_in_shear_plane)
+            for b in self.bolt_group.bolts:
+                b.params.update_shear_plane_threads(self.threaded_in_shear_plane)
 
-        if self.total_thickness <= 0.0:
-            raise ValueError("total_thickness must be > 0 to compute bolt stiffness")
+        total_thickness = self.plate.thickness
+        if total_thickness <= 0.0:
+            raise ValueError("plate thickness must be > 0 to compute bolt stiffness")
 
-        # Axial stiffness per bolt (linear spring): k = E*A/total_thickness
-        # Note: We ignore thread pitch per your instruction.
-        for bolt in self.bolt_group.bolts:
-            k = float(bolt.params.E * bolt.params.area / self.total_thickness)
-            bolt.params.stiffness = k
-            bolt.k = k
+        for b in self.bolt_group.bolts:
+            k = float(b.params.E * b.params.area / total_thickness)
+            b.params.stiffness = k
+            b.k = k
 
-    def analyze(self, load: "Load", shear_method: str = "elastic", tension_method: str = "conservative") -> "LoadedBoltConnection":
+    def analyze(
+        self,
+        load: "Load",
+        shear_method: str = "elastic",
+        tension_method: str = "conservative",
+    ) -> "LoadedBoltConnection":
         from .analysis import LoadedBoltConnection
-        return LoadedBoltConnection(self, load, shear_method, tension_method)
-                
+        return LoadedBoltConnection(
+            bolt_connection=self,
+            load=load,
+            shear_method=shear_method,
+            tension_method=tension_method,
+        )

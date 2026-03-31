@@ -39,8 +39,8 @@ class TestUniaxialBending:
         na_z = plate.z_min + plate.depth_z / 6.0  # -200 + 400/6 = -133.33
         
         for idx, (y, z) in enumerate(bolt_positions):
-            tension = result.bolt_forces[idx].Fx
-            
+            tension = result.to_bolt_forces()[idx].Fx
+
             if z < na_z:
                 # Bolt in compression zone should have zero tension
                 assert abs(tension) < 0.01, f"Bolt {idx+1} at z={z} below NA should have Fx≈0, got {tension}"
@@ -70,8 +70,8 @@ class TestUniaxialBending:
         na_z = layout.Cz  # Should be 0.0
         
         for idx, (y, z) in enumerate(bolt_positions):
-            tension = result.bolt_forces[idx].Fx
-            
+            tension = result.to_bolt_forces()[idx].Fx
+
             if z < na_z:
                 assert abs(tension) < 0.01, f"Bolt {idx+1} below centroid should have Fx≈0"
             else:
@@ -101,8 +101,8 @@ class TestUniaxialBending:
         na_y = plate.y_min + plate.depth_y / 6.0  # -200 + 400/6 = -133.33
         
         for idx, (y, z) in enumerate(bolt_positions):
-            tension = result.bolt_forces[idx].Fx
-            
+            tension = result.to_bolt_forces()[idx].Fx
+
             if y < na_y:
                 assert abs(tension) < 0.01, f"Bolt {idx+1} at y={y} below NA should have Fx≈0"
             else:
@@ -139,21 +139,21 @@ class TestBiaxialBending:
         # Test 1: Only My (should give positive tension to bolt 0)
         load_my = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=100000.0, Mz=0.0)
         result_my = connection.analyze(load=load_my, tension_method="accurate")
-        tension_my_bolt0 = result_my.bolt_forces[0].Fx
+        tension_my_bolt0 = result_my.to_bolt_forces()[0].Fx
         
         assert tension_my_bolt0 > 0.0, "My alone should create tension for bolt 0 (above NA_z)"
         
         # Test 2: Only Mz (should give zero tension to bolt 0 - below NA_y)
         load_mz = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=0.0, Mz=100000.0)
         result_mz = connection.analyze(load=load_mz, tension_method="accurate")
-        tension_mz_bolt0 = result_mz.bolt_forces[0].Fx
+        tension_mz_bolt0 = result_mz.to_bolt_forces()[0].Fx
         
         assert abs(tension_mz_bolt0) < 0.01, "Mz alone should give zero (bolt 0 below NA_y)"
         
         # Test 3: Both moments (compression from Mz should reduce tension from My for bolt 0)
         load_both = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=100000.0, Mz=100000.0)
         result_both = connection.analyze(load=load_both, tension_method="accurate")
-        tension_both_bolt0 = result_both.bolt_forces[0].Fx
+        tension_both_bolt0 = result_both.to_bolt_forces()[0].Fx
         
         # The combined tension should be less than My alone (cancelled by Mz compression)
         assert tension_both_bolt0 < tension_my_bolt0, \
@@ -184,7 +184,7 @@ class TestBiaxialBending:
         load = Load(Fx=0.0, Fy=0.0, Fz=0.0, Mx=0.0, My=200000.0, Mz=200000.0)
         result = connection.analyze(load=load, tension_method="accurate")
         
-        tensions = [br.Fx for br in result.bolt_forces]
+        tensions = [br.Fx for br in result.to_bolt_forces()]
         
         # Top-right bolt should have highest tension (furthest from both NAs)
         assert tensions[3] > tensions[0], "Top-right should have more tension than bottom-left"
@@ -219,7 +219,7 @@ class TestDirectTensionWithMoments:
         
         # Both bolts should have positive tension (direct Fx dominates)
         for idx, (y, z) in enumerate(bolt_positions):
-            tension = result.bolt_forces[idx].Fx
+            tension = result.to_bolt_forces()[idx].Fx
             assert tension > 0.0, f"Bolt {idx+1} should have tension from large direct Fx"
             
             # Direct component
@@ -246,14 +246,14 @@ class TestDirectTensionWithMoments:
         result_fx_and_my = connection.analyze(load=load_fx_and_my, tension_method="accurate")
         
         # Bottom bolt: direct Fx should be reduced by My compression
-        tension_bottom_fx_only = result_fx_only.bolt_forces[0].Fx
-        tension_bottom_combined = result_fx_and_my.bolt_forces[0].Fx
+        tension_bottom_fx_only = result_fx_only.to_bolt_forces()[0].Fx
+        tension_bottom_combined = result_fx_and_my.to_bolt_forces()[0].Fx
         
         assert tension_bottom_combined < tension_bottom_fx_only, "Moment compression should reduce tension"
         
         # Top bolt: direct Fx should be increased by My tension
-        tension_top_fx_only = result_fx_only.bolt_forces[1].Fx
-        tension_top_combined = result_fx_and_my.bolt_forces[1].Fx
+        tension_top_fx_only = result_fx_only.to_bolt_forces()[1].Fx
+        tension_top_combined = result_fx_and_my.to_bolt_forces()[1].Fx
         
         assert tension_top_combined > tension_top_fx_only, "Moment tension should increase tension"
 
@@ -288,7 +288,7 @@ class TestEdgeCases:
         
         # All bolts should have zero tension (all in compression zone)
         for idx in range(len(bolt_positions)):
-            tension = result.bolt_forces[idx].Fx
+            tension = result.to_bolt_forces()[idx].Fx
             assert abs(tension) < 0.01, f"Bolt {idx+1} in compression zone should have Fx≈0"
     
     def test_zero_moment(self) -> None:
@@ -309,7 +309,7 @@ class TestEdgeCases:
         expected_per_bolt = 10000.0 / 2
         
         for idx in range(len(bolt_positions)):
-            tension = result.bolt_forces[idx].Fx
+            tension = result.to_bolt_forces()[idx].Fx
             assert abs(tension - expected_per_bolt) < 0.1, f"Bolt {idx+1} should have {expected_per_bolt} N"
 
 

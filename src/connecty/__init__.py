@@ -24,36 +24,33 @@ Example usage (Welds):
 Example usage (Bolts):
     from connecty import BoltConnection, BoltLayout, BoltParams, Load, Plate
 
-    layout = BoltLayout.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60, offset_y=10.0, offset_z=-5.0)
+    layout = BoltLayout.from_pattern(rows=3, cols=2, spacing_y=75, spacing_z=60)
     bolt = BoltParams(diameter=20.0, grade="A325")
-    plate = Plate.from_dimensions(width=200.0, height=300.0, center=(0.0, 0.0), thickness=12.0, fu=450.0, fy=350.0)
+    plate = Plate.from_dimensions(width=300.0, height=200.0, center=(0.0, 0.0), thickness=12.0, fu=450.0, fy=350.0)
 
     connection = BoltConnection(layout=layout, bolt=bolt, plate=plate, n_shear_planes=1)
     load = Load(Fy=-100_000.0, location=(0.0, 0.0, 0.0))
 
     result = connection.analyze(load, shear_method="elastic", tension_method="conservative")
-    print(result.max_shear_force)
-    result.plot(show=False, save_path="bolt_forces.svg")
+    print(result.bolt_forces)
+    result.plot_shear(show=False, save_path="bolt_forces.svg")
 """
 
 from .common import Load
-from .bolt import BoltConnection, BoltGroup, BoltParams, LoadedBoltConnection, Plate, layout
-# from .bolt.checks import BoltCheckDetail, BoltCheckResult
+from .bolt import BoltConnection, BoltGroup, BoltLayout, BoltParams, BoltForceResult, LoadedBoltConnection, Plate
 from .weld import WeldBaseMetal, WeldConnection, WeldParams, WeldResult
 from .weld.checks import WeldCheckDetail, WeldCheckResult
 
 __all__ = [
     "Load",
     # Bolts
-    "layout",
-    "BoltGroup",
     "BoltLayout",
+    "BoltGroup",
     "BoltParams",
+    "BoltForceResult",
     "LoadedBoltConnection",
     "BoltConnection",
     "Plate",
-    # "BoltCheckResult",
-    # "BoltCheckDetail",
     # Welds
     "WeldParams",
     "WeldConnection",

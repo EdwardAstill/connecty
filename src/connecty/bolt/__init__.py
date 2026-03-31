@@ -1,7 +1,7 @@
 from .bolt import BoltConnection, BoltGroup, BoltParams, Bolt
-from .analysis import LoadedBoltConnection
+from .analysis import LoadedBoltConnection, BoltForceResult
+from .layout import BoltLayout
 from .plate import Plate
-from .load import Load
 from . import layout
 from . import plotting
 
@@ -10,9 +10,10 @@ __all__ = [
     "BoltGroup",
     "BoltParams",
     "Bolt",
+    "BoltLayout",
+    "BoltForceResult",
     "LoadedBoltConnection",
     "Plate",
-    "Load",
     "layout",
     "plotting",
 ]

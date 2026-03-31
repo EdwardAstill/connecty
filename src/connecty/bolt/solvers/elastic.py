@@ -11,18 +11,20 @@ def solve_bolt_elastic(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Solves for bolt forces using the Elastic Method (Linear Distribution).
-    Matches theory in bolt.md: x=right, y=up, z=out (normal).
-    
+
+    Works in a generic 2D (coord1, coord2) space. The caller maps global
+    coordinates: for the y-z bolt plane, pass (y, z) as (coord1, coord2).
+
     Parameters:
-    bolt_coords : np.ndarray -> Nx2 array of [x, y] coordinates.
-    Fx          : float      -> External horizontal shear force.
-    Fy          : float      -> External vertical shear force.
-    Mz          : float      -> Applied torsional moment about z-axis (CCW positive).
-    x_loc       : float      -> x-coordinate where force is applied.
-    y_loc       : float      -> y-coordinate where force is applied.
-    
+    bolt_coords : np.ndarray -> Nx2 array of [coord1, coord2] coordinates.
+    Fx          : float      -> External shear force in coord1 direction.
+    Fy          : float      -> External shear force in coord2 direction.
+    Mz          : float      -> Applied in-plane torsion (CCW positive).
+    x_loc       : float      -> coord1 of load application point.
+    y_loc       : float      -> coord2 of load application point.
+
     Returns:
-    Tuple[np.ndarray, np.ndarray]: Horizontal (Fx) and vertical (Fy) bolt forces.
+    Tuple[np.ndarray, np.ndarray]: Bolt forces in (coord1, coord2) directions.
     """
     bolt_coords = np.array(bolt_coords)  # Expected as [x, y]
     n = len(bolt_coords)
@@ -56,8 +58,12 @@ def solve_bolt_elastic(
     # rel_coords[:, 0] is dx (x - Cx)
     # rel_coords[:, 1] is dy (y - Cy)
     
-    Fx_m = -(Mz_total * rel_coords[:, 1]) / Ip
-    Fy_m = (Mz_total * rel_coords[:, 0]) / Ip
+    if Ip > 1e-12:
+        Fx_m = -(Mz_total * rel_coords[:, 1]) / Ip
+        Fy_m = (Mz_total * rel_coords[:, 0]) / Ip
+    else:
+        Fx_m = np.zeros(n)
+        Fy_m = np.zeros(n)
     
     bolt_forces_x = Fx_p + Fx_m
     bolt_forces_y = Fy_p + Fy_m
