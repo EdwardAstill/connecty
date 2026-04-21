@@ -40,38 +40,37 @@ Single load object used by both bolts and welds.
 ## Bolts
 
 ### `BoltLayout`
-**DEPRECATED**: Use `BoltGroup.create()` instead.
+Bolt positions in the y-z cross-section plane. **2D only**.
 
-Old description kept for reference:
-- Geometry/layout only. **2D only**.
-- **Fields**: `points: list[tuple[float, float]]` # (y, z)
-- **Notes**: No diameter here.
+- **Fields**: `points: list[tuple[float, float]]` — (y, z) coordinates
+- **Classmethods**:
+  - `from_pattern(*, rows, cols, spacing_y, spacing_z, offset_y=0, offset_z=0) -> BoltLayout`: Rectangular grid, centred at offset.
+  - `from_circular(*, radius, n=6, center=(0,0), start_angle=0) -> BoltLayout`: Circular bolt pattern.
+- **Properties**: `n: int`, `Cy: float`, `Cz: float`
 
 ### `BoltGroup`
-Collection of bolts with geometry properties.
+Internal grouping of `Bolt` objects created by `BoltConnection`. Accessible via `connection.bolt_group`.
 
 - **Fields**:
-  - `bolts: list[Bolt]` - List of individual bolt objects.
+  - `bolts: list[Bolt]` - Individual bolt objects.
 - **Properties**:
   - `n: int` - Number of bolts.
-  - `points: list[tuple[float, float]]` - Bolt positions (y, z coordinates).
-  - `centroid: tuple[float, float]` - Group centroid.
-  - `Cx, Cy: float` - Centroid coordinates (x and y).
+  - `points: list[tuple[float, float]]` - Bolt positions (y, z).
+  - `centroid: tuple[float, float]` - Group centroid (Cy, Cz).
+  - `Cy, Cz: float` - Centroid coordinates.
   - `Ip: float` - Polar moment of inertia about centroid.
-- **Methods**:
-  - `create(layout, params) -> BoltGroup` (classmethod): Create a bolt group from layout positions and parameters.
+- **Classmethods**:
+  - `create(layout, params) -> BoltGroup`: Create from a `BoltLayout` and `BoltParams`.
 
 ### `Bolt`
-Individual bolt in the group.
+Individual bolt in the group. Normally accessed via `connection.bolt_group.bolts`.
 
 - **Fields**:
-  - `params: BoltParams` - Bolt properties.
-  - `position: tuple[float, float]` - Bolt location (y, z) in bolt-group plane.
-  - `forces: np.ndarray` - Applied forces [Fx, Fy, Fz] (set during analysis).
-  - `index: int | None` - Bolt index in group.
-  - `k: float` - Bolt axial stiffness (set by `BoltConnection`).
-- **Methods**:
-  - `apply_force(fx, fy, fz) -> None`: Add forces to this bolt.
+  - `params: BoltParams` - Bolt material and size.
+  - `position: tuple[float, float]` - Bolt location (y, z).
+  - `index: int | None` - Bolt index.
+  - `k: float` - Axial stiffness (set by `BoltConnection` from grip length).
+- **Properties**: `y: float`, `z: float`
 
 ### `BoltParams`
 Bolt material properties and size.
@@ -111,26 +110,29 @@ Bolt material properties and size.
   - `surface_class: Literal["A", "B"] | None` (default None) - Surface preparation class (affects slip coefficient).
   - `slip_coefficient: float | None` - Slip coefficient (derived from `surface_class` if None: A→0.30, B→0.50).
 - **Properties**:
-  - `x_min, x_max, y_min, y_max: float` - Plate extent boundaries.
-  - `depth_x, depth_y, width, height: float` - Plate dimensions.
-  - `center: tuple[float, float]` - Plate center coordinate.
+  - `y_min, y_max, z_min, z_max: float` - Plate extent boundaries (plate is in the y-z plane).
+  - `depth_y, depth_z: float` - Plate dimensions in each axis.
+  - `width: float` - Size in z-direction (same as `depth_z`).
+  - `height: float` - Size in y-direction (same as `depth_y`).
+  - `center: tuple[float, float]` - Plate centre (y, z).
 
 
 
 ### `BoltConnection`
-High-level bolt connection object that combines geometry, material, and plate properties.
+Combines bolt layout, bolt parameters, and plate geometry for analysis.
 
 - **Fields**:
-  - `bolt_group: BoltGroup` - The bolt group.
-  - `plate: Plate` - The connection plate.
-  - `n_shear_planes: int` - Number of shear planes (used for capacity calculations).
-  - `L_grip: float` - Grip length (total thickness of plates in contact with bolt).
-  - `threaded_in_shear_plane: bool | None` (optional) - Override bolt thread status (if set, updates all bolts in group).
+  - `layout: BoltLayout` - Bolt positions.
+  - `bolt: BoltParams` - Bolt material and size.
+  - `plate: Plate` - Connection plate.
+  - `n_shear_planes: int` - Number of shear planes.
+  - `threaded_in_shear_plane: bool | None` - Override thread status on all bolts (optional).
+- **Computed field**: `bolt_group: BoltGroup` — created automatically from `layout` and `bolt`.
 - **Methods**:
   - `analyze(load, shear_method="elastic", tension_method="conservative") -> LoadedBoltConnection`
-    - Analyze bolt group under applied load.
-    - `shear_method`: `"elastic"` or `"icr"` (Instantaneous Center of Rotation).
-    - Returns result object with force distribution and analysis data.
+    - `shear_method`: `"elastic"` or `"icr"`.
+    - `tension_method`: `"conservative"` (NA at centroid) or `"accurate"` (d/6 NA approximation).
+    - Returns `LoadedBoltConnection` with distributed forces.
 
 ### `LoadedBoltConnection`
 Result of a bolt group analysis. Contains distributed forces and analysis metadata.
@@ -144,11 +146,14 @@ Result of a bolt group analysis. Contains distributed forces and analysis metada
   - `plate_pressure: np.ndarray | None` - Pressure distribution on plate (for out-of-plane).
   - `plate_pressure_extent: tuple[float, float, float, float] | None` - Pressure grid bounds (xmin, xmax, ymin, ymax).
 - **Methods**:
-  - `check(standard, **kwargs) -> dict`: Run design checks per code standard.
-    - `standard`: Currently supports `"aisc"`.
-    - Returns dictionary with utilization ratios per check type and per bolt.
-  - `plot_shear(**kwargs) -> Any`: Plot shear force distribution (saves as .svg).
-  - `plot_tension(**kwargs) -> Any`: Plot tension force distribution (saves as .svg).
+  - `to_bolt_forces() -> list[BoltForceResult]`: Per-bolt force results.
+  - `check(standard, connection_type, fillers=0) -> dict`: AISC 360-22 checks.
+    - `standard`: `"aisc"`.
+    - `connection_type`: `"bearing"` or `"slip_critical"`.
+    - `fillers`: number of filler plates (slip-critical only, affects h_f factor).
+    - Returns dict with per-bolt lists: `"tension"`, `"shear"`, `"combined"`, `"bearing"`, `"tearout"`, `"governing"`; and group-level `"slip"` (slip-critical only).
+  - `plot_shear(**kwargs)`: Plot shear force distribution.
+  - `plot_tension(**kwargs)`: Plot tension force distribution.
 
 ### Check Results (AISC 360-22)
 Dictionary returned by `LoadedBoltConnection.check()`.
@@ -192,9 +197,10 @@ Defines weld type/size and strength source.
   - `connection: WeldConnection`
   - `load: Load`
   - `method: Literal["elastic","icr"]`
-- **Method**:
-  - `check_aisc(...)` -> `Dict`
-  - `check_as4100(...)` -> `Dict`
+  - `discretization: int` (default 200)
+- **Properties**: `max_stress`, `min_stress`, `mean_stress`, `analysis` (underlying `LoadedWeld`)
+- **Methods**:
+  - `check(standard="aisc", F_EXX=None, enforce_max_fillet_size=True, conservative_k_ds=False) -> WeldCheckResult`
 
 ---
 

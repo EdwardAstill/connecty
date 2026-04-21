@@ -113,8 +113,8 @@ welded.plot_weld_stress(load, cmap="coolwarm", save_path="output.svg")
 The elastic method calculates stress at each point along the weld:
 
 1. **Direct stress** - Uniform distribution: `f = F / A_weld`
-2. **Torsional stress** - Varies with distance from centroid: `f = M Ã— r / Ip`
-3. **Bending stress** - Linear distribution: `f = M Ã— d / I`
+2. **Torsional stress** - Varies with distance from centroid: `f = M × r / Ip`
+3. **Bending stress** - Linear distribution: `f = M × d / I`
 
 The resultant stress is the vector sum of all components.
 
