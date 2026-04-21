@@ -81,9 +81,9 @@ class WeldResult:
     def plot_directional_factor(self, *args, **kwargs):
         return self._analysis.plot_directional_factor(*args, **kwargs)
 
-    def check(self, **kwargs) -> dict:
+    def check(self, **kwargs):
         from .checks import check_weld_group
 
-        return check_weld_group(self, **kwargs).to_dict()
+        return check_weld_group(self, **kwargs)
 
 
